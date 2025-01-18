@@ -1,21 +1,7 @@
-
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, ActivityIndicator, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { View, Text, FlatList, ActivityIndicator, StyleSheet, TouchableOpacity, Image, TextInput } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import axios from 'axios';
-
-// Message icon componentn
-const MessageIcon = () => (
-  <View style={styles.messageIconContainer}>
-    <View style={styles.messageCount}>
-      <Text style={styles.messageCountText}>3</Text>
-    </View>
-    <Image 
-      source={require('../assets/message-icon.png')}
-      style={styles.messageIcon}
-    />
-  </View>
-);
 
 export default function HomeScreen() {
   const [users, setUsers] = useState([]);
@@ -25,7 +11,8 @@ export default function HomeScreen() {
 
   const loadUsers = () => {
     setLoading(true);
-    axios.get(`https://randomuser.me/api?results=10&page=${currentPage}`)
+    axios
+      .get('https://randomuser.me/api?results=10&page=${currentPage}')
       .then((res) => {
         setUsers([...users, ...res.data.results]);
         setLoading(false);
@@ -53,67 +40,64 @@ export default function HomeScreen() {
   );
 
   const renderItem = ({ item }) => (
-    <View style={styles.card7}>
-      <View style={styles.header}>
-        <View style={styles.avatar}>
-          <Image 
-            source={{ uri: `${item.picture.thumbnail}` }}
-            style={styles.avatarImage}
-          />
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <Image source={{ uri: item.picture.thumbnail }} style={styles.avatar} />
+        <View>
+          <Text style={styles.name}>{item.name.first} {item.name.last}</Text>
+          <Text style={styles.email}>{item.email}</Text>
         </View>
-        <Text style={styles.userName}>{item.name.first} {item.name.last}</Text>
-        <Text style={styles.userEmail}>{item.email}</Text>
       </View>
-      <View style={styles.imageCaption}>
-        <Text style={styles.caption}>#connectstartup</Text>
+      <Image source={require('../assets/Image.png')} style={styles.postImage} />
+      <View style={styles.cardFooter}>
+        <Text style={styles.likes}>❤️ 789K Likes</Text>
+        <Text style={styles.comments}>💬 3M Comments</Text>
       </View>
-      <View style={styles.engagementSection}>
-        <View style={styles.emotesParent}>
-          <Text style={styles.engagementText}>789K likes</Text>
-        </View>
-        <Text style={styles.engagement}>3M comments • 256K shares</Text>
+      <View style={styles.actions}>
+        <TouchableOpacity style={styles.actionButton}>
+          <Text style={styles.navIcon}><Image source={require('../assets/icon-like.png')}/></Text>
+          <Text style={styles.actionLabel}></Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.actionButton}>
+          <Text style={styles.navIcon}><Image source={require('../assets/comment1.png')}/></Text>
+          <Text style={styles.actionLabel}></Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.actionButton}>
+          <Text style={styles.navIcon}><Image source={require('../assets/share1.png')}/></Text>
+          <Text style={styles.actionLabel}></Text>
+        </TouchableOpacity>
       </View>
-      <View style={styles.frameParent}>
-        <TouchableOpacity style={styles.vectorParent}>
-          <Text style={styles.actionText}>Like</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.vectorParent}>
-          <Text style={styles.actionText}>Comment</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.vectorParent}>
-          <Text style={styles.actionText}>Send</Text>
-        </TouchableOpacity>
+      <View style={styles.try}>
+        <Text>This is a sample text. This is the comment. Let's go. THis is a good mvp.</Text>
       </View>
     </View>
   );
 
+
   return (
     <View style={styles.container}>
+      {/* Top Bar */}
       <View style={styles.topBar}>
-        <TouchableOpacity
-          style={styles.profilePictureContainer}
-          onPress={() => navigation.navigate('Profile')}
-        >
+        <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
           <Image
             source={{ uri: 'https://randomuser.me/api/portraits/lego/1.jpg' }}
-            style={styles.profilePicture}
+            style={styles.profilePic}
           />
         </TouchableOpacity>
-
-        <View style={styles.searchBar}>
-          <View style={styles.bottomAppBar}>
-            <Text style={styles.searchText}>Search...</Text>
-          </View>
-        </View>
-
-        <TouchableOpacity
-          style={styles.messageWidgetContainer}
-          onPress={() => navigation.navigate('Chat')}
-        >
-          <MessageIcon />
+        <TextInput
+          style={styles.searchBar}
+          placeholder="Search..."
+          placeholderTextColor="#aaa"
+        />
+        <TouchableOpacity onPress={() => navigation.navigate('Chat')}>
+          <Image
+            source={require('../assets/Arrow.png')}
+            style={styles.chatIcon}
+          />
         </TouchableOpacity>
       </View>
 
+      {/* Post List */}
       <FlatList
         data={users}
         renderItem={renderItem}
@@ -123,174 +107,94 @@ export default function HomeScreen() {
         ListFooterComponent={renderFooter}
         contentContainerStyle={styles.listContentContainer}
       />
+
+      {/* Bottom Navigation */}
+      <View style={styles.bottomNav}>
+        <TouchableOpacity onPress={() => navigation.navigate('Home')}>
+          <Image source={require('../assets/home1.png')} style={styles.navIcon} />
+          <Text style={styles.actionLabel}></Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => navigation.navigate('Post')}>
+          <Image source={require('../assets/plus3.png')} style={styles.navIcon} />
+          <Text style={styles.actionLabel}></Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => navigation.navigate('Notifications')}>
+          <Image source={require('../assets/bell.png')} style={styles.navIcon} />
+          <Text style={styles.actionLabel}></Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
+          <Image source={require('../assets/settings.png')} style={styles.navIcon} />
+          <Text style={styles.actionLabel}></Text>
+
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
+  container: { flex: 1, backgroundColor: '#ffffff' },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 20,
-    paddingTop: 40,
+    justifyContent: 'space-between',
+    padding: 10,
     backgroundColor: '#fff',
+    elevation: 2,
+    marginTop: 40,
+    borderBottomWidth: 1, // Add this for the line
+    borderBottomColor: '#ddd',
   },
-  profilePictureContainer: {
-    marginRight: 10,
+  profilePic: { 
+    width: 40, 
+    height: 40, 
+    borderRadius: 20, 
+    borderWidth: 0.5, // Add this for the border thickness
+    borderColor: '#fffff', // Black border
   },
-  profilePicture: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: '#ccc',
-  },
-  searchBar: {
+    searchBar: {
     flex: 1,
     marginHorizontal: 10,
-  },
-  bottomAppBar: {
-    backgroundColor: '#f3edf7',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 14,
-    borderWidth: 2,
-    borderColor: '#000',
-  },
-  searchText: {
-    color: 'rgba(0, 0, 0, 0.6)',
-    fontFamily: 'Roboto-Regular',
-  },
-  messageWidgetContainer: {
-    marginLeft: 10,
-  },
-  messageIconContainer: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  messageIcon: {
-    width: 24,
-    height: 24,
-    tintColor: '#2196F3',
-  },
-  messageCount: {
-    position: 'absolute',
-    top: -5,
-    right: -5,
-    backgroundColor: '#FF4444',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1,
-    borderWidth: 1.5,
-    borderColor: '#fff',
-  },
-  messageCountText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: 'bold',
-    paddingHorizontal: 4,
-  },
-  listContentContainer: {
-    padding: 12,
-  },
-  card7: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    marginBottom: 16,
-    padding: 12,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  header: {
-    flexDirection: 'column',
-    marginBottom: 12,
-  },
-  avatar: {
-    width: 40,
-    height: 40,
+    paddingHorizontal: 15,
+    backgroundColor: '#eee',
     borderRadius: 20,
-    overflow: 'hidden',
-    marginBottom: 8,
+    height: 40,
+     borderWidth: 0.5, // Add this for the border thickness
+  borderColor: '#000',
   },
-  avatarImage: {
-    width: '100%',
-    height: '100%',
+  chatIcon: { width: 24, height: 24 },
+  card: {
+    backgroundColor: '#ffffff',
+    margin: 2,
+    borderRadius: 10,
+    elevation: 2,
+    padding: 10,
+    borderBottomWidth: 1, // Add this for the line
+    borderBottomColor: '#000000', // Adjust the color to your preference
   },
-  userName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: 'rgba(0, 0, 0, 0.87)',
-    marginBottom: 4,
-  },
-  userEmail: {
-    fontSize: 14,
-    color: 'rgba(0, 0, 0, 0.6)',
-  },
-  imageCaption: {
-    marginTop: 8,
-  },
-  caption: {
-    fontSize: 14,
-    color: 'rgba(0, 0, 0, 0.6)',
-  },
-  engagementSection: {
+
+  cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  avatar: { width: 40, height: 40, borderRadius: 20, marginRight: 10 },
+  name: { fontWeight: 'bold', fontSize: 16 },
+  email: { fontSize: 12, color: '#555' },
+  postImage: { width: '100%', height: 200, borderRadius: 10, marginVertical: 10 },
+  cardFooter: { flexDirection: 'row', justifyContent: 'space-between', marginVertical: 5,},
+  likes: { fontWeight: 'bold', color: '#555' },
+  comments: { fontWeight: 'bold', color: '#555' },
+  actions: { flexDirection: 'row', justifyContent: 'space-around', marginTop: 10 },
+  actionButton: { alignItems: 'center' },
+  actionText: { fontSize: 14, color: '#007bff' },
+  try: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  bottomNav: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 12,
-    paddingVertical: 8,
+    justifyContent: 'space-around',
+    paddingVertical: 10,
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: '#ddd',
+    backgroundColor: '#fff',
+    marginBottom: 10,
   },
-  emotesParent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  engagementText: {
-    fontSize: 14,
-    color: '#606163',
-    fontWeight: '500',
-  },
-  engagement: {
-    fontSize: 14,
-    color: '#606163',
-    textAlign: 'right',
-  },
-  frameParent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-    marginTop: 8,
-  },
-  vectorParent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 8,
-  },
-  actionText: {
-    fontSize: 14,
-    color: '#525252',
-    fontWeight: '500',
-  },
-  loaderContainer: {
-    paddingVertical: 20,
-    alignItems: 'center',
-  },
+
+  navIcon: { width: 24, height: 24, marginBottom: 4 },
+  navLabel: { fontSize: 12, color: '#555' },
 });

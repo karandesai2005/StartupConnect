@@ -12,7 +12,7 @@ const SplashScreen = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.logo}>Startup Connect</Text>
+      <Text style={styles.logo}>Pitch</Text>
     </View>
   );
 };
@@ -22,12 +22,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#ffffff',
   },
   logo: {
     fontSize: 30,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#000000',
   },
 });
 

@@ -7,6 +7,7 @@ export default function HomeScreen() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [expandedItems, setExpandedItems] = useState({});
   const navigation = useNavigation();
 
   const loadUsers = () => {
@@ -18,7 +19,7 @@ export default function HomeScreen() {
         setLoading(false);
       })
       .catch((error) => {
-        console.error("Error loading users:", error);
+        console.error('Error loading users:', error);
         setLoading(false);
       });
   };
@@ -31,37 +32,60 @@ export default function HomeScreen() {
     setCurrentPage(currentPage + 1);
   };
 
-  const renderFooter = () => (
+  const toggleExpand = (index) => {
+    setExpandedItems((prev) => ({
+      ...prev,
+      [index]: !prev[index],
+    }));
+  };
+
+  const renderFooter = () =>
     loading ? (
       <View style={styles.loaderContainer}>
         <ActivityIndicator size="large" color="#0000ff" />
       </View>
-    ) : null
-  );
+    ) : null;
 
-  const renderItem = ({ item }) => (
+  const renderItem = ({ item, index }) => (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
         <Image source={{ uri: item.picture.thumbnail }} style={styles.avatar} />
         <View>
-          <Text style={styles.name}>{item.name.first} {item.name.last}</Text>
+          <Text style={styles.name}>
+            {item.name.first} {item.name.last}
+          </Text>
           <Text style={styles.email}>{item.email}</Text>
         </View>
       </View>
-      <Image source={{ uri: item.picture.large }} style={styles.postImage} />
+      <Image source={require('../assets/Image.png')} style={styles.postImage} />
       <View style={styles.cardFooter}>
         <Text style={styles.likes}>❤️ 789K Likes</Text>
         <Text style={styles.comments}>💬 3M Comments</Text>
       </View>
       <View style={styles.actions}>
         <TouchableOpacity style={styles.actionButton}>
-          <Text style={styles.actionText}>Like</Text>
+          <Image source={require('../assets/icon-like.png')} style={styles.navIcon} />
         </TouchableOpacity>
         <TouchableOpacity style={styles.actionButton}>
-          <Text style={styles.actionText}>Comment</Text>
+          <Image source={require('../assets/comment1.png')} style={styles.navIcon} />
         </TouchableOpacity>
         <TouchableOpacity style={styles.actionButton}>
-          <Text style={styles.actionText}>Share</Text>
+          <Image source={require('../assets/share1.png')} style={styles.navIcon} />
+        </TouchableOpacity>
+      </View>
+      <View style={styles.try}>
+        <Text numberOfLines={expandedItems[index] ? null : 3}>
+          This is a sample text. This is the comment. Let's go. This is a good MVP.
+          Additional content for testing the "Show More" functionality...
+          Let's go. This is a good MVP.
+          Additional content for testing the "Show More" functionality...
+          Let's go. This is a good MVP.
+          Additional content for testing the "Show More" functionality...
+        </Text>
+        <TouchableOpacity onPress={() => toggleExpand(index)}>
+          <Text style={styles.actionText}>
+            {expandedItems[index] ? 'Show Less' : 'Show More'}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -83,10 +107,7 @@ export default function HomeScreen() {
           placeholderTextColor="#aaa"
         />
         <TouchableOpacity onPress={() => navigation.navigate('Chat')}>
-          <Image
-            source={require('../assets/Arrow Curve Right Up.svg')}
-            style={styles.chatIcon}
-          />
+          <Image source={require('../assets/Arrow.png')} style={styles.chatIcon} />
         </TouchableOpacity>
       </View>
 
@@ -104,20 +125,16 @@ export default function HomeScreen() {
       {/* Bottom Navigation */}
       <View style={styles.bottomNav}>
         <TouchableOpacity onPress={() => navigation.navigate('Home')}>
-          <Image source={require('../assets/Home 05.svg')} style={styles.navIcon} />
-          <Text style={styles.navLabel}>Home</Text>
+          <Image source={require('../assets/home1.png')} style={styles.navIcon} />
         </TouchableOpacity>
         <TouchableOpacity onPress={() => navigation.navigate('Post')}>
-          <Image source={require('../assets/plus.png')} style={styles.navIcon} />
-          <Text style={styles.navLabel}>Post</Text>
+          <Image source={require('../assets/plus3.png')} style={styles.navIcon} />
         </TouchableOpacity>
         <TouchableOpacity onPress={() => navigation.navigate('Notifications')}>
-          <Image source={require('../assets/notifications-icon.png')} style={styles.navIcon} />
-          <Text style={styles.navLabel}>Alerts</Text>
+          <Image source={require('../assets/bell.png')} style={styles.navIcon} />
         </TouchableOpacity>
         <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
-          <Image source={require('../assets/profile-icon.jpg')} style={styles.navIcon} />
-          <Text style={styles.navLabel}>Profile</Text>
+          <Image source={require('../assets/settings.png')} style={styles.navIcon} />
         </TouchableOpacity>
       </View>
     </View>
@@ -125,7 +142,7 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5' },
+  container: { flex: 1, backgroundColor: '#ffffff' },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -133,6 +150,9 @@ const styles = StyleSheet.create({
     padding: 10,
     backgroundColor: '#fff',
     elevation: 2,
+    marginTop: 40,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ddd',
   },
   profilePic: { width: 40, height: 40, borderRadius: 20 },
   searchBar: {
@@ -145,11 +165,13 @@ const styles = StyleSheet.create({
   },
   chatIcon: { width: 24, height: 24 },
   card: {
-    backgroundColor: '#fff',
-    margin: 10,
+    backgroundColor: '#ffffff',
+    margin: 2,
     borderRadius: 10,
     elevation: 2,
     padding: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ddd',
   },
   cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
   avatar: { width: 40, height: 40, borderRadius: 20, marginRight: 10 },
@@ -162,6 +184,7 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row', justifyContent: 'space-around', marginTop: 10 },
   actionButton: { alignItems: 'center' },
   actionText: { fontSize: 14, color: '#007bff' },
+  try: { marginTop: 10 },
   bottomNav: {
     flexDirection: 'row',
     justifyContent: 'space-around',
@@ -171,5 +194,5 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   navIcon: { width: 24, height: 24, marginBottom: 4 },
-  navLabel: { fontSize: 12, color: '#555' },
 });
+
