@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
-  Linking, 
+  Linking,
 } from "react-native";
 import { FontAwesome } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -25,11 +25,11 @@ const LoginScreen = () => {
   };
 
   const openGoogleLogin = () => {
-    Linking.openURL("https://accounts.google.com/ServiceLogin"); 
+    Linking.openURL("https://accounts.google.com/ServiceLogin");
   };
 
   const openAppleLogin = () => {
-    Linking.openURL("https://appleid.apple.com/account"); 
+    Linking.openURL("https://appleid.apple.com/account");
   };
 
   return (
@@ -68,6 +68,13 @@ const LoginScreen = () => {
         <FontAwesome name="apple" size={20} color="#ffffff" />
         <Text style={styles.appleButtonText}>Sign in with Apple</Text>
       </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.registerLink}
+        onPress={() => navigation.navigate("Register1")}
+      >
+        <Text style={styles.registerLinkText}>New user? Register here</Text>
+      </TouchableOpacity>
     </View>
   );
 };
@@ -79,12 +86,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#fff",
     paddingHorizontal: 20,
-  },
-  appleButtonText: {
-    marginLeft: 10,
-    color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "bold",
   },
   title: {
     fontSize: 32,
@@ -160,6 +161,14 @@ const styles = StyleSheet.create({
     color: "#ffffff",
     fontSize: 16,
     fontWeight: "bold",
+  },
+  registerLink: {
+    marginTop: 20,
+  },
+  registerLinkText: {
+    fontSize: 14,
+    color: "#007BFF",
+    textDecorationLine: "underline",
   },
 });
 
