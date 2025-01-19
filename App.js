@@ -10,9 +10,6 @@ import Register1 from "./components/Register1"; // Import Register1
 import Register2 from "./components/Register2"; // Import Register1
 import EditProfileP from './components/editProfileP';
 
-
-
-
 const Stack = createStackNavigator();
 
 const App = () => {

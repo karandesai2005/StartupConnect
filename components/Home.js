@@ -95,7 +95,7 @@ export default function HomeScreen() {
     <View style={styles.container}>
       {/* Top Bar */}
       <View style={styles.topBar}>
-        <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
+        <TouchableOpacity onPress={() => navigation.navigate('EditProfileP')}>
           <Image
             source={{ uri: 'https://randomuser.me/api/portraits/lego/1.jpg' }}
             style={styles.profilePic}
@@ -133,7 +133,7 @@ export default function HomeScreen() {
         <TouchableOpacity onPress={() => navigation.navigate('Notifications')}>
           <Image source={require('../assets/bell.png')} style={styles.navIcon} />
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
+        <TouchableOpacity onPress={() => navigation.navigate('EditProfileP')}>
           <Image source={require('../assets/settings.png')} style={styles.navIcon} />
         </TouchableOpacity>
       </View>
@@ -188,11 +188,10 @@ const styles = StyleSheet.create({
   bottomNav: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingVertical: 10,
+    paddingVertical: 20,
     borderTopWidth: 1,
     borderTopColor: '#ddd',
     backgroundColor: '#fff',
   },
   navIcon: { width: 24, height: 24, marginBottom: 4 },
 });
-
