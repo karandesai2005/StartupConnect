@@ -6,6 +6,7 @@ import LoginScreen from './components/LoginScreen';
 import HomeScreen from './components/Home';
 import ProfileScreen from './components/profile';
 import ChatScreen from './components/Chat';
+import EditProfileP from './components/editProfileP';
 
 
 const Stack = createStackNavigator();
@@ -19,6 +20,7 @@ const App = () => {
         <Stack.Screen name="Home" component={HomeScreen} />
         <Stack.Screen name="Profile" component={ProfileScreen}/>
         <Stack.Screen name="Chat" component={ChatScreen}/>
+        <Stack.Screen name="EditProfileP" component={EditProfileP}/>
       </Stack.Navigator>
     </NavigationContainer>
   );
