@@ -6,7 +6,11 @@ const Signup = () => {
   const navigation = useNavigation();
 
   const handleBack = () => {
-    navigation.goBack(); // Fixed navigation handler
+    navigation.goBack();
+  };
+
+  const handleNext = () => {
+    navigation.navigate('username'); // Navigate to the Username screen
   };
 
   return (
@@ -25,7 +29,7 @@ const Signup = () => {
         <Text style={styles.confirmPassword}>Confirm Password</Text>
         <Pressable style={styles.signup2Item} onPress={() => {}} />
         
-        <TouchableOpacity style={styles.nextButton}>
+        <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
           <Text style={styles.next}>Next</Text>
         </TouchableOpacity>
       </View>

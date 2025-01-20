@@ -6,67 +6,67 @@ const EditProfileP = () => {
     return (
     <View style={styles.profile12}>
       <View style={styles.contentContainer}>
-        <View style={styles.centre}>
-          <Text style={styles.title}>Title</Text>
-          <Text style={styles.largeTitle}>Profile</Text>
-          <Text style={styles.largeTitle1}>
-            The quick brown fox jumps over the lazy dog
-          </Text>
-        </View>
+      <View style={styles.centre}>
+        <Text style={styles.title}>Title</Text>
+        <Text style={styles.largeTitle}>Profile</Text>
+        <Text style={styles.largeTitle1}>
+        The quick brown fox jumps over the lazy dog
+        </Text>
+      </View>
 
-        <View style={styles.profile}>
-          <View style={styles.avatarMultiVariants}>
-            <View style={styles.masterAvatar}>
-              <Image 
-                source={require('../assets/del.png')}
-                style={styles.profileImage}
-                resizeMode="cover"
-              />
-            </View>
-          </View>
-          <View style={styles.text}>
-            <View style = {styles.id}>
-                <Text style={styles.userName}>Chir.a.g</Text>
-                <Text style={styles.checkCircleIcon}>✓</Text>
-            </View>
-            <Text style={styles.about}>CEO of PITCH. Entrepreneur inverstor and many more</Text>
-          </View>
-          <View style={styles.buttonContainer}>
-            <View style={styles.masterOutlineButton}>
-              <Text style={styles.button}>Edit Profile</Text>
-            </View>
-          </View>
+      <View style={styles.profile}>
+        <View style={styles.avatarMultiVariants}>
+        <View style={styles.masterAvatar}>
+          <Image 
+          source={require('../../../assets/del.png')}
+          style={styles.profileImage}
+          resizeMode="cover"
+          />
         </View>
-        <View style={styles.tab}>
-          <TouchableOpacity 
-            style={[styles.tabButton, activeTab === "stories" ? styles.tab1 : styles.tab2]}
-            onPress={() => setActiveTab("stories")}
-          >
-            <Text style={activeTab === "stories" ? styles.tabs : styles.tabs1}>
-              The Stories
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[styles.tabButton, activeTab === "startups" ? styles.tab1 : styles.tab2]}
-            onPress={() => setActiveTab("startups")}
-          >
-            <Text style={activeTab === "startups" ? styles.tabs : styles.tabs1}>
-              The Startups
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[styles.tabButton, activeTab === "bucks" ? styles.tab1 : styles.tab2]}
-            onPress={() => setActiveTab("bucks")}
-          >
-            <Text style={activeTab === "bucks" ? styles.tabs : styles.tabs1}>
-              The Bucks
-            </Text>
-          </TouchableOpacity>
         </View>
+        <View style={styles.text}>
+        <View style = {styles.id}>
+          <Text style={styles.userName}>Chir.a.g</Text>
+          <Text style={styles.checkCircleIcon}>✓</Text>
+        </View>
+        <Text style={styles.about}>CEO of PITCH. Entrepreneur inverstor and many more</Text>
+        </View>
+        <View style={styles.buttonContainer}>
+        <View style={styles.masterOutlineButton}>
+          <Text style={styles.button}>Edit Profile</Text>
+        </View>
+        </View>
+      </View>
+      <View style={styles.tab}>
+        <TouchableOpacity 
+        style={[styles.tabButton, activeTab === "stories" ? styles.tab1 : styles.tab2]}
+        onPress={() => setActiveTab("stories")}
+        >
+        <Text style={activeTab === "stories" ? styles.tabs : styles.tabs1}>
+          The Stories
+        </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+        style={[styles.tabButton, activeTab === "startups" ? styles.tab1 : styles.tab2]}
+        onPress={() => setActiveTab("startups")}
+        >
+        <Text style={activeTab === "startups" ? styles.tabs : styles.tabs1}>
+          The Startups
+        </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+        style={[styles.tabButton, activeTab === "bucks" ? styles.tab1 : styles.tab2]}
+        onPress={() => setActiveTab("bucks")}
+        >
+        <Text style={activeTab === "bucks" ? styles.tabs : styles.tabs1}>
+          The Bucks
+        </Text>
+        </TouchableOpacity>
+      </View>
 
-        <View style={styles.profile12Child} />
+      <View style={styles.profile12Child} />
       </View>
     </View>
     );
@@ -108,7 +108,7 @@ const styles = StyleSheet.create({
     height: "100%",
     width: "100%",
     backgroundColor: "#f0f8ff",
-    borderRadius: 48, // Changed to make it perfectly round
+    borderRadius: 48, 
     overflow: "hidden",
   },
   text: {
