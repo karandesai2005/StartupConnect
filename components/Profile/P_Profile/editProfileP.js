@@ -18,7 +18,7 @@ const EditProfileP = () => {
           <View style={styles.avatarMultiVariants}>
             <View style={styles.masterAvatar}>
               <Image 
-                source={require('../assets/del.png')}
+                source={require('../../../assets/del.png')}
                 style={styles.profileImage}
                 resizeMode="cover"
               />

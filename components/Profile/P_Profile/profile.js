@@ -5,7 +5,7 @@ export default function ProfileScreen() {
   const user = {
     name: 'John Doe',
     about: 'Passionate entrepreneur and investor with a love for innovation and technology.',
-    picture: 'https://via.placeholder.com/150', // Replace with actual image URL
+    picture: 'https://via.placeholder.com/150', 
     startups: [
       { id: '1', name: 'TechWave' },
       { id: '2', name: 'InnoVision' },
