@@ -1,244 +1,319 @@
-import React, { useState } from "react";
-import { StyleSheet, View, Text, Image, TouchableOpacity } from "react-native";
+import * as React from "react";
+import { StyleSheet, View, Text } from "react-native";
+import Edit from "../../../assets/edit.svg";
 
-const EditProfileP = () => {
-    const [activeTab, setActiveTab]=useState('stories');
-    return (
-    <View style={styles.profile12}>
-      <View style={styles.contentContainer}>
-      <View style={styles.centre}>
-        <Text style={styles.title}>Title</Text>
-        <Text style={styles.largeTitle}>Profile</Text>
-        <Text style={styles.largeTitle1}>
-        The quick brown fox jumps over the lazy dog
-        </Text>
-      </View>
 
-      <View style={styles.profile}>
+const EditProfile = () => {
+  return (
+    <View style={styles.editProfile}>
+      <View style={styles.editProfile1}>
         <View style={styles.avatarMultiVariants}>
-        <View style={styles.masterAvatar}>
-          <Image 
-          source={require('../../../assets/del.png')}
-          style={styles.profileImage}
-          resizeMode="cover"
-          />
+          <View style={styles.masterAvatar} />
         </View>
-        </View>
-        <View style={styles.text}>
-        <View style = {styles.id}>
-          <Text style={styles.userName}>Chir.a.g</Text>
-          <Text style={styles.checkCircleIcon}>✓</Text>
-        </View>
-        <Text style={styles.about}>CEO of PITCH. Entrepreneur inverstor and many more</Text>
-        </View>
-        <View style={styles.buttonContainer}>
-        <View style={styles.masterOutlineButton}>
-          <Text style={styles.button}>Edit Profile</Text>
-        </View>
+        <View style={styles.icon}>
+          <Edit style={styles.iconLayout} width={24} height={24} />
         </View>
       </View>
-      <View style={styles.tab}>
-        <TouchableOpacity 
-        style={[styles.tabButton, activeTab === "stories" ? styles.tab1 : styles.tab2]}
-        onPress={() => setActiveTab("stories")}
-        >
-        <Text style={activeTab === "stories" ? styles.tabs : styles.tabs1}>
-          The Stories
-        </Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-        style={[styles.tabButton, activeTab === "startups" ? styles.tab1 : styles.tab2]}
-        onPress={() => setActiveTab("startups")}
-        >
-        <Text style={activeTab === "startups" ? styles.tabs : styles.tabs1}>
-          The Startups
-        </Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-        style={[styles.tabButton, activeTab === "bucks" ? styles.tab1 : styles.tab2]}
-        onPress={() => setActiveTab("bucks")}
-        >
-        <Text style={activeTab === "bucks" ? styles.tabs : styles.tabs1}>
-          The Bucks
-        </Text>
-        </TouchableOpacity>
+      <View style={styles.form}>
+        <View style={styles.textFieldBoxRoundedLg}>
+          <View style={styles.masterBoxStyle}>
+            <View style={styles.textfield}>
+              <View style={[styles.content, styles.contentFlexBox]}>
+                <Leading style={styles.leadingIcon} width={22} height={22} />
+                <View style={styles.content1}>
+                  <Text style={[styles.filled, styles.filledClr]}>Pitch</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        </View>
+        <View style={styles.masterBoxStyle1}>
+          <View style={styles.textfield}>
+            <View style={[styles.content, styles.contentFlexBox]}>
+              <Personoutline style={styles.leadingIcon} width={22} height={22} />
+              <View style={styles.content1}>
+                <Text style={[styles.filled, styles.filledClr]}>
+                  X be the person
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+        <View style={styles.textFieldBoxRoundedLg}>
+          <View style={styles.masterBoxStyle}>
+            <View style={[styles.textfield2, styles.textfieldBorder]}>
+              <View style={[styles.content, styles.contentFlexBox]}>
+                <Email style={styles.leadingIcon} width={22} height={22} />
+                <View style={styles.content1}>
+                  <Text style={[styles.filled, styles.filledClr]}>
+                    support@pitch.com
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        </View>
+        <View style={styles.phoneNumber}>
+          <View style={styles.selectDropdown}>
+            <View style={styles.masterBoxStyle}>
+              <View style={[styles.textfield3, styles.textfieldBorder]}>
+                <View style={styles.content1}>
+                  <Text style={[styles.filled, styles.filledClr]}>
+                    +91 (IND)
+                  </Text>
+                </View>
+                <Trailing style={styles.leadingIcon} width={22} height={22} />
+              </View>
+            </View>
+          </View>
+          <View style={styles.content1}>
+            <View style={styles.masterBoxStyle}>
+              <View style={[styles.textfield2, styles.textfieldBorder]}>
+                <View style={[styles.content7, styles.contentFlexBox]}>
+                  <View style={styles.content1}>
+                    <Text style={[styles.filled, styles.filledClr]}>
+                      7894561230
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+          </View>
+        </View>
       </View>
-
-      <View style={styles.profile12Child} />
+      <Text style={[styles.editProfile2, styles.filledClr]}>Edit Profile</Text>
+      <View style={[styles.left, styles.contentFlexBox]}>
+        <Licon1 style={styles.iconLayout} width={24} height={24} />
+        <View style={[styles.lIcon2, styles.iconLayout]} />
+        <Text style={[styles.label, styles.labelTypo]}>Label</Text>
       </View>
     </View>
-    );
+  );
+};
+
+
+
+const FontFamily = {
+  bodyDefault: "Nunito-Regular",
+  headingH3: "Nunito-Bold",
+};
+
+const FontSize = {
+  bodyDefault_size: 16,
+  headingH3_size: 18,
+};
+
+const Color = {
+  bgColorLight: "#fff",
+  textColorDefault: "#1c1c1c",
+  textColorDefault1: "#0b0b0b",
+  strokeColorLightGrey: "#e7e7e7",
+  bgColorLightPrimary: "#e8f2fe",
+  bgColorPrimary: "#1779f3",
+};
+
+const StyleVariable = {
+  spacingXs: 6,
+  spacingSmd: 12,
+  spacingSmd1: 12,
+  spacingXxxs: 2,
+  spacingSmd2: 12,
+  spacingMd: 16,
+  radiMlg: 8,
+  spacingSm: 8,
+  spacingSm1: 8,
+  radiMlg1: 8,
+  spacingSm2: 8,
+  spacingXxs: 4,
+  radiLg: 12,
+};
+
+const Gap = {
+  gap_sm: 8,
+  gap_md: 12,
+};
+
+const Padding = {
+  p_xs: 12,
+  p_base: 16,
+};
+
+const Border = {
+  br_5xs: 8,
 };
 
 const styles = StyleSheet.create({
-  profile12: {
-    flex: 1,
-    backgroundColor: "#fff",
-  },
-  contentContainer: {
-    flex: 1,
-    alignItems: "center",
-    paddingHorizontal: 16,
-  },
-  centre: {
-    alignItems: "center",
-    gap: 8,
-    marginTop: 91,
-    width: "100%",
-  },
-  profileImage: {
-    width: "100%",
-    height: "100%",
-  },
-  profile: {
-    width: "100%",
-    backgroundColor: "#fff",
-    alignItems: "center",
-    padding: 14,
-    gap: 14,
-    marginTop: 20,
-  },
-  avatarMultiVariants: {
-    width: 96,
-    height: 96,
-  },
-  masterAvatar: {
-    height: "100%",
-    width: "100%",
-    backgroundColor: "#f0f8ff",
-    borderRadius: 48, 
-    overflow: "hidden",
-  },
-  text: {
-    width: "100%",
-    gap: 4,
-    alignItems: "center",
-  },
-  userName: {
-    fontSize: 20,
-    lineHeight: 26,
-    fontWeight: "700",
-    color: "#000",
-    fontFamily: "AvenirNextCyr",
-    textAlign: "center",
-  },
-  id: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  about: {
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: "500",
-    color: "#000",
-    fontFamily: "AvenirNextCyr",
-  },
-  checkCircleIcon: {
-    marginLeft: 5,
-    color: "green",
-  },
-  buttonContainer: {
-    width: "100%",
-    alignItems: "center",
-  },
-  masterOutlineButton: {
-    borderRadius: 14,
-    borderColor: "#ccc",
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    backgroundColor: "#f9f9f9",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  button: {
-    fontSize: 12,
-    lineHeight: 18,
-    color: "#666",
-    fontFamily: "AvenirNextCyr-Bold",
-    fontWeight: "600",
-  },
-  title: {
-    display: "none",
-    fontSize: 20,
-    lineHeight: 26,
-    fontWeight: "700",
-    color: "#333",
-    fontFamily: "AvenirNextCyr-Bold",
-  },
-  largeTitle: {
-    fontSize: 32,
-    lineHeight: 36,
-    fontWeight: "700",
-    color: "#000",
-    fontFamily: "AvenirNextCyr",
-  },
-  largeTitle1: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: "#999",
-    fontFamily: "AvenirNextCyr",
-    display: "none",
-  },
-  tab: {
-    width: "100%",
-    flexDirection: "row",
-    backgroundColor: "#f3f3f3",
-    borderRadius: 18,
-    borderColor: "#ddd",
-    borderWidth: 1,
-    padding: 4,
-    gap: 8,
-    marginTop: 20,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  tab1: {
-    flex: 1,
-    height: 30,
-    backgroundColor: "#007bff",
-    borderRadius: 18,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  tab2: {
-    flex: 1,
-    height: 28,
-    borderRadius: 14,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  tabs: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: "#fff",
-    fontFamily: "AvenirNextCyr-Bold",
-    fontWeight: "600",
-    textAlign: "center",
-  },
-  tabs1: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: "#666",
-    fontFamily: "AvenirNextCyr-Bold",
-    fontWeight: "600",
-    textAlign: "center",
-  },
-  profile12Child: {
-    width: "90%",
-    height: 382,
-    backgroundColor: "#f0f8ff",
-    borderRadius: 14,
-    marginTop: 20,
-  },
+  	contentFlexBox: {
+    		alignItems: "center",
+    		flexDirection: "row"
+  	},
+  	filledClr: {
+    		color: Color.textColorDefault1,
+    		textAlign: "left"
+  	},
+  	textfieldBorder: {
+    		borderColor: Color.strokeColorLightGrey,
+    		paddingVertical: StyleVariable.spacingMd,
+    		paddingHorizontal: StyleVariable.spacingSmd2,
+    		alignItems: "center",
+    		borderWidth: 1,
+    		borderStyle: "solid",
+    		alignSelf: "stretch",
+    		flexDirection: "row",
+    		backgroundColor: Color.bgColorLight
+  	},
+  	iconLayout: {
+    		overflow: "hidden"
+  	},
+  	labelTypo: {
+    		fontFamily: FontFamily.bodyDefault,
+    		lineHeight: 22,
+    		fontSize: FontSize.bodyDefault_size
+  	},
+  	masterAvatar: {
+    		height: "100%",
+    		top: "0%",
+    		right: "0%",
+    		bottom: "0%",
+    		left: "0%",
+    		borderRadius: 15,
+    		backgroundColor: Color.bgColorLightPrimary,
+    		position: "absolute",
+    		overflow: "hidden",
+    		width: "100%"
+  	},
+  	avatarMultiVariants: {
+    		height: 128,
+    		zIndex: 0,
+    		width: 128
+  	},
+  	icon: {
+    		top: 96,
+    		left: 86,
+    		borderRadius: StyleVariable.radiLg,
+    		backgroundColor: Color.bgColorPrimary,
+    		padding: StyleVariable.spacingXxs,
+    		zIndex: 1,
+    		flexDirection: "row",
+    		position: "absolute"
+  	},
+  	editProfile1: {
+    		marginLeft: -85,
+    		top: 143,
+    		left: "50%",
+    		width: 150,
+    		height: 149,
+    		gap: 10,
+    		flexDirection: "row",
+    		position: "absolute"
+  	},
+  	leadingIcon: {
+    		overflow: "hidden"
+  	},
+  	filled: {
+    		textAlign: "left",
+    		fontFamily: FontFamily.bodyDefault,
+    		lineHeight: 22,
+    		fontSize: FontSize.bodyDefault_size,
+    		alignSelf: "stretch"
+  	},
+  	content1: {
+    		flex: 1
+  	},
+  	content: {
+    		gap: StyleVariable.spacingSm,
+    		flex: 1
+  	},
+  	textfield: {
+    		borderColor: Color.bgColorPrimary,
+    		paddingVertical: StyleVariable.spacingMd,
+    		paddingHorizontal: StyleVariable.spacingSmd2,
+    		borderWidth: 1,
+    		alignItems: "center",
+    		borderStyle: "solid",
+    		borderRadius: StyleVariable.radiMlg,
+    		alignSelf: "stretch",
+    		backgroundColor: Color.bgColorLightPrimary,
+    		flexDirection: "row"
+  	},
+  	masterBoxStyle: {
+    		alignSelf: "stretch",
+    		overflow: "hidden"
+  	},
+  	textFieldBoxRoundedLg: {
+    		width: 343
+  	},
+  	masterBoxStyle1: {
+    		width: 343,
+    		overflow: "hidden"
+  	},
+  	textfield2: {
+    		borderRadius: StyleVariable.radiMlg,
+    		borderColor: Color.strokeColorLightGrey
+  	},
+  	textfield3: {
+    		borderRadius: StyleVariable.radiMlg1,
+    		gap: StyleVariable.spacingSm1
+  	},
+  	selectDropdown: {
+    		width: 128
+  	},
+  	content7: {
+    		flex: 1
+  	},
+  	phoneNumber: {
+    		gap: StyleVariable.spacingSmd1,
+    		width: 343,
+    		flexDirection: "row"
+  	},
+  	form: {
+    		top: 310,
+    		left: 35,
+    		width: 379,
+    		height: 364,
+    		gap: StyleVariable.spacingSmd,
+    		position: "absolute"
+  	},
+  	editProfile2: {
+    		top: 88,
+    		left: 77,
+    		fontSize: FontSize.headingH3_size,
+    		letterSpacing: 0,
+    		lineHeight: 26,
+    		fontWeight: "700",
+    		fontFamily: FontFamily.headingH3,
+    		width: 103,
+    		height: 37,
+    		textAlign: "left",
+    		position: "absolute"
+  	},
+  	lIcon2: {
+    		display: "none"
+  	},
+  	label: {
+    		color: Color.textColorDefault,
+    		display: "none",
+    		textAlign: "left"
+  	},
+  	left: {
+    		marginTop: -392,
+    		top: "50%",
+    		left: 40,
+    		borderRadius: 5,
+    		borderColor: "#000",
+    		borderWidth: 2,
+    		gap: StyleVariable.spacingXs,
+    		borderStyle: "solid",
+    		alignItems: "center",
+    		position: "absolute"
+  	},
+  	editProfile: {
+    		height: 956,
+    		overflow: "hidden",
+    		width: "100%",
+    		backgroundColor: Color.bgColorLight,
+    		flex: 1
+  	}
 });
 
-export default EditProfileP;
+export default EditProfile;

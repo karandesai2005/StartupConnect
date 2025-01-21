@@ -1,35 +1,36 @@
 import * as React from "react";
-import { Text, StyleSheet, View, Image, TextInput, Pressable } from "react-native";
+import { Text, StyleSheet, View, TextInput, Pressable } from "react-native";
 import { useNavigation } from '@react-navigation/native';
 import field from '../../field';
+
+
 
 const Signup = () => {
     const [name, setName] = React.useState("");
     const navigation = useNavigation();
-        
-        const handleBack = () => {
-            navigation.goBack();
-        };
-        
-        const nxtpage = () => {
-            navigation.navigate("field");
-        };
+    
+    const handleBack = () => {
+        navigation.goBack();
+    };
+    
+    const nxtpage = () => {
+        navigation.navigate("field");
+    };
 
     return (
         <View style={styles.signup5}>
             <Text style={[styles.createAccount, styles.centeredText]}>Create account</Text>
-            <Text style={[styles.whatsYourName, styles.centeredText]}>What’s your name?</Text>
+            <Text style={[styles.whatsYourName, styles.centeredText]}>What’s your Company's name?</Text>
 
             <TextInput
                 style={styles.textInput}
-                placeholder="Enter your name"
+                placeholder="Enter your Company's name"
                 value={name}
                 onChangeText={(text) => setName(text)}
             />
 
-            <Pressable style={styles.signupButton} onPress={() => console.log("Name entered:", name)}>
-                <Text style={styles.signupButtonText}
-                onPress={nxtpage} >Create an account</Text>
+            <Pressable style={styles.signupButton} onPress={nxtpage}>
+                <Text style={styles.signupButtonText}>Create an account</Text>
             </Pressable>
 
             {/* <Image source={require("../assets/create-watch-face.png")} style={styles.imageIcon} /> */}

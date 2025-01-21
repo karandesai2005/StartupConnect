@@ -11,7 +11,7 @@ const Signup = () => {
     };    
 
     const handleNext = () => {
-        navigation.navigate('preference');  // Navigate to next register screen
+        navigation.navigate('preference');
             
     };
 
