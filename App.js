@@ -28,6 +28,13 @@ const App = () => {
         <Stack.Screen name="Register2" component={Register2}/>
         <Stack.Screen name="ProfileP" component={ProfileScreenP} />
         <Stack.Screen name="EditProfileP" component={EditProfileP}/>
+        <Stack.Screen name="username" component={Username}/>
+        <Stack.Screen name="preference" component={Preference}/>
+        <Stack.Screen name="handlePersonal" component={handlePersonal}/>
+        
+
+
+
         
         {/* {accountType === 'business' ? (
           <React.Fragment>
