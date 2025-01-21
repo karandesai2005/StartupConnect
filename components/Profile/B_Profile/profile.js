@@ -1,119 +1,250 @@
-import React from 'react';
-import { View, Text, Image, FlatList, StyleSheet } from 'react-native';
+import React, { useState } from "react";
+import { StyleSheet, View, Text, Image, TouchableOpacity } from "react-native";
 
-export default function ProfileScreen() {
-  const user = {
-    name: 'John Doe',
-    about: 'Passionate entrepreneur and investor with a love for innovation and technology.',
-    picture: 'https://via.placeholder.com/150', // Replace with actual image URL
-    startups: [
-      { id: '1', name: 'TechWave' },
-      { id: '2', name: 'InnoVision' },
-      { id: '3', name: 'StartupConnect' },
-    ],
-    investments: [
-      { id: '1', name: 'GreenEnergy Co.' },
-      { id: '2', name: 'EduSmart' },
-      { id: '3', name: 'HealthifyMe' },
-    ],
-  };
+const ProfileB = () => {
+    const [activeTab, setActiveTab]=useState('stories');
+    return (
+    <View style={styles.profile12}>
+      <View style={styles.contentContainer}>
+      <View style={styles.centre}>
+        <Text style={styles.title}>Title</Text>
+        <Text style={styles.largeTitle}>Profile</Text>
+      </View>
 
-  const renderItem = ({ item }) => (
-    <View style={styles.listItem}>
-      <Text style={styles.listItemText}>{item.name}</Text>
-    </View>
-  );
-
-  const sections = [
-    { title: 'Startups', data: user.startups },
-    { title: 'Investments', data: user.investments },
-  ];
-
-  const renderSectionHeader = ({ section }) => (
-    <Text style={styles.sectionTitle}>{section.title}</Text>
-  );
-
-  return (
-    <FlatList
-      data={sections}
-      keyExtractor={(item, index) => index.toString()}
-      renderItem={({ item }) => (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{item.title}</Text>
-          <FlatList
-            data={item.data}
-            keyExtractor={(subItem) => subItem.id}
-            renderItem={renderItem}
-            contentContainerStyle={styles.list}
+      <View style={styles.profile}>
+        <View style={styles.avatarMultiVariants}>
+        <View style={styles.masterAvatar}>
+          <Image 
+          source={require('../../../assets/del.png')}
+          style={styles.profileImage}
+          resizeMode="cover"
           />
         </View>
-      )}
-      renderSectionHeader={renderSectionHeader}
-      ListHeaderComponent={() => (
-        <View style={styles.header}>
-          <Image source={{ uri: user.picture }} style={styles.profilePicture} />
-          <Text style={styles.name}>{user.name}</Text>
-          <Text style={styles.about}>{user.about}</Text>
         </View>
-      )}
-      contentContainerStyle={styles.container}
-      ListFooterComponent={<View style={{ height: 20 }} />} // To avoid cutting off at the bottom
-    />
-  );
-}
+        <View style={styles.text}>
+        <View style = {styles.id}>
+          <Text style={styles.userName}>PITCH</Text>
+        </View>
+        <View style={styles.try}>
+          <Text numberOfLines={expandedItems[index] ? null : 3}>
+            Pitch is designed to bridge the gap between innovative startups and forward-thinking investors.
+            Our platform provides a seamless experience for entrepreneurs to showcase their ideas and for investors to discover the next big thing.
+          </Text>
+          <TouchableOpacity onPress={() => toggleExpand(index)}>
+            <Text style={styles.actionText}>
+              {expandedItems[index] ? 'Show Less' : 'Show More'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+        </View>
+        <View style={styles.buttonContainer}>
+        <View style={styles.masterOutlineButton} onPress={() => setActiveTab("/EditProfileB")}>
+          <Text style={styles.button}>Edit Profile</Text>
+        </View>
+        </View>
+      </View>
+      <View style={styles.tab}>
+        <TouchableOpacity 
+        style={[styles.tabButton, activeTab === "story" ? styles.tab1 : styles.tab2]}
+        onPress={() => setActiveTab("story")}
+        >
+        <Text style={activeTab === "story" ? styles.tabs : styles.tabs1}>
+          The Story
+        </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+        style={[styles.tabButton, activeTab === "startup" ? styles.tab1 : styles.tab2]}
+        onPress={() => setActiveTab("startup")}
+        >
+        <Text style={activeTab === "startup" ? styles.tabs : styles.tabs1}>
+          The Startup
+        </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+        style={[styles.tabButton, activeTab === "bucks" ? styles.tab1 : styles.tab2]}
+        onPress={() => setActiveTab("bucks")}
+        >
+        <Text style={activeTab === "bucks" ? styles.tabs : styles.tabs1}>
+          The Bucks
+        </Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.profile12Child} />
+      </View>
+    </View>
+    );
+};
 
 const styles = StyleSheet.create({
-  container: {
+  profile12: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: "#fff",
   },
-  header: {
-    alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#ffffff',
-    marginBottom: 10,
-    elevation: 2,
+  contentContainer: {
+    flex: 1,
+    alignItems: "center",
+    paddingHorizontal: 16,
   },
-  profilePicture: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    marginBottom: 10,
+  centre: {
+    alignItems: "center",
+    gap: 8,
+    marginTop: 91,
+    width: "100%",
   },
-  name: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333333',
+  profileImage: {
+    width: "100%",
+    height: "100%",
+  },
+  profile: {
+    width: "100%",
+    backgroundColor: "#fff",
+    alignItems: "center",
+    padding: 14,
+    gap: 14,
+    marginTop: 20,
+  },
+  avatarMultiVariants: {
+    width: 96,
+    height: 96,
+  },
+  masterAvatar: {
+    height: "100%",
+    width: "100%",
+    backgroundColor: "#f0f8ff",
+    borderRadius: 48, 
+    overflow: "hidden",
+  },
+  text: {
+    width: "100%",
+    gap: 4,
+    alignItems: "center",
+  },
+  userName: {
+    fontSize: 20,
+    lineHeight: 26,
+    fontWeight: "700",
+    color: "#000",
+    fontFamily: "AvenirNextCyr",
+    textAlign: "center",
+  },
+  id: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
   about: {
-    fontSize: 16,
-    color: '#666666',
-    textAlign: 'center',
-    marginVertical: 10,
-    paddingHorizontal: 20,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: "500",
+    color: "#000",
+    fontFamily: "AvenirNextCyr",
   },
-  section: {
-    marginVertical: 10,
-    backgroundColor: '#ffffff',
-    padding: 10,
-    elevation: 2,
+  checkCircleIcon: {
+    marginLeft: 5,
+    color: "green",
   },
-  sectionTitle: {
+  buttonContainer: {
+    width: "100%",
+    alignItems: "center",
+  },
+  masterOutlineButton: {
+    borderRadius: 14,
+    borderColor: "#ccc",
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: "#f9f9f9",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  button: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: "#666",
+    fontFamily: "AvenirNextCyr-Bold",
+    fontWeight: "600",
+  },
+  title: {
+    display: "none",
     fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333333',
-    marginBottom: 10,
+    lineHeight: 26,
+    fontWeight: "700",
+    color: "#333",
+    fontFamily: "AvenirNextCyr-Bold",
   },
-  list: {
-    paddingBottom: 10,
+  largeTitle: {
+    fontSize: 32,
+    lineHeight: 36,
+    fontWeight: "700",
+    color: "#000",
+    fontFamily: "AvenirNextCyr",
   },
-  listItem: {
-    padding: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eeeeee',
+  largeTitle1: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: "#999",
+    fontFamily: "AvenirNextCyr",
+    display: "none",
   },
-  listItemText: {
-    fontSize: 16,
-    color: '#333333',
+  tab: {
+    width: "100%",
+    flexDirection: "row",
+    backgroundColor: "#f3f3f3",
+    borderRadius: 18,
+    borderColor: "#ddd",
+    borderWidth: 1,
+    padding: 4,
+    gap: 8,
+    marginTop: 20,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  tab1: {
+    flex: 1,
+    height: 30,
+    backgroundColor: "#007bff",
+    borderRadius: 18,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  tab2: {
+    flex: 1,
+    height: 28,
+    borderRadius: 14,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  tabs: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: "#fff",
+    fontFamily: "AvenirNextCyr-Bold",
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  tabs1: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: "#666",
+    fontFamily: "AvenirNextCyr-Bold",
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  profile12Child: {
+    width: "90%",
+    height: 382,
+    backgroundColor: "#f0f8ff",
+    borderRadius: 14,
+    marginTop: 20,
   },
 });
+
+export default ProfileB;

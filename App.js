@@ -4,13 +4,13 @@ import { createStackNavigator } from '@react-navigation/stack';
 import SplashScreen from './components/SplashScreen';
 import LoginScreen from './components/LoginScreen';
 import HomeScreen from './components/Home';
-// import ProfileScreenB from './components/Profile/B_Profile/profile';
+//import ProfileScreenB from './components/Profile/B_Profile/profile';
 import ProfileScreenP from './components/Profile/P_Profile/profile';
 import ChatScreen from './components/Chat';
 import Register1 from "./components/Register1"; 
 import Register2 from "./components/Register2"; 
 import EditProfileP from './components/Profile/P_Profile/editProfileP';
-// import EditProfileB from './components/Profile/B_Profile/editProfile';
+//import EditProfileB from './components/Profile/B_Profile/editProfile';
 
 const Stack = createStackNavigator();
 
@@ -26,7 +26,7 @@ const App = () => {
         <Stack.Screen name="Chat" component={ChatScreen}/>
         <Stack.Screen name="Register1" component={Register1}/>
         <Stack.Screen name="Register2" component={Register2}/>
-        <Stack.Screen name="Profile" component={ProfileScreenP} />
+        <Stack.Screen name="ProfileP" component={ProfileScreenP} />
         <Stack.Screen name="EditProfileP" component={EditProfileP}/>
         
         {/* {accountType === 'business' ? (
