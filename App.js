@@ -11,6 +11,12 @@ import Register1 from "./components/Register1";
 import Register2 from "./components/Register2"; 
 import EditProfileP from './components/Profile/P_Profile/editProfileP';
 //import EditProfileB from './components/Profile/B_Profile/editProfile';
+import Username from './components/username';
+import Preference from './components/preference';
+import handlePersonal from './components/Profile/P_Profile/handlePersonal';
+import handleBusiness from './components/Profile/B_Profile/handleBusiness';
+import field from './components/field';
+
 
 const Stack = createStackNavigator();
 
@@ -31,7 +37,8 @@ const App = () => {
         <Stack.Screen name="username" component={Username}/>
         <Stack.Screen name="preference" component={Preference}/>
         <Stack.Screen name="handlePersonal" component={handlePersonal}/>
-        
+        <Stack.Screen name="handleBusiness" component={handleBusiness}/>
+        <Stack.Screen name="field" component={field}/>
 
 
 

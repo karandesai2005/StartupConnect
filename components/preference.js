@@ -1,6 +1,8 @@
 import * as React from "react";
 import { Text, StyleSheet, View, Pressable, TouchableOpacity } from "react-native";
 import { useNavigation } from "@react-navigation/native";
+import handlePersonal from './Profile/P_Profile/handlePersonal';
+import handleBusiness from './Profile/B_Profile/handleBusiness';
 
 const Signup = () => {
     const navigation = useNavigation();
@@ -10,11 +12,11 @@ const Signup = () => {
     };
 
     const handlePersonalAccount = () => {
-        navigation.navigate("PersonalAccountPage"); // Replace with the actual route name
+        navigation.navigate("handlePersonal"); 
     };
 
     const handleBusinessAccount = () => {
-        navigation.navigate("BusinessAccountPage"); // Replace with the actual route name
+        navigation.navigate("handleBusiness");
     };
 
     return (
