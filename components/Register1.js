@@ -1,4 +1,4 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useState } from "react";
 import {
   View,
   Text,
@@ -6,17 +6,19 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-} from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { UserRegistrationContext } from '../context/UserRegistrationContext';
+  Alert, // Import Alert for popups
+} from "react-native";
+import { useNavigation } from "@react-navigation/native";
+import { UserRegistrationContext } from "../context/UserRegistrationContext";
 
 const SignupForm = () => {
   const navigation = useNavigation();
   const { userData, setUserData } = useContext(UserRegistrationContext);
-  
+
   // Local state for form validation and loading
-  const [emailError, setEmailError] = useState('');
+  const [emailError, setEmailError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [serverError, setServerError] = useState("");
 
   // Email validation function
   const validateEmail = (email) => {
@@ -27,8 +29,8 @@ const SignupForm = () => {
   // Handle email change
   const handleEmailChange = (email) => {
     setUserData({ ...userData, email });
-    // Clear error when user starts typing
-    if (emailError) setEmailError('');
+
+    if (emailError) setEmailError(""); // Clear error on input
   };
 
   const handleBack = () => {
@@ -36,39 +38,58 @@ const SignupForm = () => {
   };
 
   const handleNext = async () => {
-    // Validate email before proceeding
-    if (!userData.email) {
-      setEmailError('Email is required');
+    const { email } = userData;
+  
+    // Basic validation
+    if (!validateEmail(email)) {
+      setEmailError("Invalid email format");
       return;
     }
-
-    if (!validateEmail(userData.email)) {
-      setEmailError('Please enter a valid email address');
-      return;
-    }
-
+  
+    setIsLoading(true);
+    setServerError(""); // Clear previous server errors
+  
     try {
-      setIsLoading(true);
-      // Simulate API call to check if email exists
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // If everything is valid, proceed to next screen
-      navigation.navigate('Register2');
-    } catch (error) {
-      setEmailError('An error occurred. Please try again.');
+      const response = await fetch("http://10.11.18.3:3000/api/auth/save-user-details", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          step: 1,  // First step for saving email only
+          data: { email },
+        }),
+      });
+  
+      const result = await response.json();
+  
+      if (response.ok) {
+        // Navigate to Register Page 2 if registration was successful
+        navigation.navigate("Register2", { userId: result.result[0].user_id });
+      } else {
+        // Check if the backend response includes the "Email already in use" message
+        if (result.message === "Email already in use") {
+          Alert.alert(
+            "Email already in use",
+            "This email is already registered. Please use a different one.",
+            [{ text: "OK" }]
+          );
+        } else {
+          // Handle other errors
+          setServerError(result.message || "Something went wrong. Please try again.");
+        }
+      }
+    } catch (err) {
+      setServerError("Unable to save details. Please try again later.");
     } finally {
       setIsLoading(false);
     }
   };
-
+  
+  
+  
   return (
     <View style={styles.container}>
       {/* Back Button */}
-      <TouchableOpacity 
-        style={styles.backButton} 
-        onPress={handleBack}
-        disabled={isLoading}
-      >
+      <TouchableOpacity style={styles.backButton} onPress={handleBack} disabled={isLoading}>
         <Text style={styles.backButtonText}>←</Text>
       </TouchableOpacity>
 
@@ -80,13 +101,10 @@ const SignupForm = () => {
       {/* Email Section */}
       <View style={styles.emailSection}>
         <Text style={styles.emailTitle}>What's your email?</Text>
-        
+
         {/* Email Input */}
-        <TextInput 
-          style={[
-            styles.input,
-            emailError ? styles.inputError : null
-          ]}
+        <TextInput
+          style={[styles.input, emailError ? styles.inputError : null]}
           value={userData.email}
           onChangeText={handleEmailChange}
           keyboardType="email-address"
@@ -95,23 +113,21 @@ const SignupForm = () => {
           placeholderTextColor="#757575"
           editable={!isLoading}
         />
-        
-        {/* Error Message */}
+
+        {/* Error or Helper Text */}
         {emailError ? (
           <Text style={styles.errorText}>{emailError}</Text>
         ) : (
-          <Text style={styles.helperText}>
-            You'll need to confirm this email later.
-          </Text>
+          <Text style={styles.helperText}>You'll need to confirm this email later.</Text>
         )}
       </View>
 
+      {/* Server Error Message */}
+      {serverError ? <Text style={styles.errorText}>{serverError}</Text> : null}
+
       {/* Next Button */}
-      <TouchableOpacity 
-        style={[
-          styles.nextButton,
-          isLoading ? styles.nextButtonDisabled : null
-        ]} 
+      <TouchableOpacity
+        style={[styles.nextButton, isLoading ? styles.nextButtonDisabled : null]}
         onPress={handleNext}
         disabled={isLoading}
       >
@@ -128,74 +144,74 @@ const SignupForm = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     paddingHorizontal: 32,
   },
   backButton: {
-    position: 'absolute',
+    position: "absolute",
     left: 28,
     top: 86,
   },
   backButtonText: {
     fontSize: 32,
-    color: '#000',
+    color: "#000",
   },
   header: {
     marginTop: 94,
-    alignItems: 'center',
+    alignItems: "center",
   },
   headerText: {
     fontSize: 16,
-    fontWeight: '700',
-    color: '#0a0a0a',
+    fontWeight: "700",
+    color: "#0a0a0a",
   },
   emailSection: {
     marginTop: 49,
   },
   emailTitle: {
     fontSize: 20,
-    fontWeight: '700',
-    color: '#000',
+    fontWeight: "700",
+    color: "#000",
     marginBottom: 16,
   },
   input: {
-    width: '100%',
+    width: "100%",
     height: 51,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: "#f5f5f5",
     borderRadius: 5,
     paddingHorizontal: 16,
     borderWidth: 1,
-    borderColor: 'transparent',
+    borderColor: "transparent",
   },
   inputError: {
-    borderColor: '#ff0000',
-    backgroundColor: '#fff0f0',
+    borderColor: "#ff0000",
+    backgroundColor: "#fff0f0",
   },
   helperText: {
     fontSize: 8,
-    color: '#040404',
+    color: "#040404",
     marginTop: 8,
   },
   errorText: {
     fontSize: 12,
-    color: '#ff0000',
+    color: "#ff0000",
     marginTop: 8,
   },
   nextButton: {
     marginTop: 62,
-    backgroundColor: '#535353',
+    backgroundColor: "#535353",
     borderRadius: 21,
     width: 82,
     height: 42,
-    justifyContent: 'center',
-    alignItems: 'center',
-    alignSelf: 'center',
+    justifyContent: "center",
+    alignItems: "center",
+    alignSelf: "center",
   },
   nextButtonDisabled: {
     opacity: 0.7,
   },
   nextButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 15,
   },
 });

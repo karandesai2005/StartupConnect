@@ -1,11 +1,15 @@
 import * as React from "react";
 import { Text, StyleSheet, View, Pressable, TouchableOpacity } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import handlePersonal from './Profile/P_Profile/handlePersonal';
 import handleBusiness from './Profile/B_Profile/handleBusiness';
 
 const Signup = () => {
     const navigation = useNavigation();
+    const route = useRoute(); // Use this to access route params
+
+    const [isFounder, setIsFounder] = React.useState(false); // Example state
+    const [isInvestor, setIsInvestor] = React.useState(false); // Example state
 
     const handleBack = () => {
         navigation.goBack();
@@ -18,6 +22,33 @@ const Signup = () => {
     const handleBusinessAccount = () => {
         navigation.navigate("handleBusiness");
     };
+
+    const handleFinish = async () => {
+        try {
+          const response = await fetch("http://localhost:3000/api/auth/save-user-details", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              step: 4,
+              data: {
+                isFounder,
+                isInvestor,
+                userId: route.params.userId, // Access userId from route params
+              },
+            }),
+          });
+      
+          const result = await response.json();
+          console.log(result);
+      
+          if (response.ok) {
+            // Navigate to the home screen or another step
+            navigation.navigate("Home");
+          }
+        } catch (err) {
+          console.error("Error saving preference details:", err.message);
+        }
+      };
 
     return (
         <View style={styles.signup4}>
@@ -43,7 +74,7 @@ const Signup = () => {
                     </Pressable>
                 </View>
 
-                <Pressable style={styles.nextButton}>
+                <Pressable style={styles.nextButton} onPress={handleFinish}>
                     <Text style={styles.nextButtonText}>Next</Text>
                 </Pressable>
             </View>
