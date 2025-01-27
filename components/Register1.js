@@ -6,10 +6,11 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  Alert, // Import Alert for popups
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { UserRegistrationContext } from "../context/UserRegistrationContext";
+import Popup from "./Popup";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const SignupForm = () => {
   const navigation = useNavigation();
@@ -19,6 +20,8 @@ const SignupForm = () => {
   const [emailError, setEmailError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [serverError, setServerError] = useState("");
+  const [popupMessage, setPopupMessage] = useState(""); // Popup message state
+  const [isPopupVisible, setIsPopupVisible] = useState(false); // Popup visibility state
 
   // Email validation function
   const validateEmail = (email) => {
@@ -29,7 +32,6 @@ const SignupForm = () => {
   // Handle email change
   const handleEmailChange = (email) => {
     setUserData({ ...userData, email });
-
     if (emailError) setEmailError(""); // Clear error on input
   };
 
@@ -37,57 +39,116 @@ const SignupForm = () => {
     navigation.goBack();
   };
 
+  // const handleNext = async () => {
+  //   const { email } = userData;
+
+  //   // Basic validation
+  //   if (!validateEmail(email)) {
+  //     setEmailError("Invalid email format");
+  //     return;
+  //   }
+
+  //   setIsLoading(true);
+  //   setServerError(""); // Clear previous server errors
+
+  //   try {
+  //     const response = await fetch("http://10.11.18.3:3000/api/auth/save-user-details", {
+  //       method: "POST",
+  //       headers: { "Content-Type": "application/json" },
+  //       body: JSON.stringify({
+  //         step: 1, // First step for saving email only
+  //         data: { email },
+  //       }),
+  //     });
+
+  //     const result = await response.json();
+
+  //     if (response.ok) {
+  //       // Show success popup
+  //       // setPopupMessage("Email registered successfully!");
+  //       // setIsPopupVisible(true);
+
+  //       // Navigate to Register Page 2 after a delay
+  //       setTimeout(() => {
+  //         setIsPopupVisible(false);
+  //         navigation.navigate("Register2", { userId: result.result[0].user_id });
+  //       }, 3000);
+  //     } else {
+  //       // Show error popup
+  //       setPopupMessage(result.message || "Something went wrong. Please try again.");
+  //       setIsPopupVisible(true);
+  //     }
+  //   } catch (err) {
+  //     setPopupMessage("Unable to save details. Please try again later.");
+  //     setIsPopupVisible(true);
+  //   } finally {
+  //     setIsLoading(false);
+  //   }
+  // };
   const handleNext = async () => {
     const { email } = userData;
-  
-    // Basic validation
+
     if (!validateEmail(email)) {
-      setEmailError("Invalid email format");
-      return;
+        setEmailError("Invalid email format");
+        return;
     }
-  
+
     setIsLoading(true);
-    setServerError(""); // Clear previous server errors
-  
+    setServerError("");
+
     try {
-      const response = await fetch("http://10.11.18.3:3000/api/auth/save-user-details", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          step: 1,  // First step for saving email only
-          data: { email },
-        }),
-      });
-  
-      const result = await response.json();
-  
-      if (response.ok) {
-        // Navigate to Register Page 2 if registration was successful
-        navigation.navigate("Register2", { userId: result.result[0].user_id });
-      } else {
-        // Check if the backend response includes the "Email already in use" message
-        if (result.message === "Email already in use") {
-          Alert.alert(
-            "Email already in use",
-            "This email is already registered. Please use a different one.",
-            [{ text: "OK" }]
-          );
+        const response = await fetch("http://10.11.18.3:3000/api/auth/save-user-details", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                step: 1,
+                data: { email },
+            }),
+        });
+
+        const result = await response.json();
+        console.log("Response Result:", result);
+
+        if (response.ok && result.result && result.result[0]?.user_id) {
+            const userId = result.result[0].user_id;
+            console.log("Navigating with userId:", userId);
+            
+            // Save userId to AsyncStorage
+            try {
+                await AsyncStorage.setItem('userId', userId.toString());
+                console.log("Successfully saved userId to AsyncStorage:", userId);
+            } catch (storageError) {
+                console.error("Error saving to AsyncStorage:", storageError);
+                setPopupMessage("Error saving user data. Please try again.");
+                setIsPopupVisible(true);
+                return;
+            }
+
+            navigation.navigate("Register2", { userId });
         } else {
-          // Handle other errors
-          setServerError(result.message || "Something went wrong. Please try again.");
+            setPopupMessage(result.message || "Unable to retrieve userId.");
+            setIsPopupVisible(true);
         }
-      }
     } catch (err) {
-      setServerError("Unable to save details. Please try again later.");
+        console.error("Network error:", err);
+        setPopupMessage("Unable to save details. Please try again later.");
+        setIsPopupVisible(true);
     } finally {
-      setIsLoading(false);
+        setIsLoading(false);
     }
-  };
-  
-  
-  
+};
+
+
   return (
     <View style={styles.container}>
+      {/* Popup Component */}
+      {isPopupVisible && (
+        <Popup
+          message={popupMessage}
+          onClose={() => setIsPopupVisible(false)} // Close popup when dismissed
+        />
+      )}
+
       {/* Back Button */}
       <TouchableOpacity style={styles.backButton} onPress={handleBack} disabled={isLoading}>
         <Text style={styles.backButtonText}>←</Text>

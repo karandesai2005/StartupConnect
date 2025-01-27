@@ -2,170 +2,312 @@ import React, { useState } from "react";
 import { Text, StyleSheet, View, Pressable, TouchableOpacity, TextInput, Alert } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 
+const Popup = ({ visible, message, onClose }) => {
+    if (!visible) return null;
+
+    return (
+        <View style={styles.popupContainer}>
+            <View style={styles.popup}>
+                <Text style={styles.popupMessage}>{message}</Text>
+                <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+                    <Text style={styles.closeButtonText}>Close</Text>
+                </TouchableOpacity>
+            </View>
+        </View>
+    );
+};
+
 const Signup = () => {
-  const navigation = useNavigation();
-  const route = useRoute();  // To access route params (userId)
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+    const navigation = useNavigation();
+    const route = useRoute(); // To access route params (userId)
+    const [password, setPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [popupVisible, setPopupVisible] = useState(false);
+    const [popupMessage, setPopupMessage] = useState("");
 
-  const handleBack = () => {
-    navigation.goBack();
-  };
+    const handleBack = () => {
+        navigation.goBack();
+    };
 
-  const handleNext = async () => {
-    // Check if passwords match
-    if (password !== confirmPassword) {
-      Alert.alert("Error", "Passwords do not match.");
-      return;
+  //   const handleNext = async () => {
+  //     const trimmedPassword = password.trim();
+  //     const trimmedConfirmPassword = confirmPassword.trim();
+  
+  //     console.log("Password:", trimmedPassword);
+  //     console.log("Confirm Password:", trimmedConfirmPassword);
+  //     console.log("Passwords Match:", trimmedPassword === trimmedConfirmPassword);
+  
+  //     if (trimmedPassword !== trimmedConfirmPassword) {
+  //         setPopupMessage("Passwords do not match.");
+  //         setPopupVisible(true);
+  //         return;
+  //     }
+  
+  //     try {
+  //         const response = await fetch("http://10.11.18.3:3000/api/auth/save-user-details", {
+  //             method: "POST",
+  //             headers: { "Content-Type": "application/json" },
+  //             body: JSON.stringify({
+  //                 step: 2,
+  //                 data: {
+  //                     password: trimmedPassword,
+  //                     userId: route.params.userId,
+  //                 },
+  //             }),
+  //         });
+  
+  //         const result = await response.json();
+  
+  //         if (response.ok) {
+  //             navigation.navigate("username", { userId: route.params.userId });
+  //         } else {
+  //             setPopupMessage(result.message || "Something went wrong!");
+  //             setPopupVisible(true);
+  //         }
+  //     } catch (err) {
+  //         setPopupMessage("Unable to connect to the server. Please try again.");
+  //         setPopupVisible(true);
+  //     }
+  // };
+
+  const validatePassword = (password) => {
+    const minLength = 8;
+    const hasUppercase = /[A-Z]/.test(password);
+    const hasLowercase = /[a-z]/.test(password);
+    const hasNumber = /\d/.test(password);
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+
+    return (
+        password.length >= minLength &&
+        hasUppercase &&
+        hasLowercase &&
+        hasNumber &&
+        hasSpecialChar
+    );
+};
+
+const handleNext = async () => {
+    const trimmedPassword = password.trim();
+    const trimmedConfirmPassword = confirmPassword.trim();
+
+    if (trimmedPassword !== trimmedConfirmPassword) {
+        setPopupMessage("Passwords do not match.");
+        setPopupVisible(true);
+        return;
+    }
+
+    if (!validatePassword(trimmedPassword)) {
+        setPopupMessage("Password must be at least 8 characters long and include uppercase, lowercase, a number, and a special character.");
+        setPopupVisible(true);
+        return;
     }
 
     try {
-      const response = await fetch("http://10.11.18.3:3000/api/auth/save-user-details", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          step: 2,
-          data: {
-            password: password,
-            userId: route.params.userId, // Pass userId from the previous step
-          },
-        }),
-      });
+        const response = await fetch("http://10.11.18.3:3000/api/auth/save-user-details", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                step: 2,
+                data: { password: trimmedPassword, userId: route.params.userId },
+            }),
+        });
 
-      const result = await response.json();
-      console.log(result);
+        const result = await response.json();
 
-      if (response.ok) {
-        navigation.navigate("username", { userId: route.params.userId });
-      } else {
-        Alert.alert("Error", result.message || "Something went wrong!");
-      }
+        if (response.ok) {
+            navigation.navigate("username", { userId: route.params.userId });
+        } else {
+            setPopupMessage(result.message || "Something went wrong!");
+            setPopupVisible(true);
+        }
     } catch (err) {
-      console.error("Error saving Register2 details:", err.message);
-      Alert.alert("Error", "Something went wrong!");
+        setPopupMessage("Unable to connect to the server. Please try again.");
+        setPopupVisible(true);
     }
-  };
+};
 
-  return (
-    <View style={styles.signup2}>
-      <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-        <Text style={styles.backButtonText}>←</Text>
-      </TouchableOpacity>
+  
 
-      <View style={styles.contentContainer}>
-        <Text style={styles.createAccount}>Create account</Text>
-        <Text style={styles.createAPassword}>Create a password</Text>
-        <Text style={styles.useAtleast8}>Use at least 8 characters.</Text>
+    return (
+        <View style={styles.signup2}>
+            <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+                <Text style={styles.backButtonText}>←</Text>
+            </TouchableOpacity>
 
-        <TextInput
-          style={styles.signup2Child}
-          placeholder="Enter your password"
-          secureTextEntry={true}
-          onChangeText={setPassword}
-          value={password}
-        />
+            <View style={styles.contentContainer}>
+                <Text style={styles.createAccount}>Create account</Text>
+                <Text style={styles.createAPassword}>Create a password</Text>
+                <Text style={styles.useAtleast8}>Use at least 8 characters.</Text>
 
-        <Text style={styles.confirmPassword}>Confirm Password</Text>
-        <TextInput
-          style={styles.signup2Item}
-          placeholder="Confirm your password"
-          secureTextEntry={true}
-          onChangeText={setConfirmPassword}
-          value={confirmPassword}
-        />
+                {/* Password Field */}
+                <View style={styles.inputContainer}>
+                    <TextInput
+                        style={styles.signup2Child}
+                        placeholder="Enter your password"
+                        secureTextEntry={!showPassword}
+                        onChangeText={setPassword}
+                        value={password}
+                    />
+                    <TouchableOpacity
+                        style={styles.toggleVisibility}
+                        onPress={() => setShowPassword(!showPassword)}
+                    >
+                        <Text style={styles.toggleVisibilityText}>
+                            {showPassword ? "Hide" : "Show"}
+                        </Text>
+                    </TouchableOpacity>
+                </View>
 
-        <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
-          <Text style={styles.next}>Next</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+                {/* Confirm Password Field */}
+                <Text style={styles.confirmPassword}>Confirm Password</Text>
+                <View style={styles.inputContainer}>
+                    <TextInput
+                        style={styles.signup2Child}
+                        placeholder="Confirm your password"
+                        secureTextEntry={!showConfirmPassword}
+                        onChangeText={setConfirmPassword}
+                        value={confirmPassword}
+                    />
+                    <TouchableOpacity
+                        style={styles.toggleVisibility}
+                        onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                    >
+                        <Text style={styles.toggleVisibilityText}>
+                            {showConfirmPassword ? "Hide" : "Show"}
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+
+                <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
+                    <Text style={styles.next}>Next</Text>
+                </TouchableOpacity>
+            </View>
+
+            {/* Popup */}
+            <Popup
+                visible={popupVisible}
+                message={popupMessage}
+                onClose={() => setPopupVisible(false)}
+            />
+        </View>
+    );
 };
 
 const styles = StyleSheet.create({
-  signup2: {
-    backgroundColor: "#fff",
-    flex: 1,
-    width: "100%",
+    signup2: {
+        backgroundColor: "#fff",
+        flex: 1,
+        width: "100%",
+    },
+    contentContainer: {
+        flex: 1,
+        paddingHorizontal: 20,
+        alignItems: "center",
+        paddingTop: 94,
+    },
+    backButton: {
+        position: "absolute",
+        left: 28,
+        top: 86,
+        zIndex: 1,
+    },
+    backButtonText: {
+        fontSize: 32,
+        color: "#000",
+    },
+    createAccount: {
+        fontSize: 16,
+        fontWeight: "700",
+        color: "#000",
+        marginBottom: 30,
+    },
+    createAPassword: {
+        fontSize: 20,
+        fontWeight: "700",
+        width: "100%",
+        textAlign: "left",
+        marginBottom: 10,
+    },
+    confirmPassword: {
+      fontSize: 20,
+      fontWeight: "700",
+      width: "100%",
+      textAlign: "left",
+      marginBottom: 10,
   },
-  contentContainer: {
-    flex: 1,
-    paddingHorizontal: 20,
-    alignItems: "center",
-    paddingTop: 94,
-  },
-  backButton: {
-    position: "absolute",
-    left: 28,
-    top: 86,
-    zIndex: 1,
-  },
-  backButtonText: {
-    fontSize: 32,
-    color: "#000",
-  },
-  createAccount: {
-    fontSize: 16,
-    fontFamily: "Avenir Next Cyr",
-    fontWeight: "700",
-    color: "#000",
-    marginBottom: 30,
-  },
-  createAPassword: {
-    fontSize: 20,
-    color: "#000",
-    fontFamily: "Avenir Next Cyr",
-    fontWeight: "700",
-    width: "100%",
-    textAlign: "left",
-    marginBottom: 10,
-  },
-  useAtleast8: {
-    fontSize: 8,
-    color: "#000",
-    fontFamily: "Avenir Next",
-    alignSelf: "flex-start",
-    marginBottom: 30,
-  },
-  signup2Child: {
-    height: 51,
-    width: "100%",
-    backgroundColor: "#b7b7b7",
-    borderRadius: 5,
-    marginBottom: 30,
-    paddingHorizontal: 10,
-  },
-  confirmPassword: {
-    fontSize: 20,
-    color: "#000",
-    fontFamily: "Avenir Next Cyr",
-    fontWeight: "700",
-    width: "100%",
-    textAlign: "left",
-    marginBottom: 10,
-  },
-  signup2Item: {
-    height: 51,
-    width: "100%",
-    backgroundColor: "#b7b7b7",
-    borderRadius: 5,
-    marginBottom: 30,
-    paddingHorizontal: 10,
-  },
-  nextButton: {
-    backgroundColor: "#535353",
-    borderRadius: 21,
-    width: 82,
-    height: 42,
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 20,
-  },
-  next: {
-    fontSize: 15,
-    color: "#fff",
-    fontFamily: "Avenir Next",
-  },
+    useAtleast8: {
+        fontSize: 8,
+        alignSelf: "flex-start",
+        marginBottom: 30,
+    },
+    inputContainer: {
+        width: "100%",
+        flexDirection: "row",
+        alignItems: "center",
+        position: "relative",
+        marginBottom: 20,
+    },
+    signup2Child: {
+        flex: 1,
+        height: 51,
+        backgroundColor: "#b7b7b7",
+        borderRadius: 5,
+        paddingHorizontal: 10,
+    },
+    toggleVisibility: {
+        position: "absolute",
+        right: 10,
+    },
+    toggleVisibilityText: {
+        fontSize: 14,
+        color: "#007AFF",
+    },
+    nextButton: {
+        backgroundColor: "#535353",
+        borderRadius: 21,
+        width: 82,
+        height: 42,
+        justifyContent: "center",
+        alignItems: "center",
+        marginTop: 20,
+    },
+    next: {
+        fontSize: 15,
+        color: "#fff",
+    },
+    popupContainer: {
+        position: "absolute",
+        top: 0,
+        bottom: 0,
+        left: 0,
+        right: 0,
+        justifyContent: "center",
+        alignItems: "center",
+        backgroundColor: "rgba(0, 0, 0, 0.5)",
+    },
+    popup: {
+        backgroundColor: "#fff",
+        padding: 20,
+        borderRadius: 10,
+        alignItems: "center",
+    },
+    popupMessage: {
+        fontSize: 16,
+        marginBottom: 10,
+        textAlign: "center",
+    },
+    closeButton: {
+        backgroundColor: "#007AFF",
+        padding: 10,
+        borderRadius: 5,
+    },
+    closeButtonText: {
+        color: "#fff",
+        fontWeight: "600",
+    },
+
 });
 
 export default Signup;

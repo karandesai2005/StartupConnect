@@ -1,51 +1,73 @@
-import React from "react";
-import { Text, StyleSheet, View, Pressable} from "react-native";
+import React, { useState } from "react";
+import { Text, StyleSheet, View, Pressable, FlatList } from "react-native";
+import { useNavigation } from "@react-navigation/native";
 
-
-const fields = [
-  { label: "Technology", top: 223 },
-  { label: "Technology", top: 289 },
-  { label: "Technology", top: 353 },
-  { label: "Technology", top: 419 },
-  { label: "Technology", top: 484 },
-  { label: "Technology", top: 550 },
-  { label: "Technology", top: 614 },
-  { label: "Technology", top: 680 },
-  { label: "Technology", top: 744 },
-  { label: "Technology", top: 810 },
-  { label: "Technology", top: 874 },
+const INTERESTS = [
+  "AI & Machine Learning", 
+  "Data Science", 
+  "Web Development", 
+  "Mobile Development", 
+  "Cybersecurity", 
+  "Cloud Computing", 
+  "Blockchain", 
+  "UX/UI Design", 
+  "Digital Marketing", 
+  "Robotics", 
+  "Gaming"
 ];
 
 const Signup = () => {
+  const navigation = useNavigation();
+  const [selectedInterests, setSelectedInterests] = useState([]);
+
+  const toggleInterest = (interest) => {
+    setSelectedInterests(current => 
+      current.includes(interest)
+        ? current.filter(item => item !== interest)
+        : [...current, interest].slice(0, 3)
+    );
+  };
+
+  const handleNext = () => {
+    if (selectedInterests.length >= 3) {
+      navigation.navigate('Home', { interests: selectedInterests });
+    }
+  };
+
+  const renderInterest = ({ item }) => (
+    <Pressable 
+      style={[
+        styles.fieldContainer, 
+        selectedInterests.includes(item) && styles.selectedField
+      ]}
+      onPress={() => toggleInterest(item)}
+    >
+      <Text style={styles.fieldText}>{item}</Text>
+    </Pressable>
+  );
+
   return (
     <View style={styles.container}>
-      {/* Title */}
-      <Text style={styles.title}>Choose 3 or more fields you like.</Text>
+      <Text style={styles.title}>Choose 3 fields you like</Text>
+      
+      <FlatList
+        data={INTERESTS}
+        renderItem={renderInterest}
+        keyExtractor={item => item}
+        contentContainerStyle={styles.interestsList}
+        numColumns={2}
+      />
 
-      {/* Search Container */}
-      {/* <View style={styles.searchContainer}>
-        <Search style={styles.searchIcon} />
-        <Text style={styles.searchText}>Search</Text>
-      </View> */}
-
-      {/* Chevron Icon */}
-      {/* <Chevronleft style={styles.chevronIcon} /> */}
-
-      {/* Fields List */}
-      {fields.map((field, index) => (
-        <View
-          key={index}
-          style={[
-            styles.fieldContainer,
-            { top: field.top }, // Ensure `top` is applied as part of the style
-          ]}
-        >
-          <Text style={styles.fieldText}>{field.label}</Text>
-        </View>
-      ))}
-        <Pressable style={styles.nextButton}>
-            <Text style={styles.nextButtonText}>Next</Text>
-        </Pressable>
+      <Pressable 
+        style={[
+          styles.nextButton, 
+          selectedInterests.length < 3 && styles.disabledButton
+        ]}
+        onPress={handleNext}
+        disabled={selectedInterests.length < 3}
+      >
+        <Text style={styles.nextButtonText}>Next</Text>
+      </Pressable>
     </View>
   );
 };
@@ -54,71 +76,52 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#fff",
+    alignItems: "center",
+    paddingTop: 67,
   },
   title: {
-    marginTop: 67,
-    textAlign: "center",
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "700",
-    fontFamily: "Avenir Next Cyr",
     color: "#000",
+    marginBottom: 20,
   },
-  searchContainer: {
-    position: "absolute",
-    top: 114,
-    left: 31,
-    width: 369,
-    height: 42,
-    backgroundColor: "#b7b7b7",
-    borderRadius: 5,
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 10,
-  },
-  searchIcon: {
-    marginRight: 10,
-  },
-  searchText: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: "#000",
-  },
-  chevronIcon: {
-    position: "absolute",
-    top: 61,
-    left: 24,
+  interestsList: {
+    justifyContent: "center",
+    paddingHorizontal: 20,
   },
   fieldContainer: {
-    position: "absolute",
-    left: 39,
-    height: 46,
-    width: 112,
+    margin: 10,
+    height: 60,
+    width: 150,
     backgroundColor: "#d9d9d9",
     borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
   },
+  selectedField: {
+    backgroundColor: "#4CAF50",
+  },
   fieldText: {
     fontSize: 15,
     fontWeight: "500",
-    fontFamily: "Avenir Next Cyr",
     color: "#000",
   },
   nextButton: {
     backgroundColor: "#535353",
     borderRadius: 21,
-    width: 82,
-    height: 42,
+    width: 120,
+    height: 50,
     justifyContent: "center",
     alignItems: "center",
-    marginTop: "auto",
-    marginBottom: 140,
-    },
-    nextButtonText: {
-    fontSize: 15,
+    marginBottom: 40,
+  },
+  disabledButton: {
+    opacity: 0.5,
+  },
+  nextButtonText: {
+    fontSize: 16,
     color: "#fff",
-    fontFamily: "Avenir Next",
-    },
+  },
 });
 
 export default Signup;

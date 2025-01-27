@@ -15,6 +15,7 @@ import Preference from './components/preference';
 import handlePersonal from './components/Profile/P_Profile/handlePersonal';
 import handleBusiness from './components/Profile/B_Profile/handleBusiness';
 import field from './components/field';
+import Popup from './components/Popup';
 
 const Stack = createStackNavigator();
 
@@ -38,6 +39,7 @@ const App = () => {
           <Stack.Screen name="handlePersonal" component={handlePersonal}/>
           <Stack.Screen name="handleBusiness" component={handleBusiness}/>
           <Stack.Screen name="field" component={field}/>
+          <Stack.Screen name='PopUp' component={Popup}/>
         </Stack.Navigator>
       </NavigationContainer>
     </UserRegistrationProvider>

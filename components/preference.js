@@ -1,54 +1,107 @@
 import * as React from "react";
-import { Text, StyleSheet, View, Pressable, TouchableOpacity } from "react-native";
+import { Text, StyleSheet, View, Pressable, TouchableOpacity, Alert } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import handlePersonal from './Profile/P_Profile/handlePersonal';
-import handleBusiness from './Profile/B_Profile/handleBusiness';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const Signup = () => {
     const navigation = useNavigation();
-    const route = useRoute(); // Use this to access route params
+    const route = useRoute();
 
-    const [isFounder, setIsFounder] = React.useState(false); // Example state
-    const [isInvestor, setIsInvestor] = React.useState(false); // Example state
+    React.useEffect(() => {
+        // Verify userId exists when component mounts
+        const checkUserId = async () => {
+            try {
+                const userId = await AsyncStorage.getItem('userId');
+                console.log("Preferences screen - Current userId:", userId);
+                if (!userId) {
+                    Alert.alert(
+                        "Error",
+                        "Session expired. Please restart registration.",
+                        [{ text: "OK", onPress: () => navigation.navigate("Register1") }]
+                    );
+                }
+            } catch (error) {
+                console.error("Error checking userId:", error);
+            }
+        };
+        checkUserId();
+    }, []);
 
     const handleBack = () => {
         navigation.goBack();
     };
 
-    const handlePersonalAccount = () => {
-        navigation.navigate("handlePersonal"); 
-    };
-
-    const handleBusinessAccount = () => {
-        navigation.navigate("handleBusiness");
-    };
-
-    const handleFinish = async () => {
+    const handlePersonalAccount = async () => {
         try {
-          const response = await fetch("http://localhost:3000/api/auth/save-user-details", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              step: 4,
-              data: {
-                isFounder,
-                isInvestor,
-                userId: route.params.userId, // Access userId from route params
-              },
-            }),
-          });
-      
-          const result = await response.json();
-          console.log(result);
-      
-          if (response.ok) {
-            // Navigate to the home screen or another step
-            navigation.navigate("Home");
-          }
-        } catch (err) {
-          console.error("Error saving preference details:", err.message);
+            const userId = await AsyncStorage.getItem('userId');
+            console.log("UserId from AsyncStorage:", userId);
+            if (!userId) {
+                Alert.alert("Error", "User session not found. Please try again.");
+                return;
+            }
+    
+            const requestBody = {
+                step: 4,
+                data: {
+                    preference: "personal", // Use "personal" or "business" as a string
+                    userId: parseInt(userId),
+                },
+            };
+            
+            console.log("Request Body:", requestBody);
+    
+            const response = await fetch("http://10.11.18.3:3000/api/auth/save-user-details", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(requestBody),
+            });
+    
+            const result = await response.json();
+            console.log("Response from server:", result);
+    
+            if (response.ok) {
+                navigation.navigate("handlePersonal");
+            } else {
+                Alert.alert("Error", result.message || "Failed to save preference. Please try again.");
+            }
+        } catch (error) {
+            console.error("Error in handlePersonalAccount:", error);
+            Alert.alert("Error", "Something went wrong. Please try again.");
         }
-      };
+    };
+    
+    
+    const handleBusinessAccount = async () => {
+        try {
+            const userId = await AsyncStorage.getItem('userId');
+            if (!userId) {
+                Alert.alert("Error", "User session not found. Please try again.");
+                return;
+            }
+    
+            const response = await fetch("http://10.11.18.3:3000/api/auth/save-user-details", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    step: 4,
+                    data: {
+                        preference: 2,  // Changed to numeric value: 2 for business
+                        userId: parseInt(userId)
+                    },
+                }),
+            });
+    
+            if (response.ok) {
+                navigation.navigate("handleBusiness");
+            } else {
+                const result = await response.json();
+                Alert.alert("Error", result.message || "Failed to save preference. Please try again.");
+            }
+        } catch (error) {
+            console.error("Error in handleBusinessAccount:", error);
+            Alert.alert("Error", "Something went wrong. Please try again.");
+        }
+    };
 
     return (
         <View style={styles.signup4}>
@@ -73,10 +126,6 @@ const Signup = () => {
                         <Text style={styles.accountOptionText}>Business Account</Text>
                     </Pressable>
                 </View>
-
-                <Pressable style={styles.nextButton} onPress={handleFinish}>
-                    <Text style={styles.nextButtonText}>Next</Text>
-                </Pressable>
             </View>
         </View>
     );

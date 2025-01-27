@@ -1,127 +1,163 @@
-import * as React from "react";
-import { Text, StyleSheet, View, Image, TextInput, Pressable } from "react-native";
-import { useNavigation } from '@react-navigation/native';
-import field from '../../field';
+    import * as React from "react";
+    import { Text, StyleSheet, View, TextInput, Pressable, ActivityIndicator, Alert } from "react-native";
+    import { useNavigation } from "@react-navigation/native";
+    import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const Signup = () => {
-    const [name, setName] = React.useState("");
-    const navigation = useNavigation();
-        
+    const HandlePersonal = () => {
+        const [realName, setRealName] = React.useState("");
+        const [isLoading, setIsLoading] = React.useState(false);
+        const [error, setError] = React.useState("");
+        const navigation = useNavigation();
+    
+        React.useEffect(() => {
+            const checkUserId = async () => {
+                const userId = await AsyncStorage.getItem('userId');
+                console.log("Component mounted, current userId:", userId);
+            };
+            checkUserId();
+        }, []);
+    
         const handleBack = () => {
             navigation.goBack();
         };
+    
+        const handleSaveRealName = async () => {
+            try {
+                const userId = await AsyncStorage.getItem('userId');
+                console.log("Retrieved userId:", userId);
         
-        const nxtpage = () => {
-            navigation.navigate("field");
+                if (!userId) {
+                    Alert.alert("Error", "User session not found. Please try again.");
+                    return;
+                }
+        
+                // Assume `realName` is bound to an input field in your component
+                if (!realName || realName.trim() === "") {
+                    Alert.alert("Error", "Real name cannot be empty.");
+                    return;
+                }
+        
+                const requestBody = {
+                    step: 5,
+                    data: {
+                        realName: realName.trim(),
+                        userId: parseInt(userId),
+                    },
+                };
+        
+                const response = await fetch("http://10.11.18.3:3000/api/auth/save-user-details", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(requestBody),
+                });
+        
+                const result = await response.json();
+                console.log("Response from server:", result);
+        
+                if (response.ok) {
+                    // Alert.alert("Success", "Real name saved successfully.");
+                    navigation.navigate("field"); // Replace with your next navigation target
+                } else {
+                    Alert.alert("Error", result.message || "Failed to save real name. Please try again.");
+                }
+            } catch (error) {
+                console.error("Error saving real name:", error);
+                Alert.alert("Error", "Something went wrong. Please try again.");
+            }
         };
+        
+        
 
-    return (
-        <View style={styles.signup5}>
-            <Text style={[styles.createAccount, styles.centeredText]}>Create account</Text>
-            <Text style={[styles.whatsYourName, styles.centeredText]}>What’s your name?</Text>
+        return (
+            <View style={styles.container}>
+                <Text style={[styles.title, styles.centeredText]}>What’s your real name?</Text>
 
-            <TextInput
-                style={styles.textInput}
-                placeholder="Enter your name"
-                value={name}
-                onChangeText={(text) => setName(text)}
-            />
+                {/* Input Field */}
+                <TextInput
+                    style={styles.textInput}
+                    placeholder="Enter your real name"
+                    value={realName}
+                    onChangeText={(text) => setRealName(text)}
+                />
+                {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-            <Pressable style={styles.signupButton} onPress={() => console.log("Name entered:", name)}>
-                <Text style={styles.signupButtonText}
-                onPress={nxtpage} >Create an account</Text>
-            </Pressable>
+                {/* Save Button */}
+                <Pressable
+                    style={[styles.saveButton, isLoading ? styles.disabledButton : null]}
+                    onPress={handleSaveRealName}
+                    disabled={isLoading}
+                >
+                    {isLoading ? (
+                        <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                        <Text style={styles.saveButtonText}>Save and Continue</Text>
+                    )}
+                </Pressable>
 
-            {/* <Image source={require("../assets/create-watch-face.png")} style={styles.imageIcon} /> */}
-            {/* <Image source={require("../assets/line-1.png")} style={styles.imageIconLine} /> */}
+                {/* Back Button */}
+                <Pressable style={styles.backButton} onPress={handleBack}>
+                    <Text style={styles.backButtonText}>Back</Text>
+                </Pressable>
+            </View>
+        );
+    };
 
-            <Text style={styles.byTappingOn}>
-                {`By tapping on “Create account”, you agree to the Pitch Terms of Use.\n\nTo learn more about how Pitch collects, uses, shares, and protects your personal data, please see the Pitch Privacy Policy.`}
-            </Text>
-            <Text style={[styles.privacyPolicy, styles.termsText]}>Privacy Policy</Text>
-            <Text style={[styles.termsOfUse, styles.termsText]}>Terms of Use</Text>
-        </View>
-    );
-};
+    const styles = StyleSheet.create({
+        container: {
+            flex: 1,
+            backgroundColor: "#fff",
+            justifyContent: "center",
+            alignItems: "center",
+            padding: 20,
+        },
+        centeredText: {
+            textAlign: "center",
+        },
+        title: {
+            fontSize: 24,
+            fontWeight: "700",
+            color: "#000",
+            marginBottom: 20,
+        },
+        textInput: {
+            width: "100%",
+            height: 50,
+            borderColor: "#ccc",
+            borderWidth: 1,
+            borderRadius: 8,
+            padding: 10,
+            fontSize: 16,
+            marginBottom: 10,
+        },
+        saveButton: {
+            width: "100%",
+            backgroundColor: "#535353",
+            paddingVertical: 12,
+            borderRadius: 8,
+            alignItems: "center",
+            marginBottom: 20,
+        },
+        disabledButton: {
+            opacity: 0.7,
+        },
+        saveButtonText: {
+            color: "#fff",
+            fontSize: 16,
+            fontWeight: "600",
+        },
+        errorText: {
+            color: "#ff0000",
+            fontSize: 14,
+            marginBottom: 10,
+            textAlign: "center",
+        },
+        backButton: {
+            marginTop: 10,
+        },
+        backButtonText: {
+            color: "#1ed760",
+            fontSize: 14,
+        },
+    });
 
-const styles = StyleSheet.create({
-    signup5: {
-        flex: 1,
-        backgroundColor: "#fff",
-        justifyContent: "center",
-        alignItems: "center",
-        padding: 20,
-    },
-    centeredText: {
-        textAlign: "center",
-    },
-    createAccount: {
-        fontSize: 24,
-        fontWeight: "700",
-        color: "#000",
-        marginBottom: 20,
-    },
-    whatsYourName: {
-        fontSize: 18,
-        fontWeight: "700",
-        color: "#000",
-        marginBottom: 20,
-    },
-    textInput: {
-        width: "100%",
-        height: 50,
-        borderColor: "#ccc",
-        borderWidth: 1,
-        borderRadius: 8,
-        padding: 10,
-        fontSize: 16,
-        marginBottom: 30,
-    },
-    signupButton: {
-        width: "100%",
-        backgroundColor: "#535353",
-        paddingVertical: 12,
-        borderRadius: 8,
-        alignItems: "center",
-        marginBottom: 20,
-    },
-    signupButtonText: {
-        color: "#fff",
-        fontSize: 16,
-        fontWeight: "600",
-    },
-    imageIcon: {
-        width: 100,
-        height: 100,
-        resizeMode: "contain",
-        marginBottom: 20,
-    },
-    imageIconLine: {
-        width: "100%",
-        height: 2,
-        backgroundColor: "#ccc",
-        marginBottom: 20,
-    },
-    byTappingOn: {
-        fontSize: 12,
-        color: "#000",
-        textAlign: "center",
-        marginVertical: 10,
-    },
-    privacyPolicy: {
-        color: "#1ed760",
-        fontSize: 12,
-        textAlign: "center",
-        marginBottom: 5,
-    },
-    termsOfUse: {
-        color: "#1ed760",
-        fontSize: 12,
-        textAlign: "center",
-    },
-    termsText: {
-        fontWeight: "500",
-    },
-});
-
-export default Signup;
+    export default HandlePersonal;

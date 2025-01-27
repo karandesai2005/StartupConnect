@@ -17,7 +17,7 @@ const validateUsernameInput = [
 
 // Middleware to validate saveUserDetails input
 const validateSaveUserDetailsInput = [
-  body("step").isInt({ min: 1, max: 4 }).withMessage("Step must be between 1 and 4."),
+  body("step").isInt({ min: 1, max: 6 }).withMessage("Step must be between 1 and 4."),
   body("data").notEmpty().withMessage("Data field is required."),
   body("data.email").if(body("step").equals(1)).isEmail().withMessage("Invalid email."),
   body("data.password")
