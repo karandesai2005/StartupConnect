@@ -7,13 +7,15 @@ import LoginScreen from './components/LoginScreen';
 import HomeScreen from './components/Home';
 // import ProfileScreenP from './components/Profile/P_Profile/profile';
 import ChatScreen from './components/Chat';
-import Register1 from "./components/Register1"; 
+import Register1 from "./components/Register1";
 import Register2 from "./components/Register2"; 
 import EditProfileP from './components/Profile/P_Profile/editProfileP';
 import Username from './components/username';
 import Preference from './components/preference';
 import handlePersonal from './components/Profile/P_Profile/handlePersonal';
 import handleBusiness from './components/Profile/B_Profile/handleBusiness';
+import EditProfileB from './components/Profile/B_Profile/editProfile';
+
 import field from './components/field';
 import Popup from './components/Popup';
 
@@ -34,6 +36,7 @@ const App = () => {
           <Stack.Screen name="Register2" component={Register2}/>
           {/* <Stack.Screen name="ProfileP" component={ProfileScreenP} /> */}
           <Stack.Screen name="EditProfileP" component={EditProfileP}/>
+          <Stack.Screen name="EditProfileB" component={EditProfileB}/>
           <Stack.Screen name="username" component={Username}/>
           <Stack.Screen name="preference" component={Preference}/>
           <Stack.Screen name="handlePersonal" component={handlePersonal}/>

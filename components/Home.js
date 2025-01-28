@@ -1,5 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, ActivityIndicator, StyleSheet, TouchableOpacity, Image, TextInput } from 'react-native';
+import {
+  View,
+  Text,
+  FlatList,
+  ActivityIndicator,
+  StyleSheet,
+  TouchableOpacity,
+  Image,
+  TextInput,
+} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import axios from 'axios';
 
@@ -9,10 +18,11 @@ export default function HomeScreen() {
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedItems, setExpandedItems] = useState({});
   const navigation = useNavigation();
+
   useEffect(() => {
-    console.log("HomeScreen loaded");
+    console.log('HomeScreen loaded');
   }, []);
-  
+
   const loadUsers = () => {
     setLoading(true);
     axios
@@ -80,10 +90,6 @@ export default function HomeScreen() {
         <Text numberOfLines={expandedItems[index] ? null : 3}>
           This is a sample text. This is the comment. Let's go. This is a good MVP.
           Additional content for testing the "Show More" functionality...
-          Let's go. This is a good MVP.
-          Additional content for testing the "Show More" functionality...
-          Let's go. This is a good MVP.
-          Additional content for testing the "Show More" functionality...
         </Text>
         <TouchableOpacity onPress={() => toggleExpand(index)}>
           <Text style={styles.actionText}>
@@ -136,7 +142,7 @@ export default function HomeScreen() {
         <TouchableOpacity onPress={() => navigation.navigate('Notifications')}>
           <Image source={require('../assets/bell.png')} style={styles.navIcon} />
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => navigation.navigate('EditProfileP')}>
+        <TouchableOpacity onPress={() => navigation.navigate('EditProfileB')}>
           <Image source={require('../assets/settings.png')} style={styles.navIcon} />
         </TouchableOpacity>
       </View>

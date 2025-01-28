@@ -30,7 +30,7 @@ const Signup = () => {
 
   const handleNext = () => {
     if (selectedInterests.length >= 3) {
-      navigation.navigate('Home', { interests: selectedInterests });
+      navigation.navigate('Login', { interests: selectedInterests });
     }
   };
 
