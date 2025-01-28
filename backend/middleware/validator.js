@@ -20,16 +20,21 @@ const validateUsernameInput = [
 // Middleware to validate saveUserDetails input
 const validateSaveUserDetailsInput = [
   // Validate the step field (must be between 1 and 6)
-  body("step").isInt({ min: 1, max: 6 }).withMessage("Step must be between 1 and 6."),
+  body("step")
+    .isInt({ min: 1, max: 6 })
+    .withMessage("Step must be between 1 and 6."),
   
   // Ensure data field is not empty
-  body("data").notEmpty().withMessage("Data field is required."),
-
+  body("data")
+    .notEmpty()
+    .withMessage("Data field is required."),
+  
   // Step 1: Validate email and password
   body("data.email")
     .if(body("step").equals(1))
     .isEmail()
     .withMessage("Invalid email."),
+  
   body("data.password")
     .if(body("step").equals(1))
     .isLength({ min: 6 })
@@ -65,6 +70,7 @@ const validateSaveUserDetailsInput = [
     .if(body("step").equals(4))
     .isBoolean()
     .withMessage("isFounder must be a boolean."),
+  
   body("data.isInvestor")
     .if(body("step").equals(4))
     .isBoolean()
@@ -75,7 +81,7 @@ const validateSaveUserDetailsInput = [
     .if(body("step").equals(5))
     .isString()
     .withMessage("Real name is required."),
-
+  
   // Handle validation errors
   (req, res, next) => {
     const errors = validationResult(req);

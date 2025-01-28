@@ -73,7 +73,7 @@ const EditProfileP = () => {
           <View style={styles.text}>
             <View style={styles.id}>
               {/* Dynamically display username */}
-              <Text style={styles.userName}>{userData?.username}</Text>
+              <Text style={styles.userName}>{userData?.username || 'Loading...'}</Text>
               <Text style={styles.checkCircleIcon}>✓</Text>
             </View>
             <Text style={styles.about}>CEO of PITCH. Entrepreneur, investor and many more</Text>

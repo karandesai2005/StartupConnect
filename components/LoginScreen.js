@@ -36,25 +36,29 @@ const LoginScreen = () => {
     setIsLoading(true);
     setServerError("");
   
+    // Determine whether the input is an email or a username
+    const isEmail = usernameOrEmail.includes("@");
+  
     try {
       const response = await fetch("http://10.11.18.3:3000/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: usernameOrEmail, email: usernameOrEmail, password }),
+        body: JSON.stringify({
+          username: isEmail ? undefined : usernameOrEmail,
+          email: isEmail ? usernameOrEmail : undefined,
+          password,
+        }),
       });
   
       const result = await response.json();
-      console.log(result); // Add this to see the result
   
       if (response.ok && result.token) {
-        // Successfully logged in
-        await AsyncStorage.setItem("token", result.token); // Store the token
-        navigation.replace("Home"); // Navigate to home after successful login
+        await AsyncStorage.setItem("token", result.token);
+        navigation.replace("Home");
       } else {
         setPopupMessage(result.message || "Login failed. Please try again.");
         setIsPopupVisible(true);
       }
-  
     } catch (err) {
       setPopupMessage("Network error. Please try again later.");
       setIsPopupVisible(true);
@@ -62,6 +66,7 @@ const LoginScreen = () => {
       setIsLoading(false);
     }
   };
+  
   
 
   return (

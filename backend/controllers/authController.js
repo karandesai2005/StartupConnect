@@ -38,13 +38,15 @@ const login = async (req, res) => {
     if (email) {
       normalizedEmail = email.toLowerCase();
       query = 'SELECT * FROM users WHERE email = $1 COLLATE "C"';
+      const user = await pool.query(query, [normalizedEmail]);
     } else if (username) {
       query = 'SELECT * FROM users WHERE username = $1 COLLATE "C"';
-    } else {
-      return res.status(400).json({ message: "Email or username is required" });
+      const user = await pool.query(query, [username]);
     }
+    
+    
 
-    const user = await pool.query(query, [email || username]);
+    const user = await pool.query(query, [normalizedEmail || username]);
     if (user.rows.length === 0) {
       return res.status(400).json({ message: "Invalid email/username or password" });
     }
