@@ -1,45 +1,114 @@
 import React, { useState, useEffect } from "react";
-import { StyleSheet, View, Text, Image, TouchableOpacity, ActivityIndicator } from "react-native";
+import { StyleSheet, View, Text, Image, TouchableOpacity, TextInput, Modal, Button, ActivityIndicator } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { launchImageLibrary } from 'react-native-image-picker'; // Importing the image picker
+
+
+// import { launchImageLibrary } from 'react-native-image-picker'; // Importing the image picker
+
+// Inside your EditProfileP component:
+const handleProfilePictureChange = () => {
+  launchImageLibrary(
+    {
+      mediaType: 'photo',
+      quality: 1,  // Full quality image
+      includeBase64: false,  // You can enable this if you need base64 image
+    },
+    (response) => {
+      if (response.didCancel) {
+        console.log("User cancelled image picker");
+      } else if (response.errorCode) {
+        console.log("Image Picker Error: ", response.errorMessage);
+      } else {
+        const selectedImage = response.assets[0];
+        setUpdatedProfileImage(selectedImage.uri); // Set the selected image URI
+      }
+    }
+  );
+};
 
 const EditProfileP = () => {
   const [activeTab, setActiveTab] = useState('stories');
-  const [userData, setUserData] = useState(null);  // State for storing user data
-  const [isLoading, setIsLoading] = useState(true); // State for loading indicator
+  const [userData, setUserData] = useState(null); 
+  const [isLoading, setIsLoading] = useState(true); 
+  const [isEditModalVisible, setIsEditModalVisible] = useState(false); // For editing profile modal
+  const [updatedBio, setUpdatedBio] = useState(''); // Store updated bio
+  const [updatedProfileImage, setUpdatedProfileImage] = useState(null); // Store updated profile image
 
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        const token = await AsyncStorage.getItem("token");  // Get the stored token
+        const token = await AsyncStorage.getItem("token");
 
         if (token) {
           const response = await fetch("http://10.11.18.3:3000/api/auth/profile", {
             method: "GET",
             headers: {
-              "Authorization": `Bearer ${token}`,  // Pass token in the Authorization header
+              "Authorization": `Bearer ${token}`,
             },
           });
 
-          const result = await response.text();  // Get raw response text
+          const result = await response.text(); 
 
-          console.log("API Response:", result);  // Log the raw response for debugging
+          console.log("API Response:", result);
 
           if (response.ok) {
-            const jsonData = JSON.parse(result);  // Parse only if it's valid JSON
-            setUserData(jsonData);  // Store user data in state
+            const jsonData = JSON.parse(result);
+            setUserData(jsonData); 
+            setUpdatedBio(jsonData?.bio); // Set the current bio for editing
           } else {
-            console.log(result);  // Handle error message
+            console.log(result); 
           }
         }
       } catch (error) {
         console.error("Error fetching user data:", error);
       } finally {
-        setIsLoading(false);  // Stop loading after fetching
+        setIsLoading(false);
       }
     };
 
     fetchUserData();
   }, []);
+
+  const handleEditProfile = async () => {
+    try {
+      const token = await AsyncStorage.getItem("token");
+      const formData = new FormData();
+      formData.append('bio', updatedBio);
+      if (updatedProfileImage) {
+        formData.append('profile_picture', updatedProfileImage);
+      }
+  
+      const response = await fetch("http://10.11.18.3:3000/api/auth/edit-profile", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+        },
+        body: formData,
+      });
+  
+      const responseText = await response.text();
+      console.log("Raw Response:", responseText);
+  
+      if (response.ok) {
+        const result = JSON.parse(responseText);
+        console.log("Edit Profile Result:", result);
+  
+        // Update user data
+        setUserData({ ...userData, bio: updatedBio, profile_picture: updatedProfileImage });
+  
+        // Close the modal after a successful update
+        setIsEditModalVisible(false);
+      } else {
+        console.log("Error updating profile:", responseText);
+        // Optionally show an error message if the update fails
+      }
+    } catch (error) {
+      console.error("Error updating profile:", error);
+    }
+  };
+  
+  
 
   if (isLoading) {
     return (
@@ -64,7 +133,7 @@ const EditProfileP = () => {
           <View style={styles.avatarMultiVariants}>
             <View style={styles.masterAvatar}>
               <Image 
-                source={require('../../../assets/del.png')}
+                source={updatedProfileImage ? { uri: updatedProfileImage } : require('../../../assets/del.png')}
                 style={styles.profileImage}
                 resizeMode="cover"
               />
@@ -72,16 +141,17 @@ const EditProfileP = () => {
           </View>
           <View style={styles.text}>
             <View style={styles.id}>
-              {/* Dynamically display username */}
-              <Text style={styles.userName}>{userData?.username || 'Loading...'}</Text>
+              <Text style={styles.userName}>{userData?.username}</Text>
               <Text style={styles.checkCircleIcon}>✓</Text>
             </View>
-            <Text style={styles.about}>CEO of PITCH. Entrepreneur, investor and many more</Text>
+            <Text style={styles.about}>{updatedBio || userData?.bio}</Text>
           </View>
           <View style={styles.buttonContainer}>
-            <View style={styles.masterOutlineButton}>
-              <Text style={styles.button}>Edit Profile</Text>
-            </View>
+            <TouchableOpacity onPress={() => setIsEditModalVisible(true)}>
+              <View style={styles.masterOutlineButton}>
+                <Text style={styles.button}>Edit Profile</Text>
+              </View>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -116,6 +186,41 @@ const EditProfileP = () => {
 
         <View style={styles.profile12Child} />
       </View>
+
+      {/* Modal for editing profile */}
+      <Modal visible={isEditModalVisible} animationType="slide" transparent={true}>
+  <View style={styles.modalOverlay}>
+    <View style={styles.modalContent}>
+      <Text style={styles.modalTitle}>Edit Profile</Text>
+      
+      <TextInput 
+        style={styles.textInput}
+        value={updatedBio}
+        onChangeText={setUpdatedBio}
+        placeholder="Update Bio"
+        multiline
+      />
+      
+      {/* Button for changing profile picture */}
+      <TouchableOpacity style={styles.changePicButton} onPress={() => console.log("Profile picture change functionality")}>
+        <Text style={styles.changePicButtonText}>Change Profile Picture</Text>
+      </TouchableOpacity>
+      
+      {/* Save Changes Button */}
+      <TouchableOpacity onPress={handleEditProfile}>
+        <View style={styles.saveButton}>
+          <Text style={styles.saveButtonText}>Save Changes</Text>
+        </View>
+      </TouchableOpacity>
+
+      {/* Cancel Button */}
+      <TouchableOpacity onPress={() => setIsEditModalVisible(false)}>
+        <Text style={styles.cancelButton}>Cancel</Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+</Modal>
+
     </View>
   );
 };
@@ -286,6 +391,114 @@ const styles = StyleSheet.create({
     backgroundColor: "#f0f8ff",
     borderRadius: 14,
     marginTop: 20,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  },
+  modalContent: {
+    width: "80%",
+    backgroundColor: "#fff",
+    padding: 20,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 10,
+  },
+  textInput: {
+    width: "100%",
+    height: 40,
+    borderColor: "#ccc",
+    borderWidth: 1,
+    marginBottom: 10,
+    paddingLeft: 10,
+    borderRadius: 5,
+  },
+  saveButton: {
+    backgroundColor: "#007bff",
+    padding: 10,
+    marginBottom: 10,
+    borderRadius: 5,
+    alignItems: "center",
+  },
+  cancelButton: {
+    color: "#007bff",
+    fontWeight: "bold",
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.7)",  // Darker overlay for better focus
+  },
+  modalContent: {
+    width: "80%",
+    backgroundColor: "#fff",
+    padding: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    shadowColor: "#000",  // Shadow for depth
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 5, // Android shadow
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: "bold",
+    marginBottom: 12,
+    color: "#333",
+  },
+  textInput: {
+    width: "100%",
+    height: 50,
+    borderColor: "#ccc",
+    borderWidth: 1,
+    marginBottom: 15,
+    paddingLeft: 12,
+    borderRadius: 8,
+    fontSize: 16,
+  },
+  saveButton: {
+    backgroundColor: "#007bff",
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginBottom: 12,
+    width: "100%",
+    alignItems: "center",
+  },
+  saveButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  cancelButton: {
+    color: "#007bff",
+    fontSize: 16,
+    fontWeight: "bold",
+    textDecorationLine: "underline",
+  },
+  changePicButton: {
+    backgroundColor: "#f0f8ff",
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginBottom: 15,
+    width: "100%",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#007bff",
+  },
+  changePicButtonText: {
+    color: "#007bff",
+    fontSize: 16,
+    fontWeight: "bold",
   },
 });
 
