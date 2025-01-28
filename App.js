@@ -5,7 +5,7 @@ import { UserRegistrationProvider } from './context/UserRegistrationContext'; //
 import SplashScreen from './components/SplashScreen';
 import LoginScreen from './components/LoginScreen';
 import HomeScreen from './components/Home';
-import ProfileScreenP from './components/Profile/P_Profile/profile';
+// import ProfileScreenP from './components/Profile/P_Profile/profile';
 import ChatScreen from './components/Chat';
 import Register1 from "./components/Register1"; 
 import Register2 from "./components/Register2"; 
@@ -32,7 +32,7 @@ const App = () => {
           <Stack.Screen name="Chat" component={ChatScreen}/>
           <Stack.Screen name="Register1" component={Register1}/>
           <Stack.Screen name="Register2" component={Register2}/>
-          <Stack.Screen name="ProfileP" component={ProfileScreenP} />
+          {/* <Stack.Screen name="ProfileP" component={ProfileScreenP} /> */}
           <Stack.Screen name="EditProfileP" component={EditProfileP}/>
           <Stack.Screen name="username" component={Username}/>
           <Stack.Screen name="preference" component={Preference}/>

@@ -38,53 +38,6 @@ const SignupForm = () => {
   const handleBack = () => {
     navigation.goBack();
   };
-
-  // const handleNext = async () => {
-  //   const { email } = userData;
-
-  //   // Basic validation
-  //   if (!validateEmail(email)) {
-  //     setEmailError("Invalid email format");
-  //     return;
-  //   }
-
-  //   setIsLoading(true);
-  //   setServerError(""); // Clear previous server errors
-
-  //   try {
-  //     const response = await fetch("http://10.11.18.3:3000/api/auth/save-user-details", {
-  //       method: "POST",
-  //       headers: { "Content-Type": "application/json" },
-  //       body: JSON.stringify({
-  //         step: 1, // First step for saving email only
-  //         data: { email },
-  //       }),
-  //     });
-
-  //     const result = await response.json();
-
-  //     if (response.ok) {
-  //       // Show success popup
-  //       // setPopupMessage("Email registered successfully!");
-  //       // setIsPopupVisible(true);
-
-  //       // Navigate to Register Page 2 after a delay
-  //       setTimeout(() => {
-  //         setIsPopupVisible(false);
-  //         navigation.navigate("Register2", { userId: result.result[0].user_id });
-  //       }, 3000);
-  //     } else {
-  //       // Show error popup
-  //       setPopupMessage(result.message || "Something went wrong. Please try again.");
-  //       setIsPopupVisible(true);
-  //     }
-  //   } catch (err) {
-  //     setPopupMessage("Unable to save details. Please try again later.");
-  //     setIsPopupVisible(true);
-  //   } finally {
-  //     setIsLoading(false);
-  //   }
-  // };
   const handleNext = async () => {
     const { email } = userData;
 

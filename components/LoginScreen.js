@@ -1,39 +1,79 @@
 import React, { useState } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-  Linking,
-} from "react-native";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from "react-native";
 import { FontAwesome } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
+import Popup from "./Popup";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Linking } from 'react-native';
 
 const LoginScreen = () => {
-  const [username, setUsername] = useState("");
+  const [usernameOrEmail, setUsernameOrEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [serverError, setServerError] = useState("");
+  const [popupMessage, setPopupMessage] = useState("");
+  const [isPopupVisible, setIsPopupVisible] = useState(false);
+
   const navigation = useNavigation();
-
-  const handleLogin = () => {
-    if (username === "" && password === "") {
-      navigation.navigate("Home");
-    } else {
-      Alert.alert("Error", "Incorrect username or password.");
-    }
-  };
-
   const openGoogleLogin = () => {
     Linking.openURL("https://accounts.google.com/ServiceLogin");
   };
-
   const openAppleLogin = () => {
     Linking.openURL("https://appleid.apple.com/account");
   };
+  
+  const validateInput = () => {
+    return usernameOrEmail !== "" && password !== "";
+  };
+
+  const handleLogin = async () => {
+    if (!validateInput()) {
+      setPopupMessage("Please enter both username/email and password.");
+      setIsPopupVisible(true);
+      return;
+    }
+  
+    setIsLoading(true);
+    setServerError("");
+  
+    try {
+      const response = await fetch("http://10.11.18.3:3000/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: usernameOrEmail, email: usernameOrEmail, password }),
+      });
+  
+      const result = await response.json();
+      console.log(result); // Add this to see the result
+  
+      if (response.ok && result.token) {
+        // Successfully logged in
+        await AsyncStorage.setItem("token", result.token); // Store the token
+        navigation.replace("Home"); // Navigate to home after successful login
+      } else {
+        setPopupMessage(result.message || "Login failed. Please try again.");
+        setIsPopupVisible(true);
+      }
+  
+    } catch (err) {
+      setPopupMessage("Network error. Please try again later.");
+      setIsPopupVisible(true);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
 
   return (
     <View style={styles.container}>
+      {/* Popup Component */}
+      {isPopupVisible && (
+        <Popup
+          message={popupMessage}
+          onClose={() => setIsPopupVisible(false)} // Close popup when dismissed
+        />
+      )}
+
       <Text style={styles.title}>Pitch</Text>
       <Text style={styles.subtitle}>Login or sign up for free.</Text>
 
@@ -41,8 +81,8 @@ const LoginScreen = () => {
         placeholder="Email or Username"
         style={styles.input}
         placeholderTextColor="#aaa"
-        value={username}
-        onChangeText={setUsername}
+        value={usernameOrEmail}
+        onChangeText={setUsernameOrEmail}
       />
       <TextInput
         placeholder="Password"
@@ -53,8 +93,19 @@ const LoginScreen = () => {
         onChangeText={setPassword}
       />
 
-      <TouchableOpacity style={styles.continueButton} onPress={handleLogin}>
-        <Text style={styles.continueButtonText}>CONTINUE</Text>
+      {/* Server error message */}
+      {serverError ? <Text style={styles.errorText}>{serverError}</Text> : null}
+
+      <TouchableOpacity
+        style={[styles.continueButton, isLoading ? styles.buttonDisabled : null]}
+        onPress={handleLogin}
+        disabled={isLoading}
+      >
+        {isLoading ? (
+          <ActivityIndicator color="#fff" size="small" />
+        ) : (
+          <Text style={styles.continueButtonText}>CONTINUE</Text>
+        )}
       </TouchableOpacity>
 
       <Text style={styles.orText}>or use</Text>
@@ -121,6 +172,9 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     fontSize: 16,
   },
+  buttonDisabled: {
+    opacity: 0.7,
+  },
   orText: {
     marginVertical: 10,
     color: "#888",
@@ -169,6 +223,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#007BFF",
     textDecorationLine: "underline",
+  },
+  errorText: {
+    fontSize: 14,
+    color: "#ff0000",
+    marginBottom: 10,
   },
 });
 

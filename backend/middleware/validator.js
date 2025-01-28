@@ -6,6 +6,8 @@ const validateUsernameInput = [
     .isString()
     .isLength({ min: 3, max: 50 })
     .withMessage("Username must be between 3 and 50 characters."),
+  
+  // Handle validation errors
   (req, res, next) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -17,19 +19,48 @@ const validateUsernameInput = [
 
 // Middleware to validate saveUserDetails input
 const validateSaveUserDetailsInput = [
-  body("step").isInt({ min: 1, max: 6 }).withMessage("Step must be between 1 and 4."),
+  // Validate the step field (must be between 1 and 6)
+  body("step").isInt({ min: 1, max: 6 }).withMessage("Step must be between 1 and 6."),
+  
+  // Ensure data field is not empty
   body("data").notEmpty().withMessage("Data field is required."),
-  body("data.email").if(body("step").equals(1)).isEmail().withMessage("Invalid email."),
+
+  // Step 1: Validate email and password
+  body("data.email")
+    .if(body("step").equals(1))
+    .isEmail()
+    .withMessage("Invalid email."),
   body("data.password")
     .if(body("step").equals(1))
     .isLength({ min: 6 })
     .withMessage("Password must be at least 6 characters."),
+  
+  // Step 2: Ensure userId is valid
   body("data.userId")
-    .if(body("step").isIn([2, 3, 4]))
+    .if(body("step").isIn([2, 3, 4, 5])) // Adjusted to include more steps
     .isInt()
     .withMessage("Valid userId is required."),
-  body("data.bio").if(body("step").equals(2)).isString().optional({ nullable: true }),
-  body("data.username").if(body("step").equals(3)).isString().isLength({ min: 3, max: 50 }),
+  
+  // Step 2: Validate optional bio (for step 2)
+  body("data.bio")
+    .if(body("step").equals(2))
+    .isString()
+    .optional({ nullable: true }),
+  
+  // Step 3: Validate username for step 3
+  body("data.username")
+    .if(body("step").equals(3))
+    .isString()
+    .isLength({ min: 3, max: 50 })
+    .withMessage("Username must be between 3 and 50 characters."),
+  
+  // Step 4: Validate preference (Personal or Business)
+  body("data.preference")
+    .if(body("step").equals(4))
+    .isIn(["personal", "business"])
+    .withMessage("Preference must be 'personal' or 'business'."),
+
+  // Step 4: Validate boolean values for isFounder and isInvestor
   body("data.isFounder")
     .if(body("step").equals(4))
     .isBoolean()
@@ -38,6 +69,14 @@ const validateSaveUserDetailsInput = [
     .if(body("step").equals(4))
     .isBoolean()
     .withMessage("isInvestor must be a boolean."),
+  
+  // Step 5: Validate real name for Personal users
+  body("data.realName")
+    .if(body("step").equals(5))
+    .isString()
+    .withMessage("Real name is required."),
+
+  // Handle validation errors
   (req, res, next) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {

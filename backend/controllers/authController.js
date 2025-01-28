@@ -3,14 +3,13 @@ const jwt = require("jsonwebtoken");
 const { getUserByEmail, createUser } = require("../models/userModel");
 const pool = require("../config/db");
 
+// Register user
 const register = async (req, res) => {
   try {
     const { username, email, password, isFounder, isInvestor } = req.body;
 
-    // Normalize email to lowercase for consistent checks
     const normalizedEmail = email.toLowerCase();
 
-    // Case-sensitive check for existing email
     const existingUser = await pool.query(
       'SELECT * FROM users WHERE email = $1 COLLATE "C"',
       [normalizedEmail]
@@ -19,10 +18,8 @@ const register = async (req, res) => {
       return res.status(400).json({ message: "Email already in use" });
     }
 
-    // Hash the password
     const passwordHash = await bcrypt.hash(password, parseInt(process.env.SALT_ROUNDS, 10));
 
-    // Insert the new user into the database
     const user = await createUser(username, normalizedEmail, passwordHash, isFounder, isInvestor);
     res.status(201).json({ message: "User registered successfully", user });
   } catch (err) {
@@ -30,24 +27,31 @@ const register = async (req, res) => {
   }
 };
 
+// Login user
 const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, username, password } = req.body;
 
-    // Normalize email to lowercase for consistent checks
-    const normalizedEmail = email.toLowerCase();
+    let normalizedEmail = null;
+    let query = '';
 
-    const user = await pool.query(
-      'SELECT * FROM users WHERE email = $1 COLLATE "C"',
-      [normalizedEmail]
-    );
+    if (email) {
+      normalizedEmail = email.toLowerCase();
+      query = 'SELECT * FROM users WHERE email = $1 COLLATE "C"';
+    } else if (username) {
+      query = 'SELECT * FROM users WHERE username = $1 COLLATE "C"';
+    } else {
+      return res.status(400).json({ message: "Email or username is required" });
+    }
+
+    const user = await pool.query(query, [email || username]);
     if (user.rows.length === 0) {
-      return res.status(400).json({ message: "Invalid email or password" });
+      return res.status(400).json({ message: "Invalid email/username or password" });
     }
 
     const isMatch = await bcrypt.compare(password, user.rows[0].password_hash);
     if (!isMatch) {
-      return res.status(400).json({ message: "Invalid email or password" });
+      return res.status(400).json({ message: "Invalid email/username or password" });
     }
 
     const token = jwt.sign({ userId: user.rows[0].user_id }, process.env.JWT_SECRET, {
@@ -59,6 +63,7 @@ const login = async (req, res) => {
   }
 };
 
+// Save user details step-by-step
 const saveUserDetails = async (req, res) => {
   console.log("Request Body:", req.body);
 
@@ -71,16 +76,13 @@ const saveUserDetails = async (req, res) => {
 
     let query, values;
     switch (step) {
-      // Step 1: Save email
       case 1:
         if (!data.email) {
           return res.status(400).json({ message: "Email is required." });
         }
 
-        // Normalize email to lowercase
         const normalizedEmail = data.email.toLowerCase();
 
-        // Check if the email already exists
         const existingUser = await pool.query(
           'SELECT * FROM users WHERE email = $1 COLLATE "C"',
           [normalizedEmail]
@@ -89,18 +91,16 @@ const saveUserDetails = async (req, res) => {
           return res.status(400).json({ message: "Email already in use." });
         }
 
-        // Generate a temporary username
         const tempUsername = `user_${Date.now()}`;
 
         query = `
-        INSERT INTO users (email, username, created_at)
-        VALUES ($1, $2, NOW())
-        RETURNING user_id;
-      `;
+          INSERT INTO users (email, username, created_at)
+          VALUES ($1, $2, NOW())
+          RETURNING user_id;
+        `;
         values = [normalizedEmail, tempUsername];
         break;
 
-      // Step 2: Save password
       case 2:
         if (!data.password) {
           return res.status(400).json({ message: "Password is required." });
@@ -109,12 +109,11 @@ const saveUserDetails = async (req, res) => {
         const passwordHash = await bcrypt.hash(data.password, parseInt(process.env.SALT_ROUNDS, 10));
 
         query = `
-        UPDATE users SET password_hash = $1 WHERE user_id = $2;
-      `;
+          UPDATE users SET password_hash = $1 WHERE user_id = $2;
+        `;
         values = [passwordHash, data.userId];
         break;
 
-      // Step 3: Save username
       case 3:
         if (!data.username || data.username.length < 3 || data.username.length > 20) {
           return res.status(400).json({
@@ -123,39 +122,36 @@ const saveUserDetails = async (req, res) => {
         }
 
         query = `
-        UPDATE users SET username = $1 WHERE user_id = $2;
-      `;
+          UPDATE users SET username = $1 WHERE user_id = $2;
+        `;
         values = [data.username, data.userId];
         break;
 
-      // Step 4: Save preference (Personal or Business)
       case 4:
         if (data.preference !== "personal" && data.preference !== "business") {
           return res.status(400).json({ message: "Invalid preference." });
         }
 
         query = `
-        UPDATE users SET is_personal = $1, is_business = $2 WHERE user_id = $3;
-      `;
+          UPDATE users SET is_personal = $1, is_business = $2 WHERE user_id = $3;
+        `;
         values = [data.preference === "personal", data.preference === "business", data.userId];
         break;
 
-      // Step 5: Save real name (for Personal users)
       case 5:
         if (!data.realName || data.realName.trim() === "") {
           return res.status(400).json({ message: "Real name is required." });
         }
 
         query = `
-        UPDATE users SET name = $1 WHERE user_id = $2;
-      `;
+          UPDATE users SET name = $1 WHERE user_id = $2;
+        `;
         values = [data.realName.trim(), data.userId];
         break;
 
       default:
         return res.status(400).json({ message: "Invalid step." });
     }
-
 
     const result = await pool.query(query, values);
     res.status(200).json({ message: "Data saved successfully", result: result.rows });
@@ -165,12 +161,11 @@ const saveUserDetails = async (req, res) => {
   }
 };
 
-
+// Validate username availability
 const validateUsername = async (req, res) => {
   try {
     const { username } = req.body;
 
-    // Case-sensitive username check
     const result = await pool.query(
       'SELECT * FROM users WHERE username = $1 COLLATE "C"',
       [username]
@@ -191,4 +186,26 @@ const validateUsername = async (req, res) => {
   }
 };
 
-module.exports = { register, login, validateUsername, saveUserDetails };
+// Get user profile
+const getUserProfile = async (req, res) => {
+  try {
+    const userId = req.user.userId; // Extract user ID from JWT payload
+
+    const result = await pool.query(
+      'SELECT user_id, username, email, name, is_personal, is_business FROM users WHERE user_id = $1',
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const user = result.rows[0];
+    res.status(200).json(user);
+  } catch (err) {
+    console.error("Error fetching user profile:", err.message);
+    res.status(500).json({ message: "Internal server error", error: err.message });
+  }
+};
+
+module.exports = { register, login, validateUsername, saveUserDetails, getUserProfile };

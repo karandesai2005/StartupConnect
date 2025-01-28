@@ -9,7 +9,10 @@ export default function HomeScreen() {
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedItems, setExpandedItems] = useState({});
   const navigation = useNavigation();
-
+  useEffect(() => {
+    console.log("HomeScreen loaded");
+  }, []);
+  
   const loadUsers = () => {
     setLoading(true);
     axios
@@ -127,7 +130,7 @@ export default function HomeScreen() {
         <TouchableOpacity onPress={() => navigation.navigate('Home')}>
           <Image source={require('../assets/home1.png')} style={styles.navIcon} />
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => navigation.navigate('Post')}>
+        <TouchableOpacity onPress={() => navigation.navigate('Login')}>
           <Image source={require('../assets/plus3.png')} style={styles.navIcon} />
         </TouchableOpacity>
         <TouchableOpacity onPress={() => navigation.navigate('Notifications')}>

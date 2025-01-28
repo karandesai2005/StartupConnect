@@ -1,9 +1,55 @@
-import React, { useState } from "react";
-import { StyleSheet, View, Text, Image, TouchableOpacity } from "react-native";
+import React, { useState, useEffect } from "react";
+import { StyleSheet, View, Text, Image, TouchableOpacity, ActivityIndicator } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const EditProfileP = () => {
-    const [activeTab, setActiveTab]=useState('stories');
+  const [activeTab, setActiveTab] = useState('stories');
+  const [userData, setUserData] = useState(null);  // State for storing user data
+  const [isLoading, setIsLoading] = useState(true); // State for loading indicator
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const token = await AsyncStorage.getItem("token");  // Get the stored token
+
+        if (token) {
+          const response = await fetch("http://10.11.18.3:3000/api/auth/profile", {
+            method: "GET",
+            headers: {
+              "Authorization": `Bearer ${token}`,  // Pass token in the Authorization header
+            },
+          });
+
+          const result = await response.text();  // Get raw response text
+
+          console.log("API Response:", result);  // Log the raw response for debugging
+
+          if (response.ok) {
+            const jsonData = JSON.parse(result);  // Parse only if it's valid JSON
+            setUserData(jsonData);  // Store user data in state
+          } else {
+            console.log(result);  // Handle error message
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching user data:", error);
+      } finally {
+        setIsLoading(false);  // Stop loading after fetching
+      }
+    };
+
+    fetchUserData();
+  }, []);
+
+  if (isLoading) {
     return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#007BFF" />
+      </View>
+    );
+  }
+
+  return (
     <View style={styles.profile12}>
       <View style={styles.contentContainer}>
         <View style={styles.centre}>
@@ -25,11 +71,12 @@ const EditProfileP = () => {
             </View>
           </View>
           <View style={styles.text}>
-            <View style = {styles.id}>
-                <Text style={styles.userName}>Chir.a.g</Text>
-                <Text style={styles.checkCircleIcon}>✓</Text>
+            <View style={styles.id}>
+              {/* Dynamically display username */}
+              <Text style={styles.userName}>{userData?.username}</Text>
+              <Text style={styles.checkCircleIcon}>✓</Text>
             </View>
-            <Text style={styles.about}>CEO of PITCH. Entrepreneur inverstor and many more</Text>
+            <Text style={styles.about}>CEO of PITCH. Entrepreneur, investor and many more</Text>
           </View>
           <View style={styles.buttonContainer}>
             <View style={styles.masterOutlineButton}>
@@ -37,6 +84,7 @@ const EditProfileP = () => {
             </View>
           </View>
         </View>
+
         <View style={styles.tab}>
           <TouchableOpacity 
             style={[styles.tabButton, activeTab === "stories" ? styles.tab1 : styles.tab2]}
@@ -69,7 +117,7 @@ const EditProfileP = () => {
         <View style={styles.profile12Child} />
       </View>
     </View>
-    );
+  );
 };
 
 const styles = StyleSheet.create({
@@ -108,7 +156,7 @@ const styles = StyleSheet.create({
     height: "100%",
     width: "100%",
     backgroundColor: "#f0f8ff",
-    borderRadius: 48, // Changed to make it perfectly round
+    borderRadius: 48,
     overflow: "hidden",
   },
   text: {
