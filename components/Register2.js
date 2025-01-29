@@ -31,47 +31,6 @@ const Signup = () => {
         navigation.goBack();
     };
 
-  //   const handleNext = async () => {
-  //     const trimmedPassword = password.trim();
-  //     const trimmedConfirmPassword = confirmPassword.trim();
-  
-  //     console.log("Password:", trimmedPassword);
-  //     console.log("Confirm Password:", trimmedConfirmPassword);
-  //     console.log("Passwords Match:", trimmedPassword === trimmedConfirmPassword);
-  
-  //     if (trimmedPassword !== trimmedConfirmPassword) {
-  //         setPopupMessage("Passwords do not match.");
-  //         setPopupVisible(true);
-  //         return;
-  //     }
-  
-  //     try {
-  //         const response = await fetch("http://10.11.18.3:3000/api/auth/save-user-details", {
-  //             method: "POST",
-  //             headers: { "Content-Type": "application/json" },
-  //             body: JSON.stringify({
-  //                 step: 2,
-  //                 data: {
-  //                     password: trimmedPassword,
-  //                     userId: route.params.userId,
-  //                 },
-  //             }),
-  //         });
-  
-  //         const result = await response.json();
-  
-  //         if (response.ok) {
-  //             navigation.navigate("username", { userId: route.params.userId });
-  //         } else {
-  //             setPopupMessage(result.message || "Something went wrong!");
-  //             setPopupVisible(true);
-  //         }
-  //     } catch (err) {
-  //         setPopupMessage("Unable to connect to the server. Please try again.");
-  //         setPopupVisible(true);
-  //     }
-  // };
-
   const validatePassword = (password) => {
     const minLength = 8;
     const hasUppercase = /[A-Z]/.test(password);

@@ -340,7 +340,7 @@ const styles = StyleSheet.create({
   tab: {
     width: "100%",
     flexDirection: "row",
-    backgroundColor: "#f3f3f3",
+    backgroundColor: "#ffffff",
     borderRadius: 18,
     borderColor: "#ddd",
     borderWidth: 1,
