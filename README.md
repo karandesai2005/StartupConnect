@@ -32,4 +32,4 @@ Whether you're an entrepreneur looking to pitch your startup or an investor seek
 
 ## Contact Us
 
-For more information, visit our website or reach out to our support team at support@startupconnect.com. We're here to help you make the most of your Pitch experience.
+For more information, visit our website or reach out to our support team at pitchfounders@gmail.com. We're here to help you make the most of your Pitch experience.
