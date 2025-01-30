@@ -29,7 +29,7 @@
       <dict>
         <key>CFBundleURLSchemes</key>
         <array>
-          <string>pitch</string>
+          <string>com.croww.StartupConnect</string>
         </array>
       </dict>
     </array>

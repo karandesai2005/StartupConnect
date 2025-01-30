@@ -18,8 +18,6 @@ import HandleBusiness from './components/Profile/B_Profile/handleBusiness';
 import EditProfileB from './components/Profile/B_Profile/editProfile';
 import Field from './components/field';
 import Popup from './components/Popup';
-import PostCard from './components/PostCard';
-
 
 
 
@@ -52,7 +50,6 @@ const App = () => {
           <Stack.Screen name="handleBusiness" component={HandleBusiness} />
           <Stack.Screen name="field" component={Field} />
           <Stack.Screen name="PopUp" component={Popup} />
-          <Stack.Screen name="PostCard" component={PostCard} />
 
         </Stack.Navigator>
       </NavigationContainer>
