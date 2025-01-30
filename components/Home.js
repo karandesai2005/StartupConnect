@@ -275,7 +275,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#E9ECEF',
     marginTop: Platform.select({
       ios: -55,
-      android: -10
+      android: null
     })
   },
   profilePic: {

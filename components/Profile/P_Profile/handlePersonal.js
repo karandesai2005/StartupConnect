@@ -45,7 +45,7 @@
                     },
                 };
         
-                const response = await fetch("http://10.11.18.3:3000/api/auth/save-user-details", {
+                const response = await fetch("https://ec5e-103-68-38-66.ngrok-free.app/api/auth/save-user-details", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(requestBody),

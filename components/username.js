@@ -29,7 +29,7 @@ const Signup = () => {
     // Validate username (API call)
     try {
       const response = await fetch(
-        "http://10.11.18.3:3000/api/auth/validate-username",
+        "https://ec5e-103-68-38-66.ngrok-free.app/api/auth/validate-username",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -58,7 +58,7 @@ const Signup = () => {
 
     try {
       const response = await fetch(
-        "http://10.11.18.3:3000/api/auth/save-user-details",
+        "https://ec5e-103-68-38-66.ngrok-free.app/api/auth/save-user-details",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

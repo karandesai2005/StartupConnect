@@ -46,15 +46,14 @@ const LoginScreen = () => {
       setIsPopupVisible(true);
       return;
     }
-
+  
     setIsLoading(true);
     setServerError("");
-
-    // Determine whether the input is an email or a username
+  
     const isEmail = usernameOrEmail.includes("@");
-
+  
     try {
-      const response = await fetch("http://10.11.18.3:3000/api/auth/login", {
+      const response = await fetch("https://ec5e-103-68-38-66.ngrok-free.app/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -63,9 +62,9 @@ const LoginScreen = () => {
           password,
         }),
       });
-
+  
       const result = await response.json();
-
+  
       if (response.ok && result.token) {
         await AsyncStorage.setItem("token", result.token);
         navigation.replace("Home");

@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "StartupConnect",
+    "name": "PITCH",
     "slug": "StartupConnect",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -18,14 +18,15 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/PITCH.png",
         "backgroundColor": "#ffffff"
       },
       "package": "com.croww.StartupConnect",
       "permissions": [
         "CAMERA",
         "LOCATION",
-        "READ_EXTERNAL_STORAGE"
+        "READ_EXTERNAL_STORAGE",
+        "INTERNET"
       ]
     },
     "web": {
@@ -39,6 +40,7 @@
     "plugins": [
       "expo-font",
       "expo-asset"
-    ]
+    ],
+    "owner": "croww"
   }
 }

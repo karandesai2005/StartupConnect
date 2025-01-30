@@ -79,7 +79,7 @@ const EditProfileP = () => {
         formData.append('profile_picture', updatedProfileImage);
       }
   
-      const response = await fetch("http://10.11.18.3:3000/api/auth/edit-profile", {
+      const response = await fetch("https://6691-59-97-191-226.ngrok-free.app/api/auth/login", {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${token}`,

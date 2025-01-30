@@ -8,6 +8,10 @@ const register = async (req, res) => {
   try {
     const { username, email, password, isFounder, isInvestor } = req.body;
 
+    if (!username || !email || !password) {
+      return res.status(400).json({ message: "Username, email, and password are required." });
+    }
+
     const normalizedEmail = email.toLowerCase();
 
     const existingUser = await pool.query(
@@ -32,21 +36,19 @@ const login = async (req, res) => {
   try {
     const { email, username, password } = req.body;
 
-    let normalizedEmail = null;
-    let query = '';
-
+    let query, value;
     if (email) {
-      normalizedEmail = email.toLowerCase();
+      const normalizedEmail = email.toLowerCase();
       query = 'SELECT * FROM users WHERE email = $1 COLLATE "C"';
-      const user = await pool.query(query, [normalizedEmail]);
+      value = normalizedEmail;
     } else if (username) {
       query = 'SELECT * FROM users WHERE username = $1 COLLATE "C"';
-      const user = await pool.query(query, [username]);
+      value = username;
+    } else {
+      return res.status(400).json({ message: "Email or username is required." });
     }
-    
-    
 
-    const user = await pool.query(query, [normalizedEmail || username]);
+    const user = await pool.query(query, [value]);
     if (user.rows.length === 0) {
       return res.status(400).json({ message: "Invalid email/username or password" });
     }
@@ -74,6 +76,18 @@ const saveUserDetails = async (req, res) => {
 
     if (!step || !data) {
       return res.status(400).json({ message: "Step and data are required." });
+    }
+
+    // Check if userId exists (for steps 2, 3, 4, 5)
+    if (step !== 1 && !data.userId) {
+      return res.status(400).json({ message: "User ID is required." });
+    }
+
+    if (step !== 1) {
+      const userCheck = await pool.query('SELECT * FROM users WHERE user_id = $1', [data.userId]);
+      if (userCheck.rows.length === 0) {
+        return res.status(404).json({ message: "User not found." });
+      }
     }
 
     let query, values;

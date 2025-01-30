@@ -50,7 +50,7 @@ const SignupForm = () => {
     setServerError("");
 
     try {
-        const response = await fetch("http://10.11.18.3:3000/api/auth/save-user-details", {
+        const response = await fetch("https://ec5e-103-68-38-66.ngrok-free.app/api/auth/save-user-details", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -59,8 +59,10 @@ const SignupForm = () => {
             }),
         });
 
-        const result = await response.json();
-        console.log("Response Result:", result);
+        const rawResponse = await response.text();
+        console.log("Raw response:", rawResponse);
+        const result = JSON.parse(rawResponse);
+        console.log("Parsed response:", result);
 
         if (response.ok && result.result && result.result[0]?.user_id) {
             const userId = result.result[0].user_id;
@@ -84,6 +86,7 @@ const SignupForm = () => {
         }
     } catch (err) {
         console.error("Network error:", err);
+        console.error("Error details:", err.message);
         setPopupMessage("Unable to save details. Please try again later.");
         setIsPopupVisible(true);
     } finally {
