@@ -1,11 +1,9 @@
-const app = require("./app");
-
-// app.listen(3000, "0.0.0.0", () => {
-//   console.log("Server running on http://0.0.0.0:3000");
-// });
-
 const express = require("express");
-// const app = express();
+const app = require("./app");
+const path = require("path");
+
+// Serve static files from uploads folder
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // Root route
 app.get("/", (req, res) => {
@@ -14,13 +12,11 @@ app.get("/", (req, res) => {
 
 // Login route
 app.post("/api/auth/login", (req, res) => {
-  // Handle login logic here
-  res.json({ message: "h successful!" });
+  res.json({ message: "Login successful!" });
 });
 
 app.post("/api/auth/save-user-details", (req, res) => {
-  // Handle login logic here
-  res.json({ message: "heyy !" });
+  res.json({ message: "User details saved!" });
 });
 
 // Start the server

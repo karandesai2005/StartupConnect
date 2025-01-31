@@ -10,7 +10,9 @@ import HomeScreen from './components/Home';
 import ChatScreen from './components/Chat';
 import Register1 from "./components/Register1";
 import Register2 from "./components/Register2";
-import EditProfileP from './components/Profile/P_Profile/editProfileP';
+import Profile from './components/Profile/P_Profile/Profile';
+import EditProfilePage from './components/Profile/P_Profile/EditProfilePage';
+
 import Username from './components/username';
 import Preference from './components/preference';
 import HandlePersonal from './components/Profile/P_Profile/handlePersonal';
@@ -42,7 +44,7 @@ const App = () => {
           <Stack.Screen name="Chat" component={ChatScreen} />
           <Stack.Screen name="Register1" component={Register1} />
           <Stack.Screen name="Register2" component={Register2} />
-          <Stack.Screen name="EditProfileP" component={EditProfileP} />
+          <Stack.Screen name="Profile" component={Profile} />
           <Stack.Screen name="EditProfileB" component={EditProfileB} />
           <Stack.Screen name="username" component={Username} />
           <Stack.Screen name="preference" component={Preference} />
@@ -50,6 +52,7 @@ const App = () => {
           <Stack.Screen name="handleBusiness" component={HandleBusiness} />
           <Stack.Screen name="field" component={Field} />
           <Stack.Screen name="PopUp" component={Popup} />
+          <Stack.Screen name='EditProfilePage' component={EditProfilePage}/>
 
         </Stack.Navigator>
       </NavigationContainer>

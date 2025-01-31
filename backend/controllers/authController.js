@@ -205,10 +205,11 @@ const validateUsername = async (req, res) => {
 // Get user profile
 const getUserProfile = async (req, res) => {
   try {
-    const userId = req.user.userId; // Extract user ID from JWT payload
+    const userId = req.user.userId;
 
+    // Modified query to include bio and profile_picture
     const result = await pool.query(
-      'SELECT user_id, username, email, name, is_personal, is_business FROM users WHERE user_id = $1',
+      'SELECT user_id, username, email, name, bio, profile_picture, is_personal, is_business FROM users WHERE user_id = $1',
       [userId]
     );
 
@@ -224,4 +225,49 @@ const getUserProfile = async (req, res) => {
   }
 };
 
-module.exports = { register, login, validateUsername, saveUserDetails, getUserProfile };
+const updateProfile = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { bio } = req.body;
+    const profilePicture = req.file;
+
+    console.log("Received bio:", bio);
+    console.log("Received file:", profilePicture); // 🔥 Check if Multer receives the file
+
+    let updates = [];
+    let values = [];
+
+    if (bio) {
+      updates.push(`bio = $${values.length + 1}`);
+      values.push(bio);
+    }
+
+    if (profilePicture) {
+      const profilePicturePath = `${req.protocol}://${req.get('host')}/uploads/profile_pictures/${profilePicture.filename}`;
+      updates.push(`profile_picture = $${values.length + 1}`);
+      values.push(profilePicturePath);
+    }
+
+    values.push(userId);
+
+    const query = `
+      UPDATE users 
+      SET ${updates.join(', ')} 
+      WHERE user_id = $${values.length} 
+      RETURNING user_id, username, email, name, bio, profile_picture, is_personal, is_business
+    `;
+
+    const result = await pool.query(query, values);
+    console.log("Updated user:", result.rows[0]); // 🔥 Check if the database update works
+
+    return res.status(200).json(result.rows[0]);
+
+  } catch (err) {
+    console.error("Update error:", err);
+    return res.status(500).json({ message: "Internal server error", error: err.message });
+  }
+};
+
+
+
+module.exports = { register, login, validateUsername, saveUserDetails, getUserProfile,updateProfile };

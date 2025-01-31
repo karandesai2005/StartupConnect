@@ -53,7 +53,7 @@ const LoginScreen = () => {
     const isEmail = usernameOrEmail.includes("@");
   
     try {
-      const response = await fetch("https://ec5e-103-68-38-66.ngrok-free.app/api/auth/login", {
+      const response = await fetch("https://552d-202-71-156-66.ngrok-free.app/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -200,7 +200,7 @@ export default function HomeScreen() {
 
       {/* Top Bar */}
       <View style={styles.topBar}>
-        <TouchableOpacity onPress={() => navigation.navigate('EditProfileP')}>
+        <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
           <Image source={require('../assets/del.png')} style={styles.profilePic} />
         </TouchableOpacity>
         <TextInput
