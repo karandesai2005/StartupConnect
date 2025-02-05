@@ -3,14 +3,25 @@ const Post = require('../models/postModel');
 const postController = {
   createPost: async (req, res) => {
     try {
+      console.log('File received:', req.file);
       const { content } = req.body;
-      const startup_id = req.user.user_id; // Extract user_id from token
-
       if (!content) {
         return res.status(400).json({ error: 'Post content is required' });
       }
 
-      const newPost = await Post.create(startup_id, content);
+      // Check if a file is uploaded
+      let image_url = null;
+      if (req.file) {
+        // Construct full image URL (including protocol, host, and file path)
+        image_url = `${req.protocol}://${req.get('host')}/uploads/posts/${req.file.filename}`;
+      }
+
+      console.log('Full Image URL:', image_url); // Log the generated full image URL
+
+      // Pass image_url along with content to the Post.create method
+      const newPost = await Post.create(content, image_url);
+
+      // Respond with the newly created post
       res.status(201).json(newPost);
     } catch (error) {
       console.error(error);
