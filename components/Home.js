@@ -15,6 +15,9 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import axios from 'axios';
+import { useFocusEffect } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { NGROK_URL } from '@env';
 
 const { width } = Dimensions.get('window');
 
@@ -23,6 +26,7 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems }) => {
   const [imageHeight, setImageHeight] = useState(width);
   const [isLoading, setIsLoading] = useState(true);
   const [isLiked, setIsLiked] = useState(false); // State to track like status
+  const [profilePicture, setProfilePicture] = useState(null);
   const animatedScale = new Animated.Value(1);
 
   // Calculate image dimensions when the component mounts
@@ -142,16 +146,17 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems }) => {
     </Animated.View>
   );
 });
-
-// Main HomeScreen Component
 export default function HomeScreen() {
-  const [users, setUsers] = useState([]);
+  const [users, setUsers] = useState([]);  // To store random users
+  const [myPosts, setMyPosts] = useState([]);  // To store user posts
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedItems, setExpandedItems] = useState({});
+  const [userData, setUserData] = useState(null);
   const navigation = useNavigation();
 
+  // Load posts (random users and user posts)
   const loadUsers = useCallback(async (refresh = false) => {
     try {
       setLoading(true);
@@ -171,8 +176,19 @@ export default function HomeScreen() {
     }
   }, [currentPage]);
 
+  // Fetch the user's posts (simulate or fetch real posts)
+  const fetchMyPosts = useCallback(async () => {
+    try {
+      const response = await axios.get(`${NGROK_URL}/api/posts/myposts`);
+      setMyPosts(response.data.posts);  // Assuming the API returns a list of posts
+    } catch (error) {
+      console.error('Error fetching user posts:', error);
+    }
+  }, []);
+
   useEffect(() => {
     loadUsers();
+    fetchMyPosts();  // Fetch the user's posts
   }, [currentPage]);
 
   const onRefresh = useCallback(() => {
@@ -194,6 +210,38 @@ export default function HomeScreen() {
     </View>
   );
 
+  const fetchUserData = useCallback(async () => {
+    try {
+      const token = await AsyncStorage.getItem("token");
+      if (!token) return;
+
+      const response = await fetch(`${NGROK_URL}/api/auth/profile`, {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setUserData(data);
+      }
+    } catch (error) {
+      console.error("Error fetching user data:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchUserData();
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchUserData();
+    }, [fetchUserData])
+  );
+
   return (
     <View style={styles.container}>
       <View style={styles.statusBarBackground} />
@@ -201,7 +249,14 @@ export default function HomeScreen() {
       {/* Top Bar */}
       <View style={styles.topBar}>
         <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
-          <Image source={require('../assets/del.png')} style={styles.profilePic} />
+          <Image 
+            source={
+              userData?.profile_picture 
+                ? { uri: userData.profile_picture }
+                : require('../assets/del.png')
+            }
+            style={styles.profilePic} 
+          />
         </TouchableOpacity>
         <TextInput
           style={styles.searchBar}
@@ -215,7 +270,7 @@ export default function HomeScreen() {
 
       {/* Post List */}
       <FlatList
-        data={users}
+        data={[...myPosts, ...users]}  // Combine both user posts and random posts
         renderItem={({ item, index }) => (
           <PostCard
             item={item}
@@ -240,13 +295,13 @@ export default function HomeScreen() {
         <TouchableOpacity onPress={() => navigation.navigate('Home')}>
           <Image source={require('../assets/home4.webp')} style={styles.navIcon} />
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+        <TouchableOpacity onPress={() => navigation.navigate('CreatePost')}>
           <Image source={require('../assets/plus3.png')} style={styles.navIcon} />
         </TouchableOpacity>
         <TouchableOpacity onPress={() => navigation.navigate('Notifications')}>
           <Image source={require('../assets/bell.png')} style={styles.navIcon} />
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => navigation.navigate('EditProfileB')}>
+        <TouchableOpacity onPress={() => navigation.navigate('Login')}>
           <Image source={require('../assets/settings.png')} style={styles.navIcon} />
         </TouchableOpacity>
       </View>

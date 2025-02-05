@@ -20,6 +20,7 @@ import HandleBusiness from './components/Profile/B_Profile/handleBusiness';
 import EditProfileB from './components/Profile/B_Profile/editProfile';
 import Field from './components/field';
 import Popup from './components/Popup';
+import CreatePostScreen from './components/CreatePostScreen'; // Import the CreatePostScreen
 
 
 
@@ -53,6 +54,7 @@ const App = () => {
           <Stack.Screen name="field" component={Field} />
           <Stack.Screen name="PopUp" component={Popup} />
           <Stack.Screen name='EditProfilePage' component={EditProfilePage}/>
+          <Stack.Screen name="CreatePost" component={CreatePostScreen} />
 
         </Stack.Navigator>
       </NavigationContainer>

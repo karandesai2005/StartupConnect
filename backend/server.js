@@ -1,6 +1,7 @@
 const express = require("express");
 const app = require("./app");
 const path = require("path");
+const postRoutes = require('./routes/postRoutes');
 
 // Serve static files from uploads folder
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
@@ -23,3 +24,4 @@ app.post("/api/auth/save-user-details", (req, res) => {
 app.listen(3000, "0.0.0.0", () => {
   console.log("Server running on http://0.0.0.0:3000");
 });
+app.use('/api', postRoutes);

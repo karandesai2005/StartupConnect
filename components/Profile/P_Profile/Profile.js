@@ -12,8 +12,8 @@ import {
 } from "react-native";
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
-const Profile = ({ route, isBusinessProfile = false }) => {
+import { NGROK_URL } from '@env';
+const Profile = ({ route, isBusinessProfile = false}) => {
   const navigation = useNavigation();
   const [userData, setUserData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -47,7 +47,7 @@ const Profile = ({ route, isBusinessProfile = false }) => {
         return;
       }
 
-      const response = await fetch(`https://552d-202-71-156-66.ngrok-free.app/api/auth/profile?timestamp=${Date.now()}`, {
+      const response = await fetch(`${NGROK_URL}/api/auth/profile?timestamp=${Date.now()}`, {
         method: "GET",
         headers: {
           "Authorization": `Bearer ${token}`,
@@ -140,14 +140,6 @@ const Profile = ({ route, isBusinessProfile = false }) => {
           <Text style={styles.backButtonText}>←</Text>
         </TouchableOpacity>
 
-        <View style={styles.centre}>
-          <Text style={styles.title}>Title</Text>
-          <Text style={styles.largeTitle}>Profile</Text>
-          <Text style={styles.largeTitle1}>
-            The quick brown fox jumps over the lazy dog
-          </Text>
-        </View>
-
         <View style={styles.profile}>
           <View style={styles.avatarMultiVariants}>
             <View style={avatarStyle}>
@@ -203,6 +195,7 @@ const styles = StyleSheet.create({
   profileContainer: {
     flexGrow: 1,
     backgroundColor: "#fff",
+    marginTop:50,
   },
   profileImage: {
     width: "100%",
@@ -229,6 +222,8 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
     borderRadius: 48,
+    // borderWidth:2,
+    // borderColor:'#333',
   },
   profile: {
     width: "100%",
@@ -236,7 +231,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 14,
     gap: 14,
-    marginTop: 20,
+    marginTop: 30,
   },
   avatarMultiVariants: {
     width: 96,
@@ -379,6 +374,7 @@ const styles = StyleSheet.create({
   backButtonText: {
     fontSize: 32,
     color: "#000",
+    // marginBottom:250,
   },
 
 });

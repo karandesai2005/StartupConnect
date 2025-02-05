@@ -17,7 +17,7 @@ import { useNavigation } from "@react-navigation/native";
 import Popup from "./Popup";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Linking } from "react-native";
-
+import { NGROK_URL } from '@env';
 const LoginScreen = () => {
   const [usernameOrEmail, setUsernameOrEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -41,6 +41,8 @@ const LoginScreen = () => {
   };
 
   const handleLogin = async () => {
+    console.log("NGROK_URL:", NGROK_URL);
+
     if (!validateInput()) {
       setPopupMessage("Please enter both username/email and password.");
       setIsPopupVisible(true);
@@ -53,7 +55,7 @@ const LoginScreen = () => {
     const isEmail = usernameOrEmail.includes("@");
   
     try {
-      const response = await fetch("https://552d-202-71-156-66.ngrok-free.app/api/auth/login", {
+      const response = await fetch(`${NGROK_URL}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

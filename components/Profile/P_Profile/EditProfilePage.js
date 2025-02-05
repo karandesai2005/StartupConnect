@@ -12,7 +12,7 @@ import {
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
+import { NGROK_URL } from '@env';
 const EditProfilePage = () => {
   const navigation = useNavigation();
   const route = useRoute();
@@ -57,7 +57,7 @@ const EditProfilePage = () => {
   
       console.log("Updating profile with:", updatedBio, updatedProfileImage);
   
-      const response = await fetch("https://552d-202-71-156-66.ngrok-free.app/api/auth/update-profile", {
+      const response = await fetch(`${NGROK_URL}/api/auth/update-profile`, {
         method: "PUT",
         headers: { "Authorization": `Bearer ${token}` },
         body: formData,
@@ -171,7 +171,10 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    marginBottom: 8,
+    marginBottom: 12,
+    color: '#333',
+    borderColor: '#333',
+    borderWidth:0.25,
   },
   changePhotoText: {
     color: '#007bff',
