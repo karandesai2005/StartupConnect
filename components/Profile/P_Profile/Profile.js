@@ -4,15 +4,18 @@ import {
   View,
   Text,
   Image,
+  Platform,
   TouchableOpacity,
   ActivityIndicator,
   ScrollView,
   RefreshControl,
   Alert,
+  Dimensions,
 } from "react-native";
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { NGROK_URL } from '@env';
+
 const Profile = ({ route, isBusinessProfile = false}) => {
   const navigation = useNavigation();
   const [userData, setUserData] = useState(null);
@@ -21,7 +24,11 @@ const Profile = ({ route, isBusinessProfile = false}) => {
   const [lastUpdate, setLastUpdate] = useState(0);
   const [activeTab, setActiveTab] = useState('stories');
 
-  // Enhanced update handler
+  // Calculate dimensions for the grid
+  const screenWidth = Dimensions.get('window').width;
+  const spacing = 2;
+  const itemSize = (screenWidth - 32 - spacing * 2) / 3;
+
   useEffect(() => {
     if (route.params?.updatedUser) {
       console.log("Received updated user data:", route.params.updatedUser);
@@ -52,7 +59,7 @@ const Profile = ({ route, isBusinessProfile = false}) => {
         headers: {
           "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json",
-          "Cache-Control": "no-cache",  // 🔥 Prevents caching
+          "Cache-Control": "no-cache",
           "Pragma": "no-cache",
         },
       });
@@ -60,11 +67,8 @@ const Profile = ({ route, isBusinessProfile = false}) => {
       if (response.ok) {
         const data = await response.json();
         console.log("Fetched profile data:", data);
-
         setUserData(data);
         setLastUpdate(Date.now());
-
-        // 🔥 Store fresh data in AsyncStorage
         await AsyncStorage.setItem('userData', JSON.stringify(data));
       } else {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -78,7 +82,6 @@ const Profile = ({ route, isBusinessProfile = false}) => {
     }
   }, [navigation]);
 
-
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     await fetchUserData();
@@ -87,12 +90,10 @@ const Profile = ({ route, isBusinessProfile = false}) => {
   useFocusEffect(
     useCallback(() => {
       const shouldFetch = !userData || (Date.now() - lastUpdate > 5000);
-
       if (shouldFetch) {
         setIsLoading(true);
         fetchUserData();
       }
-
       return () => { };
     }, [fetchUserData, userData, lastUpdate])
   );
@@ -116,6 +117,30 @@ const Profile = ({ route, isBusinessProfile = false}) => {
     </TouchableOpacity>
   );
 
+  const renderGridItem = (index) => (
+    <TouchableOpacity 
+      key={index}
+      style={[styles.gridItem, { width: itemSize, height: itemSize }]}
+      onPress={() => Alert.alert(`Post ${index + 1} clicked`)}
+    >
+      <Image
+        source={
+          userData?.profile_picture
+            ? { uri: `${userData.profile_picture}?timestamp=${lastUpdate}` }
+            : require('../../../assets/del.png')
+        }
+        style={styles.gridImage}
+        resizeMode="cover"
+      />
+    </TouchableOpacity>
+  );
+
+  const renderGrid = () => (
+    <View style={styles.gridContainer}>
+      {[...Array(13)].map((_, index) => renderGridItem(index))}
+    </View>
+  );
+
   if (isLoading) {
     return (
       <View style={styles.container}>
@@ -125,36 +150,51 @@ const Profile = ({ route, isBusinessProfile = false}) => {
   }
 
   return (
-    <ScrollView
-      contentContainerStyle={styles.profileContainer}
-      refreshControl={
-        <RefreshControl
+    
+      <View style={styles.contentContainer}>
+        <ScrollView
+          contentContainerStyle={styles.scrollViewContent}
+          refreshControl={
+          <RefreshControl
           refreshing={refreshing}
           onRefresh={handleRefresh}
           tintColor="#007BFF"
-        />
-      }
-    >
-      <View style={styles.contentContainer}>
-        <TouchableOpacity onPress={() => navigation.navigate('Home')} style={styles.backButton}>
+          />
+          }
+        >
+        <TouchableOpacity onPress={() => navigation.goBack('Home')} style={styles.backButton}>
           <Text style={styles.backButtonText}>←</Text>
         </TouchableOpacity>
 
         <View style={styles.profile}>
-          <View style={styles.avatarMultiVariants}>
-            <View style={avatarStyle}>
-              <Image
-                source={
-                  userData?.profile_picture
-                    ? { uri: `${userData.profile_picture}?timestamp=${lastUpdate}` }
-                    : require('../../../assets/del.png')
-                }
-                style={styles.profileImage}
-                resizeMode="cover"
-                onError={(error) => console.log("Image load error:", error.nativeEvent.error)}
-              />
+          <View style={styles.profileSection}>
+            <View style={styles.statsContainer}>
+              <View style={styles.statsItem}>
+                <Text style={styles.statsNumber}>1.2K</Text>
+                <Text style={styles.statsLabel}>Followers</Text>
+              </View>
+            </View>
 
+            <View style={styles.avatarMultiVariants}>
+              <View style={avatarStyle}>
+                <Image
+                  source={
+                    userData?.profile_picture
+                      ? { uri: `${userData.profile_picture}?timestamp=${lastUpdate}` }
+                      : require('../../../assets/del.png')
+                  }
+                  style={styles.profileImage}
+                  resizeMode="cover"
+                  onError={(error) => console.log("Image load error:", error.nativeEvent.error)}
+                />
+              </View>
+            </View>
 
+            <View style={styles.statsContainer}>
+              <View style={styles.statsItem}>
+                <Text style={styles.statsNumber}>856</Text>
+                <Text style={styles.statsLabel}>Following</Text>
+              </View>
             </View>
           </View>
 
@@ -184,23 +224,54 @@ const Profile = ({ route, isBusinessProfile = false}) => {
           {renderTab("bucks", "The Bucks")}
         </View>
 
-        <View style={styles.contentBox} />
+        {activeTab === 'stories' && renderGrid()}
+
+        </ScrollView>
+        <View style={styles.bottomNav}>
+        <TouchableOpacity onPress={() => navigation.navigate('Home')}>
+          <Image source={require('../../../assets/home4.webp')} style={styles.navIcon} />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => navigation.navigate('CreatePost')}>
+          <Image source={require('../../../assets/plus3.png')} style={styles.navIcon} />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => navigation.navigate('Notifications')}>
+          <Image source={require('../../../assets/bell.png')} style={styles.navIcon} />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+          <Image source={require('../../../assets/settings.png')} style={styles.navIcon} />
+        </TouchableOpacity>
+        </View>
       </View>
-    </ScrollView>
+    
+    
   );
 };
 
-
 const styles = StyleSheet.create({
+  // Grid-specific styles
+  gridContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-start',
+    gap: 2,
+    paddingTop: 20,
+    paddingBottom: 20,
+    width: '100%',
+  },
+  gridItem: {
+    backgroundColor: '#f0f0f0',
+    marginBottom: 2,
+  },
+  gridImage: {
+    width: '100%',
+    height: '120%',
+  },
+  
+  // Existing styles
   profileContainer: {
     flexGrow: 1,
     backgroundColor: "#fff",
-    marginTop:50,
-  },
-  profileImage: {
-    width: "100%",
-    height: "100%",
-    borderRadius: 48,
+    marginTop: 30,
   },
   container: {
     flex: 1,
@@ -208,9 +279,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   contentContainer: {
+    marginTop: 20,
     flex: 1,
     alignItems: "center",
     paddingHorizontal: 16,
+    width: '100%',
   },
   centre: {
     alignItems: "center",
@@ -222,8 +295,6 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
     borderRadius: 48,
-    // borderWidth:2,
-    // borderColor:'#333',
   },
   profile: {
     width: "100%",
@@ -233,9 +304,35 @@ const styles = StyleSheet.create({
     gap: 14,
     marginTop: 30,
   },
+  profileSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    paddingHorizontal: 20,
+  },
   avatarMultiVariants: {
     width: 96,
     height: 96,
+    marginHorizontal: 20,
+  },
+  statsContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statsItem: {
+    alignItems: 'center',
+  },
+  statsNumber: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#000',
+    fontFamily: "AvenirNextCyr",
+  },
+  statsLabel: {
+    fontSize: 14,
+    color: '#666',
+    fontFamily: "AvenirNextCyr",
   },
   text: {
     width: "100%",
@@ -358,25 +455,47 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     textAlign: "center",
   },
-  contentBox: {
-    width: "90%",
-    height: 382,
-    backgroundColor: "#f0f8ff",
-    borderRadius: 14,
-    marginTop: 20,
-  },
   backButton: {
     position: "absolute",
     left: 28,
-    top: 86,
+    top: 20,
     zIndex: 1,
   },
   backButtonText: {
     fontSize: 32,
     color: "#000",
-    // marginBottom:250,
   },
-
+  scrollViewContent: {
+    paddingBottom: 60, // Adjust based on your bottom nav height
+  },
+  
+  bottomNav: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    position:'absolute',
+    paddingVertical: Platform.OS === 'ios' ? 20 : 12,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 12,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    backgroundColor: '#ffff',
+    width: "100%",
+    bottom: 0, // Stays at the bottom
+    zIndex: 10,
+    left: 16,
+    right: 0,
+    position: 'absolute',
+    height: Platform.OS === 'ios' ? 84 : 60,
+  },
+  navIcon: {
+    width: 24,
+    height: 24,
+    marginBottom: 4,
+    ...(Platform.OS === 'android' && {
+      tintColor: undefined
+    })
+  },
+  
 });
 
 export default Profile;

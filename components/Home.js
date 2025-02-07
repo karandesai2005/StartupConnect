@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, memo } from 'react';
+import React, { useEffect, useState, useCallback, memo, useMemo } from 'react';
 import {
   View,
   Text,
@@ -20,19 +20,39 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NGROK_URL } from '@env';
 
 const { width } = Dimensions.get('window');
+const formatTimestamp = (timestamp) => {
+  if (!timestamp) return 'Just now';
+
+  const now = new Date();
+  const postDate = new Date(timestamp);
+  const diffInMinutes = Math.floor((now - postDate) / (1000 * 60));
+
+  if (diffInMinutes < 1) return 'Just now';
+  if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+
+  const diffInHours = Math.floor(diffInMinutes / 60);
+  if (diffInHours < 24) return `${diffInHours}h ago`;
+
+  const diffInDays = Math.floor(diffInHours / 24);
+  if (diffInDays < 7) return `${diffInDays}d ago`;
+
+  return postDate.toLocaleDateString();
+};
 
 // Memoized Post Card Component
 const PostCard = memo(({ item, index, toggleExpand, expandedItems }) => {
   const [imageHeight, setImageHeight] = useState(width);
   const [isLoading, setIsLoading] = useState(true);
-  const [isLiked, setIsLiked] = useState(false); // State to track like status
-  const [profilePicture, setProfilePicture] = useState(null);
+  const [isLiked, setIsLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(item.likes || 0);
   const animatedScale = new Animated.Value(1);
 
-  // Calculate image dimensions when the component mounts
+  const isUserPost = item.hasOwnProperty('caption');
+
   useEffect(() => {
+    const imageUrl = isUserPost ? item.image_url : 'https://picsum.photos/800/800';
     Image.getSize(
-      item.postImage || 'https://picsum.photos/800/800',
+      imageUrl,
       (originalWidth, originalHeight) => {
         const aspectRatio = originalWidth / originalHeight;
         const calculatedHeight = width / aspectRatio;
@@ -43,7 +63,7 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems }) => {
         setImageHeight(width);
       }
     );
-  }, []);
+  }, [item]);
 
   const handlePressIn = () => {
     Animated.spring(animatedScale, {
@@ -59,23 +79,48 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems }) => {
     }).start();
   };
 
-  // Toggle like status
-  const toggleLike = () => {
-    setIsLiked(!isLiked);
+  const handleLike = async () => {
+    try {
+      setIsLiked(prev => !prev);
+      setLikeCount(prev => isLiked ? prev - 1 : prev + 1);
+
+      // Here you would typically make an API call to update the like status
+      // const token = await AsyncStorage.getItem("token");
+      // await axios.post(`${NGROK_URL}/api/posts/${item._id}/like`, {}, {
+      //   headers: { Authorization: `Bearer ${token}` }
+      // });
+    } catch (error) {
+      // Revert the optimistic update if the API call fails
+      setIsLiked(prev => !prev);
+      setLikeCount(prev => isLiked ? prev + 1 : prev - 1);
+      console.error('Error updating like:', error);
+    }
   };
+
 
   return (
     <Animated.View style={[styles.card, { transform: [{ scale: animatedScale }] }]}>
       {/* User Info Header */}
       <View style={styles.cardHeader}>
         <TouchableOpacity style={styles.userInfo}>
-          <Image source={{ uri: item.picture.thumbnail }} style={styles.avatar} />
+          <Image
+            source={
+              typeof item.profile_picture === 'string' && item.profile_picture.startsWith('http')
+                ? { uri: item.profile_picture }
+                : item.picture?.thumbnail
+                  ? { uri: item.picture.thumbnail }
+                  : require('../assets/del.png')
+            }
+            style={styles.avatar}
+          />
           <View>
-            <Text style={styles.name}>
-              {item.name.first} {item.name.last}
+            <Text>
+              {item.name && item.name.first && item.name.last
+                ? `${item.name.first} ${item.name.last}`
+                : item.username || 'Unknown User'}
             </Text>
-            <Text style={styles.timeStamp}>2h ago</Text>
           </View>
+
         </TouchableOpacity>
         <TouchableOpacity style={styles.moreButton}>
           <Text style={styles.moreButtonText}>•••</Text>
@@ -88,6 +133,7 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems }) => {
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
       >
+
         <View style={[styles.imageContainer, { height: imageHeight }]}>
           {isLoading && (
             <View style={styles.imageLoader}>
@@ -95,25 +141,29 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems }) => {
             </View>
           )}
           <Image
-            source={{ uri: 'https://picsum.photos/800/800' }}
-            style={[styles.postImage, { height: imageHeight }]}
-            resizeMode="contain"
-            onLoadStart={() => setIsLoading(true)}
-            onLoadEnd={() => setIsLoading(false)}
+            source={
+              typeof item.image_url === 'string' && item.image_url.startsWith('http')
+                ? { uri: item.image_url }
+                : require('../assets/PITCH.png')  // Create a placeholder image
+            }
+            style={styles.postImage}
           />
         </View>
       </TouchableOpacity>
 
       {/* Engagement Section */}
       <View style={styles.cardFooter}>
-        <Text style={styles.likes}>👍️ 789K Likes</Text>
-        <Text style={styles.comments}>💬 3M Comments</Text>
+        <Text style={styles.likes}>👍 {likeCount} Likes</Text>
+        <Text style={styles.comments}>💬 {item.comments || 0}</Text>
       </View>
       <View style={styles.actions}>
-        <TouchableOpacity style={styles.actionButton} onPress={toggleLike}>
+        <TouchableOpacity style={styles.actionButton} onPress={handleLike}>
           <Image
             source={require('../assets/icon-like.png')}
-            style={[styles.navIcon, { tintColor: isLiked ? '#1f219c' : 'black' }]}
+            style={[
+              styles.navIcon,
+              isLiked && { tintColor: '#1f219c' }
+            ]}
           />
         </TouchableOpacity>
         <TouchableOpacity style={styles.actionButton}>
@@ -133,9 +183,10 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems }) => {
           style={styles.caption}
           numberOfLines={expandedItems[index] ? undefined : 2}
         >
-          <Text style={styles.username}>{item.name.first} </Text>
-          This is a sample text. This is the comment. Let's go. This is a good MVP.
-          Additional content for testing the "Show More" functionality...
+          <Text style={styles.username}>
+            {isUserPost ? item.username : item.name.first}{' '}
+          </Text>
+          {item.content}
         </Text>
         <TouchableOpacity onPress={() => toggleExpand(index)}>
           <Text style={styles.showMoreText}>
@@ -155,6 +206,17 @@ export default function HomeScreen() {
   const [expandedItems, setExpandedItems] = useState({});
   const [userData, setUserData] = useState(null);
   const navigation = useNavigation();
+  const [postsError, setPostsError] = useState(null);
+  const combinedData = useMemo(() => {
+    const validPosts = myPosts.filter(post => post && post.image_url);
+    const mergedData = [...validPosts, ...users];
+
+    // console.log("🛠️ Combined Data for FlatList:", JSON.stringify(mergedData, null, 2)); // ✅ Check merged posts + users
+
+    return mergedData;
+  }, [myPosts, users]);
+
+
 
   // Load posts (random users and user posts)
   const loadUsers = useCallback(async (refresh = false) => {
@@ -177,14 +239,50 @@ export default function HomeScreen() {
   }, [currentPage]);
 
   // Fetch the user's posts (simulate or fetch real posts)
+
   const fetchMyPosts = useCallback(async () => {
     try {
-      const response = await axios.get(`${NGROK_URL}/api/posts/myposts`);
-      setMyPosts(response.data.posts);  // Assuming the API returns a list of posts
+      setPostsError(null);
+      const token = await AsyncStorage.getItem("token");
+
+      console.log("🔑 Retrieved Token:", token); // ✅ Check token
+
+      if (!token) {
+        console.log("⚠️ No token found in AsyncStorage");
+        setPostsError('Please login to view posts');
+        return;
+      }
+
+      console.log("📡 Sending request to:", `${NGROK_URL}/api/posts/myposts`);
+
+      const response = await axios.get(`${NGROK_URL}/api/posts/myposts`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+      });
+
+      console.log("✅ API Response:", JSON.stringify(response.data, null, 2)); // ✅ Check full response
+
+      if (response.data && Array.isArray(response.data)) {
+        const sortedPosts = response.data.filter(post => post.image_url).sort((a, b) =>
+          new Date(b.created_at) - new Date(a.created_at)
+        );
+        setMyPosts(sortedPosts);
+        console.log("📌 Sorted User Posts:", JSON.stringify(sortedPosts, null, 2));
+      } else {
+        console.log("⚠️ No posts found in response.");
+      }
     } catch (error) {
-      console.error('Error fetching user posts:', error);
+      console.error('❌ Error fetching posts:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
     }
   }, []);
+
+
 
   useEffect(() => {
     loadUsers();
@@ -192,10 +290,13 @@ export default function HomeScreen() {
   }, [currentPage]);
 
   const onRefresh = useCallback(() => {
+    console.log("🔄 Refresh triggered...");
     setRefreshing(true);
     setCurrentPage(1);
     loadUsers(true);
+    fetchMyPosts(); // ✅ Ensure user posts refresh too
   }, []);
+
 
   const toggleExpand = useCallback((index) => {
     setExpandedItems(prev => ({
@@ -241,6 +342,9 @@ export default function HomeScreen() {
       fetchUserData();
     }, [fetchUserData])
   );
+  // console.log("My Posts:", JSON.stringify(myPosts, null, 2));
+  // console.log("Combined Data:", JSON.stringify(combinedData, null, 2));
+
 
   return (
     <View style={styles.container}>
@@ -249,13 +353,13 @@ export default function HomeScreen() {
       {/* Top Bar */}
       <View style={styles.topBar}>
         <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
-          <Image 
+          <Image
             source={
-              userData?.profile_picture 
+              userData?.profile_picture
                 ? { uri: userData.profile_picture }
                 : require('../assets/del.png')
             }
-            style={styles.profilePic} 
+            style={styles.profilePic}
           />
         </TouchableOpacity>
         <TextInput
@@ -270,25 +374,29 @@ export default function HomeScreen() {
 
       {/* Post List */}
       <FlatList
-        data={[...myPosts, ...users]}  // Combine both user posts and random posts
-        renderItem={({ item, index }) => (
-          <PostCard
-            item={item}
-            index={index}
-            toggleExpand={toggleExpand}
-            expandedItems={expandedItems}
-          />
-        )}
-        keyExtractor={(item, index) => index.toString()}
+        data={combinedData}
+        extraData={combinedData} // Ensures re-render when data changes
+        renderItem={({ item, index }) => {
+          console.log(`📸 Rendering Post #${index}:`, item); // ✅ Check each item being rendered
+          return (
+            <PostCard
+              key={index} // Force key for better re-renders
+              item={item}
+              index={index}
+              toggleExpand={toggleExpand}
+              expandedItems={expandedItems}
+            />
+          );
+        }}
+        keyExtractor={(item, index) => item._id ? item._id.toString() : index.toString()}
         onEndReached={() => setCurrentPage(prev => prev + 1)}
         onEndReachedThreshold={0.5}
         ListFooterComponent={renderFooter}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.listContentContainer}
       />
+
 
       {/* Bottom Navigation */}
       <View style={styles.bottomNav}>

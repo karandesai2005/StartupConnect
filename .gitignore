@@ -78,6 +78,9 @@ yarn-error.*
 # @end expo-cli
 /android
 /ios
-uploads/*
-!uploads/.gitkeep
+uploads/posts/*
+uploads/profile_pictures/*
+!uploads/posts/.gitkeep
+!uploads/profile_pictures/.gitkeep
+
 

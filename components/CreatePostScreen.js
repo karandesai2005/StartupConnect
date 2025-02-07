@@ -24,10 +24,11 @@ export default function CreatePostScreen() {
   useEffect(() => {
     (async () => {
       if (Platform.OS !== 'web') {
+        // Request permission to access media library
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') {
           Alert.alert(
-            'Permission Needed', 
+            'Permission Needed',
             'Sorry, we need camera roll permissions to make this work!'
           );
         }
@@ -37,17 +38,19 @@ export default function CreatePostScreen() {
 
   const pickImage = async () => {
     try {
+      // Request permission again if needed
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert(
-          'Permission Denied', 
+          'Permission Denied',
           'Sorry, we need camera roll permissions to select an image.'
         );
         return;
       }
 
+      console.log('Opening image picker...');
       let result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ImagePicker.MediaTypeOptions.Images, // ✅ Ensures only images are picked
         allowsEditing: true,
         aspect: [4, 3],
         quality: 1,
@@ -55,10 +58,9 @@ export default function CreatePostScreen() {
 
       console.log('Image Picker Result:', JSON.stringify(result, null, 2));
 
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        const selectedImage = result.assets[0];
-        console.log('Selected Image URI:', selectedImage.uri);
-        setImage(selectedImage.uri);
+      if (!result.canceled) {
+        console.log('Image selected:', result.assets[0].uri);
+        setImage(result.assets[0].uri); // ✅ Corrected access to selected image URI
       } else {
         console.log('Image selection was canceled');
       }
@@ -69,41 +71,62 @@ export default function CreatePostScreen() {
   };
 
   const uploadPost = async () => {
-    if (!image) return alert('Please select an image');
+    if (!image) {
+      alert('Please select an image');
+      console.log('Upload attempt failed: No image selected.');
+      return;
+    }
+  
     setLoading(true);
-
+    console.log('Starting upload...');
+  
     try {
       const token = await AsyncStorage.getItem('token');
-      if (!token) return;
-
-      let formData = new FormData();
+      if (!token) {
+        console.log('No token found. User might be logged out.');
+        return;
+      }
+  
+      // Create form data
+      const formData = new FormData();
+      
+      // Add the content field (changed from caption to content)
+      formData.append('content', caption.trim() || 'No caption');
+      
+      // Add the image file
       formData.append('image', {
         uri: image,
-        name: 'post.jpg',
+        name: image.split('/').pop(),
         type: 'image/jpeg',
       });
-      formData.append('caption', caption);
-
-      const response = await fetch(`${NGROK_URL}/api/posts`, {
-        method: 'POST',
+  
+      console.log("Uploading formData:", formData._parts);
+  
+      const response = await fetch(`${NGROK_URL}/api/posts/`, {
+        method: "POST",
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data',
+          "Authorization": `Bearer ${token}`,
         },
         body: formData,
       });
-
+  
+      console.log('Upload response status:', response.status);
+  
       if (response.ok) {
         alert('Post uploaded successfully!');
+        console.log('Post uploaded successfully.');
         navigation.goBack();
       } else {
-        alert('Failed to upload post');
+        const errorData = await response.json();
+        alert(`Failed to upload post: ${errorData.error}`);
+        console.log('Upload failed. Response:', errorData);
       }
     } catch (error) {
       console.error('Upload error:', error);
       Alert.alert('Upload Failed', error.message);
     } finally {
       setLoading(false);
+      console.log('Upload process completed.');
     }
   };
 
@@ -120,7 +143,10 @@ export default function CreatePostScreen() {
         style={styles.input}
         placeholder='Write a caption...'
         value={caption}
-        onChangeText={setCaption}
+        onChangeText={(text) => {
+          console.log('Caption updated:', text);
+          setCaption(text);
+        }}
       />
       <TouchableOpacity onPress={uploadPost} style={styles.uploadButton}>
         {loading ? (

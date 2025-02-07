@@ -25,7 +25,6 @@ const LoginScreen = () => {
   const [serverError, setServerError] = useState("");
   const [popupMessage, setPopupMessage] = useState("");
   const [isPopupVisible, setIsPopupVisible] = useState(false);
-
   const navigation = useNavigation();
 
   const openGoogleLogin = () => {
