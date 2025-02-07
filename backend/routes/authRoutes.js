@@ -34,7 +34,7 @@ router.post("/save-user-details", validateSaveUserDetailsInput, saveUserDetails)
 // Fetch user profile (protected route)
 router.get("/profile", authenticateJWT, getUserProfile);  // Apply authenticateJWT middleware here
 
-router.put("/update-profile", 
+router.put("/update-profile",  
   authenticateJWT,  
   uploadProfilePicture.single('profile_picture'),  // Corrected multer upload handler
   updateProfile
