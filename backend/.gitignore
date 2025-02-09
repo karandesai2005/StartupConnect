@@ -9,4 +9,23 @@ uploads/profile_pictures/*
 # Allow the folders to be tracked
 !uploads/posts/.gitkeep
 !uploads/profile_pictures/.gitkeep
+../App.js
+../README.md
+../app.json
+../assets/
+../babel.config.js
+../build_log.txt
+../changex.txt
+../components/
+../context/
+../eas.json
+../expo/
+../index.js
+../main.js
+../metro.config.js
+../package-lock.json
+../package.json
+../path.txt
+../startupconnect@1.0.0/
+../uploads/
 
