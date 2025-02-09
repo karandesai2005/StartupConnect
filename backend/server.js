@@ -3,6 +3,7 @@ const express = require("express");
 const app = require("./app");
 const path = require("path");
 const postRoutes = require('./routes/postRoutes');
+const PORT = process.env.PORT || 8080;  // Use Azure's port or default to 8080
 // Serve static files from uploads folder
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
@@ -23,7 +24,6 @@ app.post("/api/auth/save-user-details", (req, res) => {
   res.json({ message: "User details saved!" });
 });
 
-// Start the server after routes are registered
-app.listen(3000, "0.0.0.0", () => {
-  console.log("Server running on http://0.0.0.0:3000");
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server running on http://0.0.0.0:${PORT}`);
 });
