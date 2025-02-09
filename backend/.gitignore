@@ -1,0 +1,12 @@
+# Ignore node_modules and environment files
+node_modules/
+.env
+
+# Ignore all files inside uploads/posts and uploads/profile_pictures, but keep the directories
+uploads/posts/*
+uploads/profile_pictures/*
+
+# Allow the folders to be tracked
+!uploads/posts/.gitkeep
+!uploads/profile_pictures/.gitkeep
+
