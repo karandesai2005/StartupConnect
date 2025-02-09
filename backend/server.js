@@ -1,8 +1,8 @@
+require("dotenv").config({ path: "./.env" });  // Load backend .env
 const express = require("express");
 const app = require("./app");
 const path = require("path");
 const postRoutes = require('./routes/postRoutes');
-
 // Serve static files from uploads folder
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
