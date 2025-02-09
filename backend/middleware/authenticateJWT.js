@@ -8,7 +8,7 @@ const authenticateJWT = (req, res, next) => {
   console.log('Auth header:', authHeader);
   
   const token = authHeader?.split(' ')[1];
-  console.log('Extracted token:', token ? 'Token found' : 'No token');
+  console.log('Extracted token:', token ?   'Token found' : 'No token');
 
   if (!token) {
     return res.status(401).json({ message: "Access denied. No token provided." });
