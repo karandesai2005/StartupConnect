@@ -23,8 +23,6 @@ uploads/profile_pictures/*
 ../index.js
 ../main.js
 ../metro.config.js
-../package-lock.json
-../package.json
 ../path.txt
 ../startupconnect@1.0.0/
 ../uploads/
