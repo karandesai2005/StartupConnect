@@ -3,7 +3,13 @@ const express = require("express");
 const app = require("./app");
 const path = require("path");
 const postRoutes = require('./routes/postRoutes');
-const PORT = process.env.PORT || 8080;  // Use Azure's port or default to 8080
+const { connectDB } = require("./config/db");  // Import the new Azure SQL connection
+
+const PORT = process.env.PORT || 8080;
+
+// Connect to Azure SQL
+connectDB();
+
 // Serve static files from uploads folder
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
@@ -25,5 +31,5 @@ app.post("/api/auth/save-user-details", (req, res) => {
 });
 
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server running on http://0.0.0.0:${PORT}`);
+  console.log(`🚀 Server running on http://0.0.0.0:${PORT}`);
 });
