@@ -1,79 +1,38 @@
-// config/db.js
-require('dotenv').config();
 const sql = require('mssql');
-console.log("DB Config:");
-console.log("User:", process.env.DB_USER);
-console.log("Password:", process.env.DB_PASSWORD ? "******" : "Not Set");
-console.log("Server:", process.env.DB_SERVER);
-console.log("Database:", process.env.DB_NAME);
+require('dotenv').config();
+
+// Check if environment variables are loaded
+console.log("🔍 Checking Environment Variables:");
+console.log("🔹 DB_USER:", process.env.DB_USER || "❌ Not Set");
+console.log("🔹 DB_PASSWORD:", process.env.DB_PASSWORD ? "✔️ Set" : "❌ Not Set");
+console.log("🔹 DB_HOST:", process.env.DB_HOST || "❌ Not Set");
+console.log("🔹 DB_NAME:", process.env.DB_NAME || "❌ Not Set");
+console.log("🔹 DB_PORT:", process.env.DB_PORT || "❌ Not Set");
 
 const config = {
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
-  server: process.env.DB_SERVER,
+  server: process.env.DB_HOST,
   database: process.env.DB_NAME,
+  port: parseInt(process.env.DB_PORT, 10) || 1433,
   options: {
-    encrypt: true,
-    trustServerCertificate: false,
+    encrypt: true, // Required for Azure SQL
+    trustServerCertificate: false, // Change to true if you face certificate issues
     enableArithAbort: true,
-    connectionTimeout: 30000, // Increased timeout
-    requestTimeout: 30000,
-    debug: {
-      packet: true,
-      data: true,
-      payload: true,
-      token: false,
-      log: true
-    }
   },
   pool: {
     max: 10,
     min: 0,
-    idleTimeoutMillis: 30000
+    idleTimeoutMillis: 30000,
   }
 };
 
-async function testConnection() {
-  try {
-    // First, log the connection attempt
-    console.log('Attempting to connect to database...');
-    console.log('Server:', process.env.DB_SERVER);
-    console.log('Database:', process.env.DB_NAME);
-    console.log('Username:', process.env.DB_USER);
-    
-    // Test connection
-    const pool = new sql.ConnectionPool(config);
-    
-    // Add error handler before connecting
-    pool.on('error', err => {
-      console.error('SQL Pool Error:', err);
-    });
-
-    await pool.connect();
-    console.log("✅ Connected to Azure SQL Database!");
-    
-    // Test a simple query
-    const result = await pool.request().query('SELECT 1 as test');
-    console.log("Test query result:", result);
-    
-    await pool.close();
-    return true;
-  } catch (err) {
-    console.error("Detailed connection error:");
-    console.error("Error name:", err.name);
-    console.error("Error code:", err.code);
-    console.error("Error number:", err.number);
-    console.error("Error state:", err.state);
-    console.error("Error class:", err.class);
-    console.error("Full error:", err);
-    return false;
-  }
-}
-
+// ✅ Function to establish DB connection
 async function connectDB() {
   try {
-    const pool = await new sql.ConnectionPool(config).connect();
-    console.log("✅ Connected to Azure SQL Database!");
+    console.log("⚡ Connecting to Azure SQL Database...");
+    const pool = await sql.connect(config);
+    console.log("✅ Connection established successfully!");
     return pool;
   } catch (err) {
     console.error("❌ Database connection failed:", err);
@@ -81,8 +40,30 @@ async function connectDB() {
   }
 }
 
+// ✅ Function to test DB connection (fixing missing reference)
+async function testConnection() {
+  try {
+    console.log('⚡ Attempting to connect to database...');
+    await sql.connect(config);
+    console.log("✅ Successfully connected to Azure SQL Database!");
+
+    // Run a test query
+    const result = await sql.query('SELECT 1 AS test');
+    console.log("🟢 Test Query Result:", result.recordset);
+
+    // Close connection
+    await sql.close();
+    return true;
+  } catch (err) {
+    console.error("❌ Database Connection Failed!");
+    console.error("➡️ Error:", err);
+    return false;
+  }
+}
+
+// ✅ Export both functions properly
 module.exports = {
-  connectDB,
+  connectDB,   // Corrected export
   testConnection,
   sql
 };
