@@ -5,7 +5,7 @@ const path = require("path");
 const postRoutes = require("./routes/postRoutes");
 const { connectDB } = require("./config/db"); // Import Azure SQL connection
 
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 3000;
 
 // ✅ Ensure DB connection before starting the server
 async function startServer() {
