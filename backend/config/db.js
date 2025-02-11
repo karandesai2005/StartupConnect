@@ -1,7 +1,12 @@
-const sql = require('mssql');
-require('dotenv').config();
+require('dotenv').config();  // Load .env file
 
-// Check if environment variables are loaded
+// For Azure SQL Database, it's better to use the mssql package instead of pg.
+// (Azure SQL is a Microsoft SQL Server, not a PostgreSQL database.)
+// Ensure you have installed mssql with: npm install mssql
+
+const sql = require('mssql');
+
+// Log environment variables for debugging
 console.log("🔍 Checking Environment Variables:");
 console.log("🔹 DB_USER:", process.env.DB_USER || "❌ Not Set");
 console.log("🔹 DB_PASSWORD:", process.env.DB_PASSWORD ? "✔️ Set" : "❌ Not Set");
@@ -16,8 +21,8 @@ const config = {
   database: process.env.DB_NAME,
   port: parseInt(process.env.DB_PORT, 10) || 1433,
   options: {
-    encrypt: true, // Required for Azure SQL
-    trustServerCertificate: false, // Change to true if you face certificate issues
+    encrypt: true,               // Required for Azure SQL
+    trustServerCertificate: false,
     enableArithAbort: true,
   },
   pool: {
@@ -27,7 +32,6 @@ const config = {
   }
 };
 
-// ✅ Function to establish DB connection
 async function connectDB() {
   try {
     console.log("⚡ Connecting to Azure SQL Database...");
@@ -40,30 +44,6 @@ async function connectDB() {
   }
 }
 
-// ✅ Function to test DB connection (fixing missing reference)
-async function testConnection() {
-  try {
-    console.log('⚡ Attempting to connect to database...');
-    await sql.connect(config);
-    console.log("✅ Successfully connected to Azure SQL Database!");
-
-    // Run a test query
-    const result = await sql.query('SELECT 1 AS test');
-    console.log("🟢 Test Query Result:", result.recordset);
-
-    // Close connection
-    await sql.close();
-    return true;
-  } catch (err) {
-    console.error("❌ Database Connection Failed!");
-    console.error("➡️ Error:", err);
-    return false;
-  }
-}
-
-// ✅ Export both functions properly
 module.exports = {
-  connectDB,   // Corrected export
-  testConnection,
-  sql
+  connectDB,
 };
