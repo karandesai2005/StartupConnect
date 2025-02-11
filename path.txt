@@ -1,3 +1,0 @@
-:/home/whitecrow/StartupConnect/dist/application-e087b881-b077-487c-9b33-a902647fe82e.aab
-/home/whitecrow/my-release-key.jks
-

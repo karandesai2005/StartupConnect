@@ -83,4 +83,30 @@ uploads/profile_pictures/*
 !uploads/posts/.gitkeep
 !uploads/profile_pictures/.gitkeep
 
+backend/uploads/*
+!backend/uploads/posts/.gitkeep
+!backend/uploads/profile_pictures/.gitkeep
+
+.env
+backend/.env
+
+App.js
+README.md
+app.json
+assets/
+babel.config.js
+build_log.txt
+changex.txt
+components/
+context/
+eas.json
+expo/
+index.js
+main.js
+metro.config.js
+package-lock.json
+package.json
+path.txt
+startupconnect@1.0.0/
+uploads/
 

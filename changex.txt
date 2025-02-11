@@ -1,5 +1,0 @@
-home icon
-raise nav bar
-state error for sign in 
-doesnt check if its same email id:wq
-
