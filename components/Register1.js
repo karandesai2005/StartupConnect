@@ -11,11 +11,12 @@ import { useNavigation } from "@react-navigation/native";
 import { UserRegistrationContext } from "../context/UserRegistrationContext";
 import Popup from "./Popup";
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { NGROK_URL } from '@env';
 
 const SignupForm = () => {
   const navigation = useNavigation();
   const { userData, setUserData } = useContext(UserRegistrationContext);
-
+  console.log("NGROK_URL:", NGROK_URL);
   // Local state for form validation and loading
   const [emailError, setEmailError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -50,7 +51,7 @@ const SignupForm = () => {
     setServerError("");
 
     try {
-        const response = await fetch("https://c1df-59-97-191-226.ngrok-free.app/api/auth/save-user-details", {
+        const response = await fetch(`${NGROK_URL}/api/auth/save-user-details`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
