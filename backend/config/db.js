@@ -32,18 +32,40 @@ const config = {
   }
 };
 
+let poolPromise;
+
 async function connectDB() {
+  if (!poolPromise) {
+    poolPromise = sql.connect(config)
+      .then(pool => {
+        console.log("✅ Connection established successfully!");
+        return pool;
+      })
+      .catch(err => {
+        console.error("❌ Database connection failed:", err);
+        poolPromise = null;
+        throw err;
+      });
+  }
+  return poolPromise;
+}
+
+async function queryDB(query, params = []) {
   try {
-    console.log("⚡ Connecting to Azure SQL Database...");
-    const pool = await sql.connect(config);
-    console.log("✅ Connection established successfully!");
-    return pool;
-  } catch (err) {
-    console.error("❌ Database connection failed:", err);
-    throw err;
+    const pool = await connectDB();
+    const request = pool.request();
+    params.forEach((param, index) => {
+      request.input(`param${index + 1}`, param);
+    });
+    const result = await request.query(query);
+    return result.recordset;
+  } catch (error) {
+    console.error("❌ Query execution failed:", error);
+    throw error;
   }
 }
 
 module.exports = {
   connectDB,
+  queryDB,
 };
