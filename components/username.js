@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import Popup from "./Popup"; // Import the Popup component
+import { NGROK_URL } from '@env';
 
 const Signup = () => {
   const navigation = useNavigation();
@@ -28,8 +29,7 @@ const Signup = () => {
 
     // Validate username (API call)
     try {
-      const response = await fetch(
-        "https://c4a4-59-97-191-226.ngrok-free.app/api/auth/validate-username",
+      const response = await fetch(`${NGROK_URL}/api/auth/validate-username`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -58,7 +58,7 @@ const Signup = () => {
 
     try {
       const response = await fetch(
-        "https://c1df-59-97-191-226.ngrok-free.app/api/auth/save-user-details",
+        `${NGROK_URL}/api/auth/save-user-details`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

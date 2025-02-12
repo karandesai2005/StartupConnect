@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Text, StyleSheet, View, Pressable, TouchableOpacity, TextInput, Alert } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
+import { NGROK_URL } from '@env';
 
 const Popup = ({ visible, message, onClose }) => {
     if (!visible) return null;
@@ -64,7 +65,7 @@ const handleNext = async () => {
     }
 
     try {
-        const response = await fetch("https://c1df-59-97-191-226.ngrok-free.app/api/auth/save-user-details", {
+        const response = await fetch(`${NGROK_URL}/api/auth/save-user-details`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
