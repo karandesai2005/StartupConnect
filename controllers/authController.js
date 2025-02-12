@@ -64,30 +64,34 @@ const login = async (req, res) => {
     let query, value;
     if (email) {
       const normalizedEmail = email.toLowerCase();
-      query = 'SELECT * FROM users WHERE email = $1 COLLATE "C"';
+      query = 'SELECT * FROM users WHERE LOWER(email) = LOWER($1)';
       value = normalizedEmail;
     } else if (username) {
-      query = 'SELECT * FROM users WHERE username = $1 COLLATE "C"';
+      query = 'SELECT * FROM users WHERE LOWER(username) = LOWER($1)';
       value = username;
     } else {
       return res.status(400).json({ message: "Email or username is required." });
     }
 
-    const user = await pool.query(query, [value]);
-    if (user.rows.length === 0) {
+    const user = await queryDB(query, [value]);
+
+    if (user.length === 0) {
       return res.status(400).json({ message: "Invalid email/username or password" });
     }
 
-    const isMatch = await bcrypt.compare(password, user.rows[0].password_hash);
+    const isMatch = await bcrypt.compare(password, user[0].password_hash);
     if (!isMatch) {
       return res.status(400).json({ message: "Invalid email/username or password" });
     }
 
-    const token = jwt.sign({ userId: user.rows[0].user_id }, process.env.JWT_SECRET, {
+    const token = jwt.sign({ userId: user[0].user_id }, process.env.JWT_SECRET, {
       expiresIn: "1h",
     });
+
     res.status(200).json({ message: "Login successful", token });
+
   } catch (err) {
+    console.error("Login error:", err);
     res.status(500).json({ message: "Internal server error", error: err.message });
   }
 };
@@ -221,30 +225,25 @@ const validateUsername = async (req, res) => {
   try {
     const { username } = req.body;
 
-    if (!username || username.length < 3 || username.length > 20) {
+    const result = await pool.query(
+      'SELECT * FROM users WHERE username = $1 COLLATE "C"',
+      [username]
+    );
+    if (result.rows.length > 0) {
+      return res.status(400).json({ message: "Username already exists" });
+    }
+
+    if (username.length < 3 || username.length > 20) {
       return res.status(400).json({
-        message: "Username must be between 3 and 20 characters.",
+        message: "Username must be between 3 and 20 characters",
       });
     }
 
-    // Use queryDB for consistency
-    const result = await queryDB(
-      'SELECT * FROM users WHERE LOWER(username) = LOWER(@param1)',
-      [username]
-    );
-
-    if (result.length > 0) {
-      return res.status(400).json({ message: "Username already exists." });
-    }
-
-    res.status(200).json({ message: "Username is available." });
-
+    res.status(200).json({ message: "Username is available" });
   } catch (err) {
-    console.error("Error validating username:", err);
     res.status(500).json({ message: "Error validating username", error: err.message });
   }
 };
-
 
 // Get user profile
 const getUserProfile = async (req, res) => {
