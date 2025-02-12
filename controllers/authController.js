@@ -221,25 +221,30 @@ const validateUsername = async (req, res) => {
   try {
     const { username } = req.body;
 
-    const result = await pool.query(
-      'SELECT * FROM users WHERE username = $1 COLLATE "C"',
-      [username]
-    );
-    if (result.rows.length > 0) {
-      return res.status(400).json({ message: "Username already exists" });
-    }
-
-    if (username.length < 3 || username.length > 20) {
+    if (!username || username.length < 3 || username.length > 20) {
       return res.status(400).json({
-        message: "Username must be between 3 and 20 characters",
+        message: "Username must be between 3 and 20 characters.",
       });
     }
 
-    res.status(200).json({ message: "Username is available" });
+    // Use queryDB for consistency
+    const result = await queryDB(
+      'SELECT * FROM users WHERE LOWER(username) = LOWER(@param1)',
+      [username]
+    );
+
+    if (result.length > 0) {
+      return res.status(400).json({ message: "Username already exists." });
+    }
+
+    res.status(200).json({ message: "Username is available." });
+
   } catch (err) {
+    console.error("Error validating username:", err);
     res.status(500).json({ message: "Error validating username", error: err.message });
   }
 };
+
 
 // Get user profile
 const getUserProfile = async (req, res) => {
