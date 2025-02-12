@@ -2,6 +2,7 @@
     import { Text, StyleSheet, View, TextInput, Pressable, ActivityIndicator, Alert } from "react-native";
     import { useNavigation } from "@react-navigation/native";
     import AsyncStorage from '@react-native-async-storage/async-storage';
+    import { NGROK_URL } from '@env';
 
     const HandlePersonal = () => {
         const [realName, setRealName] = React.useState("");
