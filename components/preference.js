@@ -2,6 +2,7 @@ import * as React from "react";
 import { Text, StyleSheet, View, Pressable, TouchableOpacity, Alert } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { NGROK_URL } from '@env';
 
 const Signup = () => {
     const navigation = useNavigation();
