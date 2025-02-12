@@ -1,7 +1,8 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const { getUserByEmail, createUser } = require("../models/userModel");
-const pool = require("../config/db");
+const { queryDB } = require("../config/db");
+
 
 // Register user
 const register = async (req, res) => {
@@ -14,19 +15,43 @@ const register = async (req, res) => {
 
     const normalizedEmail = email.toLowerCase();
 
-    const existingUser = await pool.query(
-      'SELECT * FROM users WHERE email = $1 COLLATE "C"',
+    // Check for existing user
+    const existingUsers = await queryDB(
+      'SELECT * FROM users WHERE email = @param1',
       [normalizedEmail]
     );
-    if (existingUser.rows.length > 0) {
+    
+    if (existingUsers.length > 0) {
       return res.status(400).json({ message: "Email already in use" });
     }
 
     const passwordHash = await bcrypt.hash(password, parseInt(process.env.SALT_ROUNDS, 10));
 
-    const user = await createUser(username, normalizedEmail, passwordHash, isFounder, isInvestor);
-    res.status(201).json({ message: "User registered successfully", user });
+    // Insert new user
+    const query = `
+      INSERT INTO users (username, email, password_hash, is_founder, is_investor)
+      VALUES (@param1, @param2, @param3, @param4, @param5);
+      SELECT SCOPE_IDENTITY() AS user_id;
+    `;
+    
+    const result = await queryDB(query, [
+      username,
+      normalizedEmail,
+      passwordHash,
+      isFounder ? 1 : 0,
+      isInvestor ? 1 : 0
+    ]);
+
+    res.status(201).json({ 
+      message: "User registered successfully", 
+      user: { 
+        user_id: result[0].user_id,
+        username,
+        email: normalizedEmail
+      }
+    });
   } catch (err) {
+    console.error("Registration error:", err);
     res.status(500).json({ message: "Internal server error", error: err.message });
   }
 };
@@ -68,6 +93,7 @@ const login = async (req, res) => {
 };
 
 // Save user details step-by-step
+// Save user details step-by-step
 const saveUserDetails = async (req, res) => {
   console.log("Request Body:", req.body);
 
@@ -78,19 +104,8 @@ const saveUserDetails = async (req, res) => {
       return res.status(400).json({ message: "Step and data are required." });
     }
 
-    // Check if userId exists (for steps 2, 3, 4, 5)
-    if (step !== 1 && !data.userId) {
-      return res.status(400).json({ message: "User ID is required." });
-    }
+    let query, params;
 
-    if (step !== 1) {
-      const userCheck = await pool.query('SELECT * FROM users WHERE user_id = $1', [data.userId]);
-      if (userCheck.rows.length === 0) {
-        return res.status(404).json({ message: "User not found." });
-      }
-    }
-
-    let query, values;
     switch (step) {
       case 1:
         if (!data.email) {
@@ -99,22 +114,25 @@ const saveUserDetails = async (req, res) => {
 
         const normalizedEmail = data.email.toLowerCase();
 
-        const existingUser = await pool.query(
-          'SELECT * FROM users WHERE email = $1 COLLATE "C"',
+        // Check if email exists
+        const existingUsers = await queryDB(
+          'SELECT * FROM users WHERE email = @param1',
           [normalizedEmail]
         );
-        if (existingUser.rows.length > 0) {
+
+        if (existingUsers.length > 0) {
           return res.status(400).json({ message: "Email already in use." });
         }
 
         const tempUsername = `user_${Date.now()}`;
 
+        // Insert new user and get ID
         query = `
           INSERT INTO users (email, username, created_at)
-          VALUES ($1, $2, NOW())
-          RETURNING user_id;
+          VALUES (@param1, @param2, GETDATE());
+          SELECT SCOPE_IDENTITY() AS user_id;
         `;
-        values = [normalizedEmail, tempUsername];
+        params = [normalizedEmail, tempUsername];
         break;
 
       case 2:
@@ -122,12 +140,19 @@ const saveUserDetails = async (req, res) => {
           return res.status(400).json({ message: "Password is required." });
         }
 
+        if (!data.userId) {
+          return res.status(400).json({ message: "User ID is required." });
+        }
+
         const passwordHash = await bcrypt.hash(data.password, parseInt(process.env.SALT_ROUNDS, 10));
 
         query = `
-          UPDATE users SET password_hash = $1 WHERE user_id = $2;
+          UPDATE users 
+          SET password_hash = @param1 
+          WHERE user_id = @param2;
+          SELECT user_id FROM users WHERE user_id = @param2;
         `;
-        values = [passwordHash, data.userId];
+        params = [passwordHash, data.userId];
         break;
 
       case 3:
@@ -138,9 +163,12 @@ const saveUserDetails = async (req, res) => {
         }
 
         query = `
-          UPDATE users SET username = $1 WHERE user_id = $2;
+          UPDATE users 
+          SET username = @param1 
+          WHERE user_id = @param2;
+          SELECT user_id FROM users WHERE user_id = @param2;
         `;
-        values = [data.username, data.userId];
+        params = [data.username, data.userId];
         break;
 
       case 4:
@@ -149,9 +177,16 @@ const saveUserDetails = async (req, res) => {
         }
 
         query = `
-          UPDATE users SET is_personal = $1, is_business = $2 WHERE user_id = $3;
+          UPDATE users 
+          SET is_personal = @param1, is_business = @param2 
+          WHERE user_id = @param3;
+          SELECT user_id FROM users WHERE user_id = @param3;
         `;
-        values = [data.preference === "personal", data.preference === "business", data.userId];
+        params = [
+          data.preference === "personal" ? 1 : 0,
+          data.preference === "business" ? 1 : 0,
+          data.userId
+        ];
         break;
 
       case 5:
@@ -160,19 +195,23 @@ const saveUserDetails = async (req, res) => {
         }
 
         query = `
-          UPDATE users SET name = $1 WHERE user_id = $2;
+          UPDATE users 
+          SET name = @param1 
+          WHERE user_id = @param2;
+          SELECT user_id FROM users WHERE user_id = @param2;
         `;
-        values = [data.realName.trim(), data.userId];
+        params = [data.realName.trim(), data.userId];
         break;
 
       default:
         return res.status(400).json({ message: "Invalid step." });
     }
 
-    const result = await pool.query(query, values);
-    res.status(200).json({ message: "Data saved successfully", result: result.rows });
+    const result = await queryDB(query, params);
+    res.status(200).json({ message: "Data saved successfully", result });
+
   } catch (err) {
-    console.error("Error saving user details:", err.message);
+    console.error("Error saving user details:", err);
     res.status(500).json({ message: "Internal server error", error: err.message });
   }
 };
