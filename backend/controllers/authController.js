@@ -233,13 +233,12 @@ const validateUsername = async (req, res) => {
       });
     }
 
-    // Check if username exists
-    const result = await pool.query(
-      'SELECT * FROM users WHERE username = $1 COLLATE "C"',
-      [username]
-    );
+    // Check if username exists in a case-insensitive manner
+    const result = await pool.request()
+      .input("username", username.toLowerCase()) // Convert to lowercase before checking
+      .query("SELECT * FROM users WHERE LOWER(username) = @username");
 
-    if (result.rows.length > 0) {
+    if (result.recordset.length > 0) {
       return res.status(200).json({
         available: false,
         message: "Username already exists",
@@ -251,6 +250,7 @@ const validateUsername = async (req, res) => {
       message: "Username is available",
     });
   } catch (err) {
+    console.error("Error validating username:", err);
     res.status(500).json({
       available: false,
       message: "Error validating username",
