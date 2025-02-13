@@ -55,50 +55,51 @@ const register = async (req, res) => {
     res.status(500).json({ message: "Internal server error", error: err.message });
   }
 };
-
 const login = async (req, res) => {
   try {
     const { email, username, password } = req.body;
     console.log("Login attempt with:", { email, username }); // Debug log
-
-    let query, value;
-    if (email) {
-      const normalizedEmail = email.toLowerCase();
-      query = 'SELECT * FROM users WHERE email = @param1';
-      value = normalizedEmail;
-    } else if (username) {
-      query = 'SELECT * FROM users WHERE username = @param1';
-      value = username;
-    } else {
+    
+    if (!email && !username) {
       return res.status(400).json({ message: "Email or username is required." });
     }
 
-    console.log("Executing query:", query, "with value:", value); // Debug log
-    const user = await queryDB(query, [value]);
-    console.log("Database response:", user); // Debug log
+    let query;
+    let paramValue;
 
-    if (user.length === 0) {
+    if (email) {
+      query = "SELECT * FROM users WHERE email = @param1";
+      paramValue = email.toLowerCase();
+    } else {
+      query = "SELECT * FROM users WHERE username = @param1";
+      paramValue = username.toLowerCase();
+    }
+
+    // Use queryDB instead of pool.request()
+    const users = await queryDB(query, [paramValue]);
+    console.log("Query result:", users); // Debug log
+
+    if (users.length === 0) {
       return res.status(400).json({ message: "Invalid email/username or password" });
     }
 
-    console.log("Comparing passwords..."); // Debug log
-    console.log("Stored hash:", user[0].password_hash); // Debug log (remove in production)
-    const isMatch = await bcrypt.compare(password, user[0].password_hash);
-    console.log("Password match result:", isMatch); // Debug log
+    const user = users[0];
+    console.log("Found user:", { userId: user.user_id }); // Debug log
 
+    // Compare hashed password
+    const isMatch = await bcrypt.compare(password, user.password_hash);
+    console.log("Password match:", isMatch); // Debug log
+    
     if (!isMatch) {
       return res.status(400).json({ message: "Invalid email/username or password" });
     }
 
-    const token = jwt.sign({ userId: user[0].user_id }, process.env.JWT_SECRET, {
+    // Generate JWT token
+    const token = jwt.sign({ userId: user.user_id }, process.env.JWT_SECRET, {
       expiresIn: "1h",
     });
 
-    res.status(200).json({ 
-      message: "Login successful", 
-      token,
-      userId: user[0].user_id // Optional: return userId if needed
-    });
+    res.status(200).json({ message: "Login successful", token });
 
   } catch (err) {
     console.error("Login error:", err);
