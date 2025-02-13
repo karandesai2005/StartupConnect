@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import Popup from "./Popup"; // Import the Popup component
-import { NGROK_URL } from '@env';
+import { NGROK_URL } from "@env";
 
 const Signup = () => {
   const navigation = useNavigation();
@@ -17,60 +17,69 @@ const Signup = () => {
   const [username, setUsername] = useState("");
   const [isUsernameAvailable, setIsUsernameAvailable] = useState(null); // Null to handle initial state
   const [showPopup, setShowPopup] = useState(false); // Popup visibility
+  const [checkingAvailability, setCheckingAvailability] = useState(false); // Prevent multiple API calls
 
   const handleBack = () => {
     navigation.goBack();
   };
 
   const handleUsernameChange = async (text) => {
-    const lowercaseUsername = text.toLowerCase(); // Convert to lowercase
+    const lowercaseUsername = text.toLowerCase();
     setUsername(lowercaseUsername);
-    setIsUsernameAvailable(null); // Reset availability on text change
+    setIsUsernameAvailable(null); // Reset availability when typing
 
-    // Validate username (API call)
+    if (!text.trim()) return; // Avoid empty requests
+    if (text.length < 3 || text.length > 20) return; // Ignore invalid lengths early
+
+    setCheckingAvailability(true); // Indicate checking status
+
     try {
-      const response = await fetch(`${NGROK_URL}/api/auth/validate-username`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username: lowercaseUsername }),
-        }
-      );
+      const response = await fetch(`${NGROK_URL}/api/auth/validate-username`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: lowercaseUsername }),
+      });
 
       const result = await response.json();
+      console.log("Username validation response:", result); // Debugging
 
-      if (response.ok) {
-        setIsUsernameAvailable(true);
-      } else {
-        setIsUsernameAvailable(false);
-      }
+      setIsUsernameAvailable(result.available);
     } catch (error) {
       console.error("Error validating username:", error.message);
       setIsUsernameAvailable(false);
+    } finally {
+      setCheckingAvailability(false);
     }
   };
 
   const handleNext = async () => {
+    if (checkingAvailability) {
+      Alert.alert("Please wait", "Checking username availability...");
+      return;
+    }
+
+    if (isUsernameAvailable === null) {
+      Alert.alert("Error", "Please check username availability first.");
+      return;
+    }
+
     if (!isUsernameAvailable) {
       setShowPopup(true); // Show popup only on submission
       return;
     }
 
     try {
-      const response = await fetch(
-        `${NGROK_URL}/api/auth/save-user-details`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            step: 3,
-            data: {
-              username,
-              userId: route.params.userId,
-            },
-          }),
-        }
-      );
+      const response = await fetch(`${NGROK_URL}/api/auth/save-user-details`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          step: 3,
+          data: {
+            username,
+            userId: route.params.userId,
+          },
+        }),
+      });
 
       const result = await response.json();
 
@@ -104,6 +113,12 @@ const Signup = () => {
             autoCorrect={false}
           />
         </View>
+        {isUsernameAvailable === false && (
+          <Text style={styles.errorText}>Username is already taken.</Text>
+        )}
+        {checkingAvailability && (
+          <Text style={styles.loadingText}>Checking availability...</Text>
+        )}
         <View style={styles.buttonContainer}>
           <TouchableOpacity style={styles.signupItem} onPress={handleNext}>
             <Text style={styles.next}>Next</Text>
@@ -171,6 +186,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     fontSize: 16,
     color: "#000",
+  },
+  errorText: {
+    color: "red",
+    marginTop: 10,
+    fontSize: 14,
+  },
+  loadingText: {
+    color: "#666",
+    marginTop: 10,
+    fontSize: 14,
   },
   buttonContainer: {
     marginTop: 30,
