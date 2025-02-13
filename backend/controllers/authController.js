@@ -224,6 +224,7 @@ const saveUserDetails = async (req, res) => {
 const validateUsername = async (req, res) => {
   try {
     const { username } = req.body;
+    console.log("Validating username:", username); // Debug log
 
     // Validate length first
     if (username.length < 3 || username.length > 20) {
@@ -233,12 +234,15 @@ const validateUsername = async (req, res) => {
       });
     }
 
-    // Check if username exists in a case-insensitive manner
-    const result = await pool.request()
-      .input("username", username.toLowerCase()) // Convert to lowercase before checking
-      .query("SELECT * FROM users WHERE LOWER(username) = @username");
+    // Check if username exists using queryDB
+    const existingUsers = await queryDB(
+      'SELECT * FROM users WHERE username = @param1',
+      [username]
+    );
+    
+    console.log("Query result:", existingUsers); // Debug log
 
-    if (result.recordset.length > 0) {
+    if (existingUsers.length > 0) {
       return res.status(200).json({
         available: false,
         message: "Username already exists",
