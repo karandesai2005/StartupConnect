@@ -56,30 +56,36 @@ const register = async (req, res) => {
   }
 };
 
-// Login user
 const login = async (req, res) => {
   try {
     const { email, username, password } = req.body;
+    console.log("Login attempt with:", { email, username }); // Debug log
 
     let query, value;
     if (email) {
       const normalizedEmail = email.toLowerCase();
-      query = 'SELECT * FROM users WHERE LOWER(email) = LOWER($1)';
+      query = 'SELECT * FROM users WHERE email = @param1';
       value = normalizedEmail;
     } else if (username) {
-      query = 'SELECT * FROM users WHERE LOWER(username) = LOWER($1)';
+      query = 'SELECT * FROM users WHERE username = @param1';
       value = username;
     } else {
       return res.status(400).json({ message: "Email or username is required." });
     }
 
+    console.log("Executing query:", query, "with value:", value); // Debug log
     const user = await queryDB(query, [value]);
+    console.log("Database response:", user); // Debug log
 
     if (user.length === 0) {
       return res.status(400).json({ message: "Invalid email/username or password" });
     }
 
+    console.log("Comparing passwords..."); // Debug log
+    console.log("Stored hash:", user[0].password_hash); // Debug log (remove in production)
     const isMatch = await bcrypt.compare(password, user[0].password_hash);
+    console.log("Password match result:", isMatch); // Debug log
+
     if (!isMatch) {
       return res.status(400).json({ message: "Invalid email/username or password" });
     }
@@ -88,7 +94,11 @@ const login = async (req, res) => {
       expiresIn: "1h",
     });
 
-    res.status(200).json({ message: "Login successful", token });
+    res.status(200).json({ 
+      message: "Login successful", 
+      token,
+      userId: user[0].user_id // Optional: return userId if needed
+    });
 
   } catch (err) {
     console.error("Login error:", err);
