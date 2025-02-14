@@ -21,8 +21,7 @@ import EditProfileB from './components/Profile/B_Profile/editProfile';
 import Field from './components/field';
 import Popup from './components/Popup';
 import CreatePostScreen from './components/CreatePostScreen'; // Import the CreatePostScreen
-
-
+import PostViewScreen from './components/Profile/P_Profile/PostViewScreen';
 
 const Stack = createStackNavigator();
 
@@ -55,7 +54,8 @@ const App = () => {
           <Stack.Screen name="PopUp" component={Popup} />
           <Stack.Screen name='EditProfilePage' component={EditProfilePage}/>
           <Stack.Screen name="CreatePost" component={CreatePostScreen} />
-
+          <Stack.Screen name="PostView" component={PostViewScreen} options={{ headerShown: false }}
+/>
         </Stack.Navigator>
       </NavigationContainer>
     </UserRegistrationProvider>

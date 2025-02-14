@@ -25,6 +25,7 @@ const Profile = ({ route, isBusinessProfile = false }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(0);
   const [activeTab, setActiveTab] = useState('stories');
+  const [userPosts, setUserPosts] = useState([]);
 
   // Calculate dimensions for the grid
   const screenWidth = Dimensions.get('window').width;
@@ -238,7 +239,10 @@ const renderGridItem = (post, index) => (
       height: itemSize,
       marginBottom: 2
     }]}
-    onPress={() => Alert.alert(`Post ${index + 1} clicked`)}
+    onPress={() => navigation.navigate('PostView', {
+      posts: userPosts,
+      initialIndex: index
+    })}
   >
     <Image
       source={
