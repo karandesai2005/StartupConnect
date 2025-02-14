@@ -269,7 +269,7 @@ export default function HomeScreen() {
           new Date(b.created_at) - new Date(a.created_at)
         );
         setMyPosts(sortedPosts);
-        console.log("📌 Sorted User Posts:", JSON.stringify(sortedPosts, null, 2));
+        // console.log("📌 Sorted User Posts:", JSON.stringify(sortedPosts, null, 2));
       } else {
         console.log("⚠️ No posts found in response.");
       }
@@ -377,7 +377,7 @@ export default function HomeScreen() {
         data={combinedData}
         extraData={combinedData} // Ensures re-render when data changes
         renderItem={({ item, index }) => {
-          console.log(`📸 Rendering Post #${index}:`, item); // ✅ Check each item being rendered
+          // console.log(`📸 Rendering Post #${index}:`, item); // ✅ Check each item being rendered
           return (
             <PostCard
               key={index} // Force key for better re-renders

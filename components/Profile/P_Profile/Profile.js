@@ -1,10 +1,10 @@
 import React, { useState, useCallback, useEffect } from "react";
+import { Platform } from "react-native";
 import {
   StyleSheet,
   View,
   Text,
   Image,
-  Platform,
   TouchableOpacity,
   ActivityIndicator,
   ScrollView,
@@ -15,8 +15,10 @@ import {
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { NGROK_URL } from '@env';
+import { BarChart, PieChart, LineChart } from 'react-native-gifted-charts';
+import Card from "../../Card";
 
-const Profile = ({ route, isBusinessProfile = false}) => {
+const Profile = ({ route, isBusinessProfile = false }) => {
   const navigation = useNavigation();
   const [userData, setUserData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -54,6 +56,7 @@ const Profile = ({ route, isBusinessProfile = false}) => {
         return;
       }
 
+
       const response = await fetch(`${NGROK_URL}/api/auth/profile?timestamp=${Date.now()}`, {
         method: "GET",
         headers: {
@@ -82,172 +85,264 @@ const Profile = ({ route, isBusinessProfile = false}) => {
     }
   }, [navigation]);
 
-  const handleRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await fetchUserData();
-  }, [fetchUserData]);
 
-  useFocusEffect(
-    useCallback(() => {
-      const shouldFetch = !userData || (Date.now() - lastUpdate > 5000);
-      if (shouldFetch) {
-        setIsLoading(true);
-        fetchUserData();
+const handleRefresh = useCallback(async () => {
+  setRefreshing(true);
+  await fetchUserData();
+}, [fetchUserData]);
+
+useFocusEffect(
+  useCallback(() => {
+    const shouldFetch = !userData || (Date.now() - lastUpdate > 5000);
+    if (shouldFetch) {
+      setIsLoading(true);
+      fetchUserData();
+    }
+    return () => { };
+  }, [fetchUserData, userData, lastUpdate])
+);
+
+const avatarStyle = {
+  height: "100%",
+  width: "100%",
+  backgroundColor: "#f0f8ff",
+  borderRadius: isBusinessProfile ? 20 : 48,
+  overflow: "hidden",
+};
+const del = {
+  height: "100%",
+  width: "100%",
+  backgroundColor: "#f0f8ff",
+  borderRadius: isBusinessProfile ? 20 : 48,
+  overflow: "hidden",
+  marginLeft: 10,
+  marginRight: 10,
+};
+
+
+
+const renderTab = (tabName, label) => (
+  <TouchableOpacity
+    style={[styles.tabButton, activeTab === tabName ? styles.tab1 : styles.tab2]}
+    onPress={() => setActiveTab(tabName)}
+  >
+    <Text style={activeTab === tabName ? styles.tabs : styles.tabs1}>
+      {label}
+    </Text>
+  </TouchableOpacity>
+);
+
+const data = [
+  { value: 50, label: 'Jan', frontColor: '#007bff', color: '#007bff' },
+  { value: 80, label: 'Feb', frontColor: '#B0B0B0', color: '#B0B0B0' },
+  { value: 60, label: 'Mar', frontColor: '#505050', color: '#505050' },
+  { value: 90, label: 'Apr', frontColor: '#000000', color: '#000000' },
+];
+
+const renderTry = () => (
+  <View style={styles.try}>
+    <Card title={"Bar Chart"}>
+      <View style={{ padding: 20 }}>
+        <BarChart
+          data={data}
+          isAnimated
+          animationDuration={300}
+          barWidth={18}
+          barBorderRadius={3}
+          height={200}
+          width={300}
+          minHeight={1}
+          spacing={20}
+          noOfSections={5}
+          yAxisThickness={0}
+          xAxisThickness={0}
+        />
+
+      </View>
+    </Card>
+    <Card title={"Pie Chart"}>
+      <View style={{ alignItems: "center", padding: 20 }}>
+        <PieChart
+          data={data}
+          radius={80} // Adjust the size of the pie chart
+          showText
+          textColor="black"
+          textSize={10}
+          //donut
+          innerRadius={60} // If you want a donut-style chart
+        //focusOnPress
+        //showGradient
+        //isAnimated={true} // dont work
+        //animationDuration={800} // dont work
+        />
+      </View>
+    </Card>
+    <Card title={"Line Chart"}>
+      <View style={{ padding: 20 }}>
+        <LineChart
+          data={data}
+          barWidth={18}
+          barBorderRadius={30}
+          height={200}
+          width={300}
+          minHeight={1}
+          spacing={50}
+          noOfSections={5}
+          yAxisThickness={0}
+          xAxisThickness={0}
+          isAnimated
+          animationDuration={7000}
+        />
+
+      </View>
+    </Card>
+  </View>
+)
+
+const renderGridItem = (index) => (
+  <TouchableOpacity
+    key={index}
+    style={[styles.gridItem, { width: itemSize, height: itemSize }]}
+    onPress={() => Alert.alert(`Post ${index + 1} clicked`)}
+  >
+    <Image
+      source={
+        userData?.profile_picture
+          ? { uri: `${userData.profile_picture}?timestamp=${lastUpdate}` }
+          : require('../../../assets/del.png')
       }
-      return () => { };
-    }, [fetchUserData, userData, lastUpdate])
-  );
+      style={styles.gridImage}
+      resizeMode="cover"
+    />
+  </TouchableOpacity>
+);
 
-  const avatarStyle = {
-    height: "100%",
-    width: "100%",
-    backgroundColor: "#f0f8ff",
-    borderRadius: isBusinessProfile ? 20 : 48,
-    overflow: "hidden",
-  };
 
-  const renderTab = (tabName, label) => (
-    <TouchableOpacity
-      style={[styles.tabButton, activeTab === tabName ? styles.tab1 : styles.tab2]}
-      onPress={() => setActiveTab(tabName)}
-    >
-      <Text style={activeTab === tabName ? styles.tabs : styles.tabs1}>
-        {label}
-      </Text>
-    </TouchableOpacity>
-  );
+const renderGrid = () => (
+  <View style={styles.gridContainer}>
+    {[...Array(13)].map((_, index) => renderGridItem(index))}
+  </View>
+);
 
-  const renderGridItem = (index) => (
-    <TouchableOpacity 
-      key={index}
-      style={[styles.gridItem, { width: itemSize, height: itemSize }]}
-      onPress={() => Alert.alert(`Post ${index + 1} clicked`)}
-    >
-      <Image
-        source={
-          userData?.profile_picture
-            ? { uri: `${userData.profile_picture}?timestamp=${lastUpdate}` }
-            : require('../../../assets/del.png')
-        }
-        style={styles.gridImage}
-        resizeMode="cover"
-      />
-    </TouchableOpacity>
-  );
-
-  const renderGrid = () => (
-    <View style={styles.gridContainer}>
-      {[...Array(13)].map((_, index) => renderGridItem(index))}
+if (isLoading) {
+  return (
+    <View style={styles.container}>
+      <ActivityIndicator size="large" color="#007BFF" />
     </View>
   );
+}
 
-  if (isLoading) {
-    return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#007BFF" />
-      </View>
-    );
-  }
+return (
 
-  return (
-    
-      <View style={styles.contentContainer}>
-        <ScrollView
-          contentContainerStyle={styles.scrollViewContent}
-          refreshControl={
-          <RefreshControl
+  <View style={styles.contentContainer}>
+    <ScrollView
+      contentContainerStyle={styles.scrollViewContent}
+      refreshControl={
+        <RefreshControl
           refreshing={refreshing}
           onRefresh={handleRefresh}
-          tintColor="#007BFF"
-          />
-          }
-        >
-        <TouchableOpacity onPress={() => navigation.goBack('Home')} style={styles.backButton}>
-          <Text style={styles.backButtonText}>←</Text>
-        </TouchableOpacity>
+          tintColor="#000000"
+        />
+      }
+    >
+      <TouchableOpacity onPress={() => navigation.goBack('Home')} style={styles.backButton}>
+        <Text style={styles.backButtonText}>←</Text>
+      </TouchableOpacity>
 
-        <View style={styles.profile}>
-          <View style={styles.profileSection}>
-            <View style={styles.statsContainer}>
-              <View style={styles.statsItem}>
-                <Text style={styles.statsNumber}>1.2K</Text>
-                <Text style={styles.statsLabel}>Followers</Text>
-              </View>
-            </View>
-
-            <View style={styles.avatarMultiVariants}>
-              <View style={avatarStyle}>
-                <Image
-                  source={
-                    userData?.profile_picture
-                      ? { uri: `${userData.profile_picture}?timestamp=${lastUpdate}` }
-                      : require('../../../assets/del.png')
-                  }
-                  style={styles.profileImage}
-                  resizeMode="cover"
-                  onError={(error) => console.log("Image load error:", error.nativeEvent.error)}
-                />
-              </View>
-            </View>
-
-            <View style={styles.statsContainer}>
-              <View style={styles.statsItem}>
-                <Text style={styles.statsNumber}>856</Text>
-                <Text style={styles.statsLabel}>Following</Text>
-              </View>
+      <View style={styles.profile}>
+        <View style={styles.profileSection}>
+          <View style={styles.statsContainer}>
+            <View style={styles.statsItem}>
+              <Text style={styles.statsNumber}>1.2K</Text>
+              <Text style={styles.statsLabel}>Followers</Text>
             </View>
           </View>
 
-          <View style={styles.text}>
-            <View style={styles.id}>
-              <Text style={styles.userName}>{userData?.username || "Chir.a.g"}</Text>
-              <Text style={styles.checkCircleIcon}>✓</Text>
-            </View>
-            <Text style={[styles.about, { textAlign: 'center', paddingHorizontal: 10 }]}>
-              {userData?.bio || "CEO of PITCH. Entrepreneur investor and many more"}
-            </Text>
-          </View>
+          <View style={styles.avatarMultiVariants}>
+  <View style={avatarStyle}>
+    <Image
+      source={
+        userData?.profile_picture
+          ? { uri: `${userData.profile_picture}?timestamp=${lastUpdate}` } // Corrected string interpolation
+          : require('../../../assets/del.png')
+      }
+      style={styles.profileImage}
+      resizeMode="cover"
+      onError={(error) =>
+        console.log("Image load error:", error.nativeEvent.error)
+      }
+    />
+  </View>
+</View>
 
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              style={styles.masterOutlineButton}
-              onPress={() => navigation.navigate('EditProfilePage', { userData })}
-            >
-              <Text style={styles.button}>Edit Profile</Text>
-            </TouchableOpacity>
+
+          <View style={styles.statsContainer}>
+            <View style={styles.statsItem}>
+              <Text style={styles.statsNumber}>856</Text>
+              <Text style={styles.statsLabel}>Following</Text>
+            </View>
           </View>
         </View>
 
-        <View style={styles.tab}>
-          {renderTab("stories", isBusinessProfile ? "The Startup" : "The Stories")}
-          {renderTab("startups", "The Teams")}
-          {renderTab("bucks", "The Bucks")}
+        <View style={styles.text}>
+          <View style={styles.id}>
+            <Text style={styles.userName}>{userData?.username || "Chir.a.g"}</Text>
+            <Text style={styles.checkCircleIcon}>✓</Text>
+          </View>
+          <Text style={[styles.about, { textAlign: 'center', paddingHorizontal: 10 }]}>
+            {userData?.bio || "CEO of PITCH. Entrepreneur investor and many more"}
+          </Text>
         </View>
 
-        {activeTab === 'stories' && renderGrid()}
-
-        </ScrollView>
-        <View style={styles.bottomNav}>
-        <TouchableOpacity onPress={() => navigation.navigate('Home')}>
-          <Image source={require('../../../assets/home4.webp')} style={styles.navIcon} />
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => navigation.navigate('CreatePost')}>
-          <Image source={require('../../../assets/plus3.png')} style={styles.navIcon} />
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => navigation.navigate('Notifications')}>
-          <Image source={require('../../../assets/bell.png')} style={styles.navIcon} />
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-          <Image source={require('../../../assets/settings.png')} style={styles.navIcon} />
-        </TouchableOpacity>
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity
+            style={styles.masterOutlineButton}
+            onPress={() => navigation.navigate('EditProfilePage', { userData })}
+          >
+            <Text style={styles.button}>Edit Profile</Text>
+          </TouchableOpacity>
         </View>
       </View>
-    
-    
-  );
+
+      <View style={styles.tab}>
+        {renderTab("stories", isBusinessProfile ? "The Startup" : "The Stories")}
+        {renderTab("startups", "The Teams")}
+        {renderTab("bucks", "The Bucks")}
+      </View>
+
+      {activeTab === 'stories' && renderGrid()}
+      {activeTab === 'startups' && renderTry()}
+    </ScrollView>
+    <View style={styles.bottomNav}>
+      <TouchableOpacity onPress={() => navigation.navigate('Home')}>
+        <Image source={require('../../../assets/home4.webp')} style={styles.navIcon} />
+      </TouchableOpacity>
+      <TouchableOpacity onPress={() => navigation.navigate('CreatePost')}>
+        <Image source={require('../../../assets/plus3.png')} style={styles.navIcon} />
+      </TouchableOpacity>
+      <TouchableOpacity onPress={() => navigation.navigate('Notifications')}>
+        <Image source={require('../../../assets/bell.png')} style={styles.navIcon} />
+      </TouchableOpacity>
+      <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+        <Image source={require('../../../assets/settings.png')} style={styles.navIcon} />
+      </TouchableOpacity>
+    </View>
+  </View>
+
+
+);
 };
 
 const styles = StyleSheet.create({
+  try: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 20,
+    paddingBottom: 20,
+    width: '100%',
+  },
+
   // Grid-specific styles
   gridContainer: {
     flexDirection: 'row',
@@ -264,9 +359,10 @@ const styles = StyleSheet.create({
   },
   gridImage: {
     width: '100%',
-    height: '120%',
+    height: '100%', // Changed from 120% to 100% for better proportions
+    borderRadius: 4, // Optional: adds slight rounding to images
   },
-  
+
   // Existing styles
   profileContainer: {
     flexGrow: 1,
@@ -315,6 +411,13 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     marginHorizontal: 20,
+  },
+  del2: {
+    width: 96,
+    height: 96,
+    marginHorizontal: 20,
+    flexDirection: 'row',
+    backgroundColor: '#f0f0f0',
   },
   statsContainer: {
     alignItems: 'center',
@@ -468,12 +571,12 @@ const styles = StyleSheet.create({
   scrollViewContent: {
     paddingBottom: 60, // Adjust based on your bottom nav height
   },
-  
+
   bottomNav: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    position:'absolute',
+    position: 'absolute',
     paddingVertical: Platform.OS === 'ios' ? 20 : 12,
     paddingBottom: Platform.OS === 'ios' ? 34 : 12,
     borderTopWidth: 1,
@@ -495,8 +598,7 @@ const styles = StyleSheet.create({
       tintColor: undefined
     })
   },
-  
+
 });
 
 export default Profile;
-
