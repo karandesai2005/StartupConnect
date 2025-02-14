@@ -7,26 +7,26 @@ const postController = {
       console.log('User:', req.user, '| Body:', req.body, '| File:', req.file);
 
       const { content } = req.body;
-      const user_id = req.user.userId || req.user.id;
+      const user_id = req.user?.userId || req.user?.id;
+
+      if (!user_id) {
+        return res.status(400).json({ error: "User ID is required." });
+      }
 
       if (!content) {
         return res.status(400).json({ error: "Post content is required." });
       }
 
-      const image_url = req.file?.filename
+      const image_url = req.file && req.file.filename
         ? `${process.env.NGROK_URL}/uploads/posts/${req.file.filename}`
         : '';
 
       console.log('Creating post:', { content, user_id, image_url });
 
-      try {
-        const newPost = await Post.create(content, image_url, user_id);
-        console.log('Post created:', newPost);
-        res.status(201).json(newPost);
-      } catch (dbError) {
-        console.error('Database error:', dbError);
-        throw dbError;
-      }
+      const newPost = await Post.create(content, image_url, user_id);
+      console.log('Post created:', newPost);
+      res.status(201).json(newPost);
+
     } catch (error) {
       console.error('Error in createPost:', error);
       res.status(500).json({ error: 'Server error', details: error.message });
@@ -35,28 +35,34 @@ const postController = {
 
   getAllPosts: async (req, res) => {
     try {
+      console.log('=== Fetching All Posts ===');
       const posts = await Post.getAllPosts();
+      console.log('Total posts fetched:', posts.length);
       res.status(200).json(posts);
     } catch (error) {
       console.error('Error in getAllPosts:', error);
-      res.status(500).json({ error: 'Server error' });
+      res.status(500).json({ error: 'Server error', details: error.message });
     }
   },
 
   getUserPosts: async (req, res) => {
     try {
-      const user_id = req.params.user_id || req.user.userId || req.user.id;
-      console.log('Fetching posts for:', user_id);
+      console.log('=== Fetching User Posts ===');
+
+      const user_id = req.params.user_id || req.user?.userId || req.user?.id;
 
       if (!user_id) {
         return res.status(400).json({ error: "User ID is required." });
       }
 
+      console.log('Fetching posts for:', user_id);
       const posts = await Post.getPostsByUserId(user_id);
+      console.log(`Posts found for user ${user_id}:`, posts.length);
       res.status(200).json(posts);
+
     } catch (error) {
       console.error('Error in getUserPosts:', error);
-      res.status(500).json({ error: 'Server error' });
+      res.status(500).json({ error: 'Server error', details: error.message });
     }
   },
 };

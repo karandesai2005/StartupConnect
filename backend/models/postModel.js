@@ -1,19 +1,27 @@
-const db = require('../config/db');
+const db = require('../config/db'); // Ensure db.js uses MSSQL
+const sql = require('mssql'); // Ensure you have `mssql` installed
 
 const Post = {
   create: async (content, image_url, user_id) => {
     console.log('=== Post Model Create Debug ===');
     console.log('Creating post with:', { content, image_url, user_id });
-    
-    const query = 'INSERT INTO posts (content, image_url, user_id) VALUES ($1, $2, $3) RETURNING *';
-    const values = [content, image_url, user_id];
-    
-    console.log('Executing query:', { query, values });
-    
+
+    const query = `
+      INSERT INTO posts (content, image_url, user_id) 
+      OUTPUT INSERTED.*
+      VALUES (@content, @image_url, @user_id)
+    `;
+
     try {
-      const result = await db.query(query, values);
-      console.log('Query result:', result.rows[0]);
-      return result.rows[0];
+      const pool = await db;
+      const result = await pool.request()
+        .input('content', sql.NVarChar, content)
+        .input('image_url', sql.NVarChar, image_url)
+        .input('user_id', sql.Int, user_id)
+        .query(query);
+
+      console.log('Query result:', result.recordset[0]);
+      return result.recordset[0];
     } catch (error) {
       console.error('Database error in create:', error);
       throw error;
@@ -22,22 +30,24 @@ const Post = {
 
   getAllPosts: async () => {
     console.log('=== Get All Posts Debug ===');
+
     const query = `
       SELECT 
-        posts.*, 
-        users.username, 
-        users.name,
-        users.profile_picture 
-      FROM posts 
-      JOIN users ON posts.user_id = users.user_id 
-      ORDER BY posts.created_at DESC
+        p.*, 
+        u.username, 
+        u.name,
+        u.profile_picture 
+      FROM posts p
+      JOIN users u ON p.user_id = u.user_id 
+      ORDER BY p.created_at DESC
     `;
-    
+
     try {
-      console.log('Executing getAllPosts query');
-      const result = await db.query(query);
-      console.log('Found posts:', result.rows.length);
-      return result.rows;
+      const pool = await db;
+      const result = await pool.request().query(query);
+
+      console.log('Found posts:', result.recordset.length);
+      return result.recordset;
     } catch (error) {
       console.error('Database error in getAllPosts:', error);
       throw error;
@@ -47,23 +57,27 @@ const Post = {
   getPostsByUserId: async (userId) => {
     console.log('=== Get Posts By User ID Debug ===');
     console.log('Getting posts for user:', userId);
-    
+
     const query = `
       SELECT 
-        posts.*, 
-        users.username, 
-        users.name,
-        users.profile_picture 
-      FROM posts 
-      JOIN users ON posts.user_id = users.user_id 
-      WHERE posts.user_id = $1
-      ORDER BY posts.created_at DESC
+        p.*, 
+        u.username, 
+        u.name,
+        u.profile_picture 
+      FROM posts p
+      JOIN users u ON p.user_id = u.user_id 
+      WHERE p.user_id = @user_id
+      ORDER BY p.created_at DESC
     `;
-    
+
     try {
-      const result = await db.query(query, [userId]);
-      console.log('Found user posts:', result.rows.length);
-      return result.rows;
+      const pool = await db;
+      const result = await pool.request()
+        .input('user_id', sql.Int, userId)
+        .query(query);
+
+      console.log('Found user posts:', result.recordset.length);
+      return result.recordset;
     } catch (error) {
       console.error('Database error in getPostsByUserId:', error);
       throw error;
