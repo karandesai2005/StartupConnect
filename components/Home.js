@@ -207,6 +207,7 @@ export default function HomeScreen() {
   const [userData, setUserData] = useState(null);
   const navigation = useNavigation();
   const [postsError, setPostsError] = useState(null);
+  
   const combinedData = useMemo(() => {
     const validPosts = myPosts.filter(post => post && post.image_url);
     const mergedData = [...validPosts, ...users];

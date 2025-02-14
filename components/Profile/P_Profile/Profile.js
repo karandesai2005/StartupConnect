@@ -47,6 +47,34 @@ const Profile = ({ route, isBusinessProfile = false }) => {
       }
     }
   }, [route.params?.updatedUser]);
+  const fetchUserPosts = useCallback(async () => {
+    try {
+      const token = await AsyncStorage.getItem("token");
+      if (!token) {
+        navigation.navigate('Login');
+        return;
+      }
+  
+      const response = await fetch(`${NGROK_URL}/api/posts/myposts`, {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+  
+      if (response.ok) {
+        const data = await response.json();
+        console.log("Fetched user posts:", data);
+        setUserPosts(data);
+      } else {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+    } catch (error) {
+      console.error("Posts fetch error:", error);
+      Alert.alert('Error', 'Failed to fetch posts');
+    }
+  }, [navigation]);
 
   const fetchUserData = useCallback(async () => {
     try {
@@ -86,20 +114,23 @@ const Profile = ({ route, isBusinessProfile = false }) => {
   }, [navigation]);
 
 
-const handleRefresh = useCallback(async () => {
-  setRefreshing(true);
-  await fetchUserData();
-}, [fetchUserData]);
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await Promise.all([fetchUserData(), fetchUserPosts()]);
+    setRefreshing(false);
+  }, [fetchUserData, fetchUserPosts]);
 
+// Update useFocusEffect to also fetch posts
 useFocusEffect(
   useCallback(() => {
     const shouldFetch = !userData || (Date.now() - lastUpdate > 5000);
     if (shouldFetch) {
       setIsLoading(true);
       fetchUserData();
+      fetchUserPosts(); // Add this line
     }
     return () => { };
-  }, [fetchUserData, userData, lastUpdate])
+  }, [fetchUserData, fetchUserPosts, userData, lastUpdate])
 );
 
 const avatarStyle = {
@@ -199,16 +230,20 @@ const renderTry = () => (
   </View>
 )
 
-const renderGridItem = (index) => (
+const renderGridItem = (post, index) => (
   <TouchableOpacity
     key={index}
-    style={[styles.gridItem, { width: itemSize, height: itemSize }]}
+    style={[styles.gridItem, { 
+      width: itemSize, 
+      height: itemSize,
+      marginBottom: 2
+    }]}
     onPress={() => Alert.alert(`Post ${index + 1} clicked`)}
   >
     <Image
       source={
-        userData?.profile_picture
-          ? { uri: `${userData.profile_picture}?timestamp=${lastUpdate}` }
+        post?.image_url 
+          ? { uri: post.image_url } 
           : require('../../../assets/del.png')
       }
       style={styles.gridImage}
@@ -220,7 +255,7 @@ const renderGridItem = (index) => (
 
 const renderGrid = () => (
   <View style={styles.gridContainer}>
-    {[...Array(13)].map((_, index) => renderGridItem(index))}
+    {userPosts.map((post, index) => renderGridItem(post, index))}
   </View>
 );
 
