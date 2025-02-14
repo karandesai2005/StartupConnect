@@ -1,5 +1,5 @@
-const db = require('../config/db'); // Ensure db.js uses MSSQL
-const sql = require('mssql'); // Ensure you have `mssql` installed
+const { connectDB } = require('../config/db'); // Use connectDB from db.js
+const sql = require('mssql');
 
 const Post = {
   create: async (content, image_url, user_id) => {
@@ -13,7 +13,7 @@ const Post = {
     `;
 
     try {
-      const pool = await db;
+      const pool = await connectDB(); // 🔹 Correctly get the pool instance
       const result = await pool.request()
         .input('content', sql.NVarChar, content)
         .input('image_url', sql.NVarChar, image_url)
@@ -43,7 +43,7 @@ const Post = {
     `;
 
     try {
-      const pool = await db;
+      const pool = await connectDB();
       const result = await pool.request().query(query);
 
       console.log('Found posts:', result.recordset.length);
@@ -71,7 +71,7 @@ const Post = {
     `;
 
     try {
-      const pool = await db;
+      const pool = await connectDB();
       const result = await pool.request()
         .input('user_id', sql.Int, userId)
         .query(query);
