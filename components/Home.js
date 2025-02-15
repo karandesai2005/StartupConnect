@@ -241,53 +241,38 @@ export default function HomeScreen() {
 
   // Fetch the user's posts (simulate or fetch real posts)
 
-  const fetchMyPosts = useCallback(async () => {
+  const fetchAllPosts = useCallback(async () => {
     try {
-      setPostsError(null);
-      const token = await AsyncStorage.getItem("token");
+        setPostsError(null);
+        console.log("📡 Sending request to:", `${NGROK_URL}/api/posts/all`);
 
-      console.log("🔑 Retrieved Token:", token); // ✅ Check token
+        const response = await axios.get(`${NGROK_URL}/api/posts/all`, {
+            headers: { "Content-Type": "application/json" },
+        });
 
-      if (!token) {
-        console.log("⚠️ No token found in AsyncStorage");
-        setPostsError('Please login to view posts');
-        return;
-      }
+        console.log("✅ API Response:", JSON.stringify(response.data, null, 2));
 
-      console.log("📡 Sending request to:", `${NGROK_URL}/api/posts/myposts`);
+        if (response.data && Array.isArray(response.data)) {
+            const sortedPosts = response.data
+                .filter(post => post.image_url) // Ensure posts with images are prioritized
+                .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
-      const response = await axios.get(`${NGROK_URL}/api/posts/myposts`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json"
-        },
-      });
-
-      console.log("✅ API Response:", JSON.stringify(response.data, null, 2)); // ✅ Check full response
-
-      if (response.data && Array.isArray(response.data)) {
-        const sortedPosts = response.data.filter(post => post.image_url).sort((a, b) =>
-          new Date(b.created_at) - new Date(a.created_at)
-        );
-        setMyPosts(sortedPosts);
-        // console.log("📌 Sorted User Posts:", JSON.stringify(sortedPosts, null, 2));
-      } else {
-        console.log("⚠️ No posts found in response.");
-      }
+            setMyPosts(sortedPosts); // Ensure correct state update
+        } else {
+            console.log("⚠️ No posts found in response.");
+        }
     } catch (error) {
-      console.error('❌ Error fetching posts:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status
-      });
+        console.error('❌ Error fetching posts:', {
+            message: error.message,
+            response: error.response?.data,
+            status: error.response?.status
+        });
     }
-  }, []);
-
-
+}, []);
 
   useEffect(() => {
     loadUsers();
-    fetchMyPosts();  // Fetch the user's posts
+    fetchAllPosts();  // Fetch the user's posts
   }, [currentPage]);
 
   const onRefresh = useCallback(() => {
@@ -295,7 +280,7 @@ export default function HomeScreen() {
     setRefreshing(true);
     setCurrentPage(1);
     loadUsers(true);
-    fetchMyPosts(); // ✅ Ensure user posts refresh too
+    fetchAllPosts(); // ✅ Ensure user posts refresh too
   }, []);
 
 
