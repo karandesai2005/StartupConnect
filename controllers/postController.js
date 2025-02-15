@@ -14,17 +14,18 @@ const postController = {
         return res.status(400).json({ error: "User ID is required." });
       }
 
-      if (!content) {
-        return res.status(400).json({ error: "Post content is required." });
+      if (!content && !req.file) {
+        return res.status(400).json({ error: "Post content or media is required." });
       }
 
-      const image_url = req.file?.filename
-      ? `${process.env.NGROK_URL || 'https://pitch-backend-avb7geahhvfteqf9.centralindia-01.azurewebsites.net'}/uploads/posts/${req.file.filename}`
-      : '';
-    
-      console.log('Creating post:', { content, user_id, image_url });
+      // Handle file upload (image/video)
+      const media_url = req.file
+        ? `${process.env.NGROK_URL || 'https://pitch-backend-avb7geahhvfteqf9.centralindia-01.azurewebsites.net'}/uploads/posts/${req.file.filename}`
+        : '';
 
-      const newPost = await Post.create(content, image_url, user_id);
+      console.log('Creating post:', { content, user_id, media_url });
+
+      const newPost = await Post.create(content, media_url, user_id);
       console.log('Post created:', newPost);
       res.status(201).json(newPost);
 
