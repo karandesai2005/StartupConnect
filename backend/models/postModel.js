@@ -1,42 +1,42 @@
-const { connectDB } = require('../config/db'); // Use connectDB from db.js
+const { connectDB } = require('../config/db'); // Import connectDB
 const sql = require('mssql');
 
 const Post = {
-  create: async (content, image_url, user_id) => {
-    console.log('=== Post Model Create Debug ===');
-    console.log('Creating post with:', { content, image_url, user_id });
+  create: async (content, media_url, user_id) => {
+    console.log('=== 🔹 Post Model Create Debug ===');
+    console.log('📌 Creating post with:', { content, media_url, user_id });
 
     const query = `
-      INSERT INTO posts (content, image_url, user_id) 
+      INSERT INTO posts (content, media_url, user_id) 
       OUTPUT INSERTED.*
-      VALUES (@content, @image_url, @user_id)
+      VALUES (@content, @media_url, @user_id)
     `;
 
     try {
-      const pool = await connectDB(); // 🔹 Correctly get the pool instance
-      const result = await pool.request()
+      const pool = await connectDB();
+      const request = pool.request()
         .input('content', sql.NVarChar, content)
-        .input('image_url', sql.NVarChar, image_url)
-        .input('user_id', sql.Int, user_id)
-        .query(query);
+        .input('media_url', media_url ? sql.NVarChar : sql.NVarChar, media_url || null) // Handle NULL cases
+        .input('user_id', sql.Int, user_id);
+      
+      const result = await request.query(query);
 
-      console.log('Query result:', result.recordset[0]);
+      console.log('✅ Post created successfully:', result.recordset[0]);
       return result.recordset[0];
+
     } catch (error) {
-      console.error('Database error in create:', error);
-      throw error;
+      console.error('❌ Database error in create:', error);
+      throw new Error('Database error: Unable to create post.');
     }
   },
 
   getAllPosts: async () => {
-    console.log('=== Get All Posts Debug ===');
+    console.log('=== 🔹 Fetching All Posts ===');
 
     const query = `
       SELECT 
-        p.*, 
-        u.username, 
-        u.name,
-        u.profile_picture 
+        p.post_id, p.content, p.media_url, p.created_at, 
+        u.user_id, u.username, u.name, u.profile_picture 
       FROM posts p
       JOIN users u ON p.user_id = u.user_id 
       ORDER BY p.created_at DESC
@@ -46,24 +46,22 @@ const Post = {
       const pool = await connectDB();
       const result = await pool.request().query(query);
 
-      console.log('Found posts:', result.recordset.length);
+      console.log('✅ Total posts fetched:', result.recordset.length);
       return result.recordset;
+
     } catch (error) {
-      console.error('Database error in getAllPosts:', error);
-      throw error;
+      console.error('❌ Database error in getAllPosts:', error);
+      throw new Error('Database error: Unable to fetch posts.');
     }
   },
-  
+
   getPostsByUserId: async (userId) => {
-    console.log('=== Get Posts By User ID Debug ===');
-    console.log('Getting posts for user:', userId);
+    console.log('=== 🔹 Fetching Posts for User:', userId);
 
     const query = `
       SELECT 
-        p.*, 
-        u.username, 
-        u.name,
-        u.profile_picture 
+        p.post_id, p.content, p.media_url, p.created_at, 
+        u.user_id, u.username, u.name, u.profile_picture 
       FROM posts p
       JOIN users u ON p.user_id = u.user_id 
       WHERE p.user_id = @user_id
@@ -72,15 +70,15 @@ const Post = {
 
     try {
       const pool = await connectDB();
-      const result = await pool.request()
-        .input('user_id', sql.Int, userId)
-        .query(query);
+      const request = pool.request().input('user_id', sql.Int, userId);
+      const result = await request.query(query);
 
-      console.log('Found user posts:', result.recordset.length);
+      console.log(`✅ Found ${result.recordset.length} posts for user ${userId}`);
       return result.recordset;
+
     } catch (error) {
-      console.error('Database error in getPostsByUserId:', error);
-      throw error;
+      console.error('❌ Database error in getPostsByUserId:', error);
+      throw new Error('Database error: Unable to fetch user posts.');
     }
   }
 };

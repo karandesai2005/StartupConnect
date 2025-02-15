@@ -10,13 +10,26 @@ import {
   Platform,
   Alert,
 } from 'react-native';
+import { Video } from 'expo-av';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NGROK_URL } from '@env';
 import { useNavigation } from '@react-navigation/native';
+import * as FileSystem from 'expo-file-system';
+
+// Function to get a proper file URI (Fixes Android content:// issue)
+const getFileUri = async (uri) => {
+  if (Platform.OS === 'android' && uri.startsWith('content://')) {
+    const fileUri = `${FileSystem.cacheDirectory}tempUpload`;
+    await FileSystem.copyAsync({ from: uri, to: fileUri });
+    return fileUri;
+  }
+  return uri;
+};
 
 export default function CreatePostScreen() {
-  const [image, setImage] = useState(null);
+  const [media, setMedia] = useState(null);
+  const [mediaType, setMediaType] = useState(null); // 'image' or 'video'
   const [caption, setCaption] = useState('');
   const [loading, setLoading] = useState(false);
   const navigation = useNavigation();
@@ -24,121 +37,121 @@ export default function CreatePostScreen() {
   useEffect(() => {
     (async () => {
       if (Platform.OS !== 'web') {
-        // Request permission to access media library
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') {
           Alert.alert(
             'Permission Needed',
-            'Sorry, we need camera roll permissions to make this work!'
+            'Sorry, we need media permissions to make this work!'
           );
         }
       }
     })();
   }, []);
 
-  const pickImage = async () => {
+  const pickMedia = async () => {
     try {
-      // Request permission again if needed
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert(
-          'Permission Denied',
-          'Sorry, we need camera roll permissions to select an image.'
-        );
+        Alert.alert('Permission Denied', 'We need media permissions to proceed.');
         return;
       }
 
-      console.log('Opening image picker...');
+      console.log('Opening media picker...');
       let result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images, // ✅ Ensures only images are picked
+        mediaTypes: ImagePicker.MediaTypeOptions.All, // Allow images & videos
         allowsEditing: true,
         aspect: [4, 3],
         quality: 1,
       });
 
-      console.log('Image Picker Result:', JSON.stringify(result, null, 2));
+      console.log('Media Picker Result:', JSON.stringify(result, null, 2));
 
-      if (!result.canceled) {
-        console.log('Image selected:', result.assets[0].uri);
-        setImage(result.assets[0].uri); // ✅ Corrected access to selected image URI
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const selectedMedia = result.assets[0];
+        const type = selectedMedia.type; // 'image' or 'video'
+
+        console.log(`Selected media type: ${type}`);
+        setMedia(selectedMedia.uri);
+        setMediaType(type);
       } else {
-        console.log('Image selection was canceled');
+        console.log('Media selection was canceled');
       }
     } catch (error) {
-      console.error('Error picking image:', error);
-      Alert.alert('Image Selection Error', error.message);
+      console.error('Error picking media:', error);
+      Alert.alert('Media Selection Error', error.message);
     }
   };
 
   const uploadPost = async () => {
-    if (!image) {
-      alert('Please select an image');
-      console.log('Upload attempt failed: No image selected.');
+    if (!media) {
+      alert('Please select an image or video');
       return;
     }
-  
+
     setLoading(true);
-    console.log('Starting upload...');
-  
+
     try {
       const token = await AsyncStorage.getItem('token');
       if (!token) {
         console.log('No token found. User might be logged out.');
         return;
       }
-  
-      // Create form data
+
+      // Fix: Ensure correct file URI handling
+      let fileUri = await getFileUri(media);
+      let fileType = media.split('.').pop();
+      let mimeType = mediaType === 'video' ? `video/${fileType}` : `image/${fileType}`;
+
       const formData = new FormData();
-      
-      // Add the content field (changed from caption to content)
       formData.append('content', caption.trim() || 'No caption');
-      
-      // Add the image file
-      formData.append('image', {
-        uri: image,
-        name: image.split('/').pop(),
-        type: 'image/jpeg',
+      formData.append('media', {
+        uri: fileUri,
+        name: `upload.${fileType}`,
+        type: mimeType,
       });
-  
-      console.log("Uploading formData:", formData._parts);
-  
+
+      console.log('Uploading formData:', formData._parts);
+
       const response = await fetch(`${NGROK_URL}/api/posts/`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-        },
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
         body: formData,
       });
-  
-      console.log('Upload response status:', response.status);
-  
+
       if (response.ok) {
         alert('Post uploaded successfully!');
-        console.log('Post uploaded successfully.');
         navigation.goBack();
       } else {
         const errorData = await response.json();
         alert(`Failed to upload post: ${errorData.error}`);
-        console.log('Upload failed. Response:', errorData);
       }
     } catch (error) {
       console.error('Upload error:', error);
       Alert.alert('Upload Failed', error.message);
     } finally {
       setLoading(false);
-      console.log('Upload process completed.');
     }
   };
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity onPress={pickImage} style={styles.imagePicker}>
-        {image ? (
-          <Image source={{ uri: image }} style={styles.image} />
+      <TouchableOpacity onPress={pickMedia} style={styles.mediaPicker}>
+        {media ? (
+          mediaType === 'image' ? (
+            <Image source={{ uri: media }} style={styles.media} />
+          ) : (
+            <Video
+              source={{ uri: media }}
+              style={styles.media}
+              useNativeControls
+              resizeMode="contain"
+            />
+          )
         ) : (
-          <Text>Select an Image</Text>
+          <Text>Select an Image or Video</Text>
         )}
       </TouchableOpacity>
+
       <TextInput
         style={styles.input}
         placeholder='Write a caption...'
@@ -148,6 +161,7 @@ export default function CreatePostScreen() {
           setCaption(text);
         }}
       />
+
       <TouchableOpacity onPress={uploadPost} style={styles.uploadButton}>
         {loading ? (
           <ActivityIndicator color='#fff' />
@@ -167,7 +181,7 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: '#fff',
   },
-  imagePicker: {
+  mediaPicker: {
     width: 300,
     height: 300,
     backgroundColor: '#eee',
@@ -176,7 +190,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 20,
   },
-  image: {
+  media: {
     width: '100%',
     height: '100%',
     borderRadius: 10,
