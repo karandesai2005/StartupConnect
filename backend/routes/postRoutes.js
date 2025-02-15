@@ -24,6 +24,5 @@ router.post('/posts',
 router.get('/posts/myposts', authenticateJWT, postController.getUserPosts);
 router.get('/users/:user_id/posts', authenticateJWT, postController.getUserPosts);
 router.get('/posts', authenticateJWT, postController.getAllPosts);
-router.get('/api/posts/all', postController.getAllPosts);
-
+router.get('/posts/all', postController.getAllPosts);
 module.exports = router;
