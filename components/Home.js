@@ -464,7 +464,7 @@ export default function HomeScreen() {
       {/* Bottom Navigation */}
       <View style={styles.bottomNav}>
         <TouchableOpacity onPress={() => navigation.navigate('Home')}>
-          <Image source={require('../assets/home4.webp')} style={styles.navIcon} />
+          <Image source={require('../assets/film.png')} style={styles.navIcon} />
         </TouchableOpacity>
         <TouchableOpacity onPress={() => navigation.navigate('CreatePost')}>
           <Image source={require('../assets/plus3.png')} style={styles.navIcon} />

@@ -41,16 +41,17 @@ const profileFileFilter = (req, file, cb) => {
 
 // File filter for post uploads (Images & Videos)
 const postFileFilter = (req, file, cb) => {
-  if ([...imageTypes, ...videoTypes].includes(file.mimetype)) {
+  if ([...imageTypes, ...videoTypes, 'video/quicktime'].includes(file.mimetype)) {
     cb(null, true);
   } else {
     cb(new Error('❌ Invalid file type! Only JPEG, PNG, GIF, WEBP images and MP4, MOV, AVI, MKV videos are allowed for posts.'), false);
   }
 };
 
+
 // File size limits (Increase if needed)
 const profileUploadLimits = { fileSize: 2 * 1024 * 1024 }; // 2MB max for profile pictures
-const postUploadLimits = { fileSize: 50 * 1024 * 1024 }; // 50MB max for post images/videos
+const postUploadLimits = { fileSize: 100 * 1024 * 1024 }; // 100MB max
 
 // Create multer instances with limits
 const uploadProfilePicture = multer({
