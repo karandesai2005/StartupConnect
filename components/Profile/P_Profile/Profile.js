@@ -17,6 +17,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { NGROK_URL } from '@env';
 import { BarChart, PieChart, LineChart } from 'react-native-gifted-charts';
 import Card from "../../Card";
+import { Video } from 'expo-av';
 
 const Profile = ({ route, isBusinessProfile = false }) => {
   const navigation = useNavigation();
@@ -67,7 +68,27 @@ const Profile = ({ route, isBusinessProfile = false }) => {
       if (response.ok) {
         const data = await response.json();
         console.log("Fetched user posts:", data);
-        setUserPosts(data);
+        
+        // Map the backend fields to match what your component expects
+        const mappedPosts = data.map(post => ({
+          _id: post.post_id,
+          username: post.username,
+          profile_picture: post.profile_picture,
+          image_url: post.media_url, // Map media_url to image_url
+          content: post.content,
+          created_at: post.created_at,
+          likes: 0, // Default value if not provided
+          comments: 0, // Default value if not provided
+          caption: post.content, // Also map content to caption
+          media_type: post.media_type || (post.media_url?.includes('.mp4') ? 'video' : 'image') // Determine if it's a video
+        }));
+        
+        // Filter out invalid posts and sort by date
+        const validPosts = mappedPosts
+          .filter(post => post.image_url && !post.image_url.includes('undefined'))
+          .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        
+        setUserPosts(validPosts);
       } else {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -231,31 +252,52 @@ const renderTry = () => (
   </View>
 )
 
-const renderGridItem = (post, index) => (
-  <TouchableOpacity
-    key={index}
-    style={[styles.gridItem, { 
-      width: itemSize, 
-      height: itemSize,
-      marginBottom: 2
-    }]}
-    onPress={() => navigation.navigate('PostView', {
-      posts: userPosts,
-      initialIndex: index
-    })}
-  >
-    <Image
-      source={
-        post?.image_url 
-          ? { uri: post.image_url } 
-          : require('../../../assets/del.png')
-      }
-      style={styles.gridImage}
-      resizeMode="cover"
-    />
-  </TouchableOpacity>
-);
-
+const renderGridItem = (post, index) => {
+  const isVideo = post.media_type === 'video' || post.image_url?.includes('.mp4');
+  
+  return (
+    <TouchableOpacity
+      key={index}
+      style={[styles.gridItem, { 
+        width: itemSize, 
+        height: itemSize,
+        marginBottom: 2
+      }]}
+      onPress={() => navigation.navigate('PostView', {
+        posts: userPosts,
+        initialIndex: index
+      })}
+    >
+      {isVideo ? (
+        <View style={styles.videoContainer}>
+          <Video
+            source={{ uri: post.image_url }}
+            style={styles.gridImage}
+            resizeMode="cover"
+            shouldPlay={false}
+            isMuted={true}
+            useNativeControls={false}
+          />
+          <View style={styles.playIconContainer}>
+            <Text style={styles.playIcon}>▶</Text>
+          </View>
+        </View>
+      ) : (
+        <Image
+          source={
+            post?.image_url 
+              ? { uri: post.image_url }
+              : post?.media_url
+                ? { uri: post.media_url }
+                : require('../../../assets/del.png')
+          }
+          style={styles.gridImage}
+          resizeMode="cover"
+        />
+      )}
+    </TouchableOpacity>
+  );
+};
 
 const renderGrid = () => (
   <View style={styles.gridContainer}>
@@ -380,6 +422,27 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 20,
     width: '100%',
+  },
+
+  // Video-related styles
+  videoContainer: {
+    position: 'relative',
+    width: '100%',
+    height: '100%',
+  },
+  playIconContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  playIcon: {
+    color: 'white',
+    fontSize: 24,
   },
 
   // Grid-specific styles

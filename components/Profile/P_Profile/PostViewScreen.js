@@ -14,10 +14,10 @@ import {
     ActivityIndicator,
     Alert,
 } from 'react-native';
+import { Video } from 'expo-av';
 import { useNavigation } from '@react-navigation/native';
 import PropTypes from 'prop-types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
 const { width } = Dimensions.get('window');
 const NGROK_URL = 'https://pitch-backend-avb7geahhvfteqf9.centralindia-01.azurewebsites.net/';  // Replace with your actual URL
 // Memoized Post Item Component
@@ -28,29 +28,59 @@ const PostItem = memo(({
     expandedItems,
     onDoubleTap
 }) => {
-    const [isLiked, setIsLiked] = useState(false);
-    const [likeCount, setLikeCount] = useState(item.likes || 0);
     const [imageHeight, setImageHeight] = useState(width);
     const [isLoading, setIsLoading] = useState(true);
+    const [isLiked, setIsLiked] = useState(false);
+    const [likeCount, setLikeCount] = useState(item.likes || 0);
     const [imageError, setImageError] = useState(false);
-    const [imageAspectRatio, setImageAspectRatio] = useState(1);
+    const [isVideo, setIsVideo] = useState(false);
+    const [isPaused, setIsPaused] = useState(true);
     const animatedScale = useRef(new Animated.Value(1)).current;
     const lastTap = useRef(0);
+    const videoRef = useRef(null);
 
     useEffect(() => {
-        if (item.image_url) {
-            Image.getSize(
-                item.image_url,
-                (imgWidth, imgHeight) => {
-                    const aspectRatio = imgWidth / imgHeight;
-                    setImageAspectRatio(aspectRatio);
-                    setImageHeight(width / aspectRatio); // Maintain aspect ratio correctly
-                },
-                () => setImageError(true)
-            );
+        const mediaUrl = item.image_url || item.media_url;
+        
+        if (typeof mediaUrl === 'string') {
+            if (mediaUrl.match(/\.(mp4|mov|avi|wmv|3gp|mkv)$/i)) {
+                setIsVideo(true);
+                setImageHeight(width * 9 / 16); // 16:9 aspect ratio for videos
+                setIsLoading(false);
+            } else if (mediaUrl.startsWith('http')) {
+                Image.getSize(
+                    mediaUrl,
+                    (imgWidth, imgHeight) => {
+                        const aspectRatio = imgWidth / imgHeight;
+                        setImageHeight(width / aspectRatio);
+                        setIsLoading(false);
+                    },
+                    (error) => {
+                        console.log('Error getting image size:', error);
+                        setImageHeight(width);
+                        setIsLoading(false);
+                        setImageError(true);
+                    }
+                );
+            } else {
+                setIsLoading(false);
+            }
         }
-    }, [item.image_url]);
-    
+    }, [item]);
+
+    const handleMediaPress = () => {
+        if (isVideo) {
+            setIsPaused(!isPaused);
+            if (videoRef.current) {
+                if (isPaused) {
+                    videoRef.current.playAsync();
+                } else {
+                    videoRef.current.pauseAsync();
+                }
+            }
+        }
+        handlePressIn();
+    };
 
     const handlePressIn = useCallback(() => {
         Animated.spring(animatedScale, {
@@ -71,34 +101,11 @@ const PostItem = memo(({
         setLikeCount(prev => isLiked ? prev - 1 : prev + 1);
     }, [isLiked]);
 
-    const handleImagePress = useCallback(() => {
-        const now = Date.now();
-        const DOUBLE_TAP_DELAY = 300;
-
-        if (now - lastTap.current < DOUBLE_TAP_DELAY) {
-            onDoubleTap();
-            handleLike();
-        }
-        lastTap.current = now;
-    }, [handleLike, onDoubleTap]);
-    console.log("Caption:", item.content);
-
-
     return (
-        <Animated.View
-            style={[styles.card, { transform: [{ scale: animatedScale }] }]}
-            accessible={true}
-            accessibilityRole="none"
-            accessibilityLabel={`Post by ${item.username}`}
-        >
+        <Animated.View style={[styles.card, { transform: [{ scale: animatedScale }] }]}>
             {/* User Info Header */}
             <View style={styles.cardHeader}>
-                <TouchableOpacity
-                    style={styles.userInfo}
-                    accessible={true}
-                    accessibilityRole="button"
-                    accessibilityLabel={`View ${item.username}'s profile`}
-                >
+                <View style={styles.userInfo}>
                     <Image
                         source={
                             item?.profile_picture
@@ -106,27 +113,19 @@ const PostItem = memo(({
                                 : require('../../../assets/del.png')
                         }
                         style={styles.avatar}
-                        accessible={true}
-                        accessibilityLabel={`${item.username}'s profile picture`}
                     />
                     <Text style={styles.name}>{item.username || 'Unknown User'}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={styles.moreButton}
-                    accessibilityLabel="More options"
-                    accessibilityRole="button"
-                >
+                </View>
+                <TouchableOpacity style={styles.moreButton}>
                     <Text style={styles.moreButtonText}>•••</Text>
                 </TouchableOpacity>
             </View>
 
-            {/* Post Image */}
+            {/* Media Content */}
             <TouchableOpacity
                 activeOpacity={0.95}
-                onPressIn={handlePressIn}
+                onPressIn={handleMediaPress}
                 onPressOut={handlePressOut}
-                onPress={handleImagePress}
-                accessibilityLabel="Double tap to like"
             >
                 <View style={[styles.imageContainer, { height: imageHeight }]}>
                     {isLoading && !imageError && (
@@ -134,20 +133,43 @@ const PostItem = memo(({
                             <ActivityIndicator size="large" color="#007AFF" />
                         </View>
                     )}
-                    {!imageError ? (
+
+                    {isVideo ? (
+                        <>
+                            <Video
+                                ref={videoRef}
+                                source={{ uri: item.image_url || item.media_url }}
+                                style={styles.postImage}
+                                resizeMode="cover"
+                                shouldPlay={!isPaused}
+                                isLooping={true}
+                                onLoad={() => setIsLoading(false)}
+                                onError={(error) => {
+                                    console.log("Video loading error:", error);
+                                    setIsLoading(false);
+                                    setImageError(true);
+                                }}
+                                useNativeControls={true}
+                            />
+                            {isPaused && (
+                                <View style={styles.playButtonOverlay}>
+                                    <Image
+                                        source={require('../../../assets/play-button.png')}
+                                        style={styles.playButton}
+                                    />
+                                </View>
+                            )}
+                        </>
+                    ) : (
                         <Image
-                            source={{ uri: item.image_url }}
-                            style={[styles.postImage, { aspectRatio: imageAspectRatio }]}
+                            source={{ uri: item.image_url || item.media_url }}
+                            style={styles.postImage}
                             onLoad={() => setIsLoading(false)}
                             onError={() => {
                                 setIsLoading(false);
                                 setImageError(true);
                             }}
                         />
-                    ) : (
-                        <View style={styles.errorContainer}>
-                            <Text style={styles.errorText}>Unable to load image</Text>
-                        </View>
                     )}
                 </View>
             </TouchableOpacity>
@@ -160,36 +182,19 @@ const PostItem = memo(({
 
             {/* Action Buttons */}
             <View style={styles.actions}>
-                <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={handleLike}
-                    accessibilityLabel={isLiked ? "Unlike post" : "Like post"}
-                    accessibilityRole="button"
-                >
+                <TouchableOpacity style={styles.actionButton} onPress={handleLike}>
                     <Image
                         source={require('../../../assets/icon-like.png')}
                         style={[styles.navIcon, isLiked && { tintColor: '#1f219c' }]}
                     />
                 </TouchableOpacity>
-                <TouchableOpacity
-                    style={styles.actionButton}
-                    accessibilityLabel="Comment on post"
-                    accessibilityRole="button"
-                >
+                <TouchableOpacity style={styles.actionButton}>
                     <Image source={require('../../../assets/comment6.png')} style={styles.navIcon} />
                 </TouchableOpacity>
-                <TouchableOpacity
-                    style={styles.actionButton}
-                    accessibilityLabel="Share post"
-                    accessibilityRole="button"
-                >
+                <TouchableOpacity style={styles.actionButton}>
                     <Image source={require('../../../assets/share.png')} style={styles.navIcon} />
                 </TouchableOpacity>
-                <TouchableOpacity
-                    style={styles.actionButton}
-                    accessibilityLabel="Save post"
-                    accessibilityRole="button"
-                >
+                <TouchableOpacity style={styles.actionButton}>
                     <Image source={require('../../../assets/save.png')} style={styles.navIcon} />
                 </TouchableOpacity>
             </View>
@@ -203,12 +208,8 @@ const PostItem = memo(({
                     <Text style={styles.username}>{item.username} </Text>
                     {item.content}
                 </Text>
-                {item.content.length > 80 && (
-                    <TouchableOpacity
-                        onPress={() => toggleExpand(index)}
-                        accessibilityLabel={expandedItems[index] ? "Show less" : "Show more"}
-                        accessibilityRole="button" // Ensuring it's a valid string
-                    >
+                {item.content && item.content.length > 80 && (
+                    <TouchableOpacity onPress={() => toggleExpand(index)}>
                         <Text style={styles.showMoreText}>
                             {expandedItems[index] ? 'Show less' : 'Show more'}
                         </Text>
@@ -232,27 +233,39 @@ const PostViewScreen = ({ route }) => {
     const fetchPosts = async () => {
         try {
             setIsLoading(true);
-    
-            // Retrieve token using the correct key
+
             const token = await AsyncStorage.getItem("token");
             if (!token) {
                 console.error('No token found');
                 Alert.alert('Authentication Error', 'Please log in again.');
                 return;
             }
-    
+
             const response = await fetch(`${NGROK_URL}/api/posts/myposts`, {
                 method: 'GET',
                 headers: {
-                    "Authorization": `Bearer ${token}`, // Ensure the token is correctly formatted
+                    "Authorization": `Bearer ${token}`,
                     "Content-Type": "application/json",
                 },
             });
-    
+
             if (response.ok) {
                 const data = await response.json();
                 console.log("Fetched posts:", data);
-                setLocalPosts(data);
+
+                // Map backend fields to match what PostItem expects
+                const mappedPosts = data.map(post => ({
+                    _id: post.post_id,
+                    username: post.username,
+                    profile_picture: post.profile_picture,
+                    image_url: post.media_url, // Correct field mapping
+                    content: post.content,
+                    created_at: post.created_at,
+                    likes: post.likes ?? 0, // Default to 0 if undefined
+                    comments: post.comments ?? 0,
+                }));
+
+                setLocalPosts(mappedPosts);
             } else {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
@@ -263,7 +276,8 @@ const PostViewScreen = ({ route }) => {
             setIsLoading(false);
         }
     };
-    
+
+
 
     useEffect(() => {
         fetchPosts();
@@ -507,6 +521,21 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#868E96',
         marginTop: 4,
+    },
+    playButtonOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.2)',
+    },
+    playButton: {
+        width: 60,
+        height: 60,
+        tintColor: 'white',
     },
 });
 

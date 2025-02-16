@@ -18,6 +18,7 @@ import axios from 'axios';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NGROK_URL } from '@env';
+import { Video } from 'expo-av';
 
 const { width } = Dimensions.get('window');
 const formatTimestamp = (timestamp) => {
@@ -40,30 +41,66 @@ const formatTimestamp = (timestamp) => {
 };
 
 // Memoized Post Card Component
+// Memoized Post Card Component
 const PostCard = memo(({ item, index, toggleExpand, expandedItems }) => {
   const [imageHeight, setImageHeight] = useState(width);
   const [isLoading, setIsLoading] = useState(true);
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(item.likes || 0);
   const animatedScale = new Animated.Value(1);
+  const [isVideo, setIsVideo] = useState(false);
+  const [isPaused, setIsPaused] = useState(true);
+  const videoRef = React.useRef(null);
 
-  const isUserPost = item.hasOwnProperty('caption');
+  const isUserPost = item.hasOwnProperty('caption') || item.hasOwnProperty('content');
 
   useEffect(() => {
-    const imageUrl = isUserPost ? item.image_url : 'https://picsum.photos/800/800';
-    Image.getSize(
-      imageUrl,
-      (originalWidth, originalHeight) => {
-        const aspectRatio = originalWidth / originalHeight;
-        const calculatedHeight = width / aspectRatio;
-        setImageHeight(calculatedHeight);
-      },
-      (error) => {
-        console.log('Error getting image size:', error);
-        setImageHeight(width);
+    // Check if media is video by looking at URL extension
+    const mediaUrl = item.image_url || item.media_url;
+
+    if (typeof mediaUrl === 'string') {
+      if (mediaUrl.match(/\.(mp4|mov|avi|wmv|3gp|mkv)$/i)) {
+        setIsVideo(true);
+        setImageHeight(width * 9 / 16); // 16:9 aspect ratio for videos
+        setIsLoading(false);
+      } else if (mediaUrl.startsWith('http')) {
+        // Handle images as before
+        Image.getSize(
+          mediaUrl,
+          (originalWidth, originalHeight) => {
+            const aspectRatio = originalWidth / originalHeight;
+            const calculatedHeight = width / aspectRatio;
+            setImageHeight(calculatedHeight);
+            setIsLoading(false);
+          },
+          (error) => {
+            console.log('Error getting image size:', error);
+            setImageHeight(width);
+            setIsLoading(false);
+          }
+        );
+      } else {
+        setIsLoading(false);
       }
-    );
+    } else {
+      // Default fallback image
+      setIsLoading(false);
+    }
   }, [item]);
+
+  const handleMediaPress = () => {
+    if (isVideo) {
+      setIsPaused(!isPaused);
+      if (videoRef.current) {
+        if (isPaused) {
+          videoRef.current.playAsync();
+        } else {
+          videoRef.current.pauseAsync();
+        }
+      }
+    }
+    handlePressIn();
+  };
 
   const handlePressIn = () => {
     Animated.spring(animatedScale, {
@@ -97,64 +134,89 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems }) => {
     }
   };
 
-
   return (
     <Animated.View style={[styles.card, { transform: [{ scale: animatedScale }] }]}>
       {/* User Info Header */}
       <View style={styles.cardHeader}>
-        <TouchableOpacity style={styles.userInfo}>
+        <View style={styles.userInfo}>
           <Image
             source={
               typeof item.profile_picture === 'string' && item.profile_picture.startsWith('http')
                 ? { uri: item.profile_picture }
-                : item.picture?.thumbnail
-                  ? { uri: item.picture.thumbnail }
-                  : require('../assets/del.png')
+                : require('../assets/del.png')  // Fallback avatar
             }
             style={styles.avatar}
           />
           <View>
-            <Text>
-              {item.name && item.name.first && item.name.last
-                ? `${item.name.first} ${item.name.last}`
-                : item.username || 'Unknown User'}
-            </Text>
+            <Text style={styles.name}>{isUserPost ? item.username : (item.name ? item.name.first : 'User')}</Text>
+            <Text style={styles.timeStamp}>{formatTimestamp(item.created_at)}</Text>
           </View>
-
-        </TouchableOpacity>
+        </View>
         <TouchableOpacity style={styles.moreButton}>
           <Text style={styles.moreButtonText}>•••</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Post Image */}
+      {/* Post Media (Image or Video) */}
       <TouchableOpacity
         activeOpacity={0.95}
-        onPressIn={handlePressIn}
+        onPressIn={handleMediaPress}
         onPressOut={handlePressOut}
       >
-
         <View style={[styles.imageContainer, { height: imageHeight }]}>
           {isLoading && (
             <View style={styles.imageLoader}>
               <ActivityIndicator size="large" color="#007AFF" />
             </View>
           )}
-          <Image
-            source={
-              typeof item.image_url === 'string' && item.image_url.startsWith('http')
-                ? { uri: item.image_url }
-                : require('../assets/PITCH.png')  // Create a placeholder image
-            }
-            style={styles.postImage}
-          />
+
+          {isVideo ? (
+            <Video
+              ref={videoRef}
+              source={{ uri: item.image_url || item.media_url }}
+              style={[styles.video, { height: imageHeight }]}  // Changed here
+              resizeMode="cover"
+              shouldPlay={!isPaused}
+              isLooping={true}
+              onLoad={() => setIsLoading(false)}
+              onError={(error) => {
+                console.log("Video loading error:", error);
+                setIsLoading(false);
+                setIsVideo(false);
+              }}
+              useNativeControls={false}
+            />
+
+          ) : (
+            <Image
+              source={
+                typeof item.image_url === 'string' && item.image_url.startsWith('http')
+                  ? { uri: item.image_url }
+                  : typeof item.media_url === 'string' && item.media_url.startsWith('http')
+                    ? { uri: item.media_url }
+                    : require('../assets/PITCH.png')  // Fallback image
+              }
+              style={[styles.postImage, { height: imageHeight }]}  // Changed here
+              onLoad={() => setIsLoading(false)}
+            />
+          )}
+
+          {/* Play button overlay for videos */}
+          {isVideo && isPaused && (
+            <View style={styles.playButtonOverlay}>
+              <Image
+                source={require('../assets/play-button.png')}
+                style={styles.playButton}
+              />
+            </View>
+          )}
         </View>
       </TouchableOpacity>
 
       {/* Engagement Section */}
       <View style={styles.cardFooter}>
         <Text style={styles.likes}>👍 {likeCount} Likes</Text>
-        <Text style={styles.comments}>💬 {item.comments || 0}</Text>
+        <Text style={styles.comments}>💬 {item.comments || 0} Comments</Text>
       </View>
       <View style={styles.actions}>
         <TouchableOpacity style={styles.actionButton} onPress={handleLike}>
@@ -184,15 +246,17 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems }) => {
           numberOfLines={expandedItems[index] ? undefined : 2}
         >
           <Text style={styles.username}>
-            {isUserPost ? item.username : item.name.first}{' '}
+            {isUserPost ? item.username : (item.name ? item.name.first : 'User')}{' '}
           </Text>
-          {item.content}
+          {item.content || item.caption}
         </Text>
-        <TouchableOpacity onPress={() => toggleExpand(index)}>
-          <Text style={styles.showMoreText}>
-            {expandedItems[index] ? 'Show less' : 'Show more'}
-          </Text>
-        </TouchableOpacity>
+        {(item.content || item.caption) && (
+          <TouchableOpacity onPress={() => toggleExpand(index)}>
+            <Text style={styles.showMoreText}>
+              {expandedItems[index] ? 'Show less' : 'Show more'}
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
     </Animated.View>
   );
@@ -207,13 +271,13 @@ export default function HomeScreen() {
   const [userData, setUserData] = useState(null);
   const navigation = useNavigation();
   const [postsError, setPostsError] = useState(null);
-  
+
   const combinedData = useMemo(() => {
-    const validPosts = myPosts.filter(post => post && post.image_url);
+    const validPosts = myPosts.filter(post =>
+      post && (post.image_url || post.media_url) &&
+      !String(post.image_url || post.media_url).includes('undefined')
+    );
     const mergedData = [...validPosts, ...users];
-
-    // console.log("🛠️ Combined Data for FlatList:", JSON.stringify(mergedData, null, 2)); // ✅ Check merged posts + users
-
     return mergedData;
   }, [myPosts, users]);
 
@@ -243,32 +307,45 @@ export default function HomeScreen() {
 
   const fetchAllPosts = useCallback(async () => {
     try {
-        setPostsError(null);
-        console.log("📡 Sending request to:", `${NGROK_URL}/api/posts/all`);
+      setPostsError(null);
+      console.log("📡 Sending request to:", `${NGROK_URL}/api/posts/all`);
 
-        const response = await axios.get(`${NGROK_URL}/api/posts/all`, {
-            headers: { "Content-Type": "application/json" },
-        });
+      const response = await axios.get(`${NGROK_URL}/api/posts/all`, {
+        headers: { "Content-Type": "application/json" },
+      });
 
-        console.log("✅ API Response:", JSON.stringify(response.data, null, 2));
+      console.log("✅ API Response:", JSON.stringify(response.data, null, 2));
 
-        if (response.data && Array.isArray(response.data)) {
-            const sortedPosts = response.data
-                .filter(post => post.image_url) // Ensure posts with images are prioritized
-                .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      if (response.data && Array.isArray(response.data)) {
+        // Map the backend fields to match what your component expects
+        const mappedPosts = response.data.map(post => ({
+          _id: post.post_id,
+          username: post.username,
+          profile_picture: post.profile_picture,
+          image_url: post.media_url, // Map media_url to image_url
+          content: post.content,
+          created_at: post.created_at,
+          likes: 0, // Default value since it's not provided by the API
+          comments: 0, // Default value
+          caption: post.content // Also map content to caption for the isUserPost check
+        }));
 
-            setMyPosts(sortedPosts); // Ensure correct state update
-        } else {
-            console.log("⚠️ No posts found in response.");
-        }
+        const sortedPosts = mappedPosts
+          .filter(post => post.image_url && !post.image_url.includes('undefined'))
+          .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+        setMyPosts(sortedPosts);
+      } else {
+        console.log("⚠️ No posts found in response.");
+      }
     } catch (error) {
-        console.error('❌ Error fetching posts:', {
-            message: error.message,
-            response: error.response?.data,
-            status: error.response?.status
-        });
+      console.error('❌ Error fetching posts:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
     }
-}, []);
+  }, []);
 
   useEffect(() => {
     loadUsers();
@@ -506,7 +583,7 @@ const styles = StyleSheet.create({
   },
   postImage: {
     width: width,
-    height: '100%',
+    resizeMode: 'cover',
   },
   cardFooter: {
     flexDirection: 'row',
@@ -577,5 +654,24 @@ const styles = StyleSheet.create({
   },
   loaderContainer: {
     paddingVertical: 20,
+  },
+  playButtonOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.2)',
+  },
+  playButton: {
+    width: 60,
+    height: 60,
+    tintColor: 'white',
+  },
+  video: {
+    width: width,
+    backgroundColor: 'black',
   },
 });

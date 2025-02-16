@@ -39,7 +39,8 @@
     },
     "plugins": [
       "expo-font",
-      "expo-asset"
+      "expo-asset",
+      "expo-video"
     ],
     "owner": "croww"
   }
