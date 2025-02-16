@@ -1,7 +1,7 @@
 const express = require('express');
 const postController = require('../controllers/postController');
 const authenticateJWT = require('../middleware/authenticateJWT');
-const { uploadPostMedia } = require("../config/multerConfig"); // Updated multer import
+const { uploadAndConvertPostMedia } = require("../config/multerConfig"); // Updated multer import
 
 const router = express.Router();
 
@@ -13,14 +13,14 @@ const debugMiddleware = (req, res, next) => {
   next();
 };
 
-// Post Creation Route (Supports Image & Video)
+// Post Creation Route (Supports Image & Video, Converts MOV to MP4)
 router.post('/posts',
   debugMiddleware,
   authenticateJWT, // Authenticate user first
-  uploadPostMedia.single('media'), // Then process file upload
+  uploadAndConvertPostMedia, // Upload + MOV-to-MP4 conversion
   (req, res, next) => {
     if (req.file) {
-      console.log('Uploaded File:', req.file.filename, '| Type:', req.file.mimetype);
+      console.log('Processed File:', req.file.filename, '| Type:', req.file.mimetype);
     } else {
       console.log('No media uploaded.');
     }
