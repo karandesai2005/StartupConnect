@@ -4,7 +4,22 @@ const fs = require('fs');
 const ffmpeg = require('fluent-ffmpeg');
 
 // 🔥 Critical Fix: Set FFmpeg path explicitly
-ffmpeg.setFfmpegPath('/usr/bin/ffmpeg'); // Update this path to match your system
+try {
+  ffmpeg.setFfmpegPath('/usr/bin/ffmpeg');
+  ffmpeg.setFfprobePath('/usr/bin/ffprobe');
+  
+  // Verify FFmpeg installation
+  ffmpeg.getAvailableFormats((err, formats) => {
+    if (err) {
+      console.error('❌ FFmpeg verification failed:', err);
+      process.exit(1);
+    }
+    console.log('✅ FFmpeg successfully initialized');
+  });
+} catch (error) {
+  console.error('❌ FFmpeg initialization failed:', error);
+  process.exit(1);
+}
 
 // Ensure upload directories exist
 const profileUploadDir = path.join(__dirname, '../uploads/profile_pictures');
