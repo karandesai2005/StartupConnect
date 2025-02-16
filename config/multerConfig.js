@@ -1,6 +1,7 @@
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const ffmpeg = require('fluent-ffmpeg');
 
 // Ensure upload directories exist
 const profileUploadDir = path.join(__dirname, '../uploads/profile_pictures');
@@ -48,22 +49,58 @@ const postFileFilter = (req, file, cb) => {
   }
 };
 
-
-// File size limits (Increase if needed)
+// File size limits
 const profileUploadLimits = { fileSize: 2 * 1024 * 1024 }; // 2MB max for profile pictures
 const postUploadLimits = { fileSize: 100 * 1024 * 1024 }; // 100MB max
 
-// Create multer instances with limits
-const uploadProfilePicture = multer({
-  storage: profileStorage,
-  fileFilter: profileFileFilter,
-  limits: profileUploadLimits
-});
+// Function to convert MOV to MP4
+const convertMovToMp4 = (filePath, outputFilePath) => {
+  return new Promise((resolve, reject) => {
+    ffmpeg(filePath)
+      .output(outputFilePath)
+      .videoCodec('libx264')
+      .audioCodec('aac')
+      .on('end', () => {
+        console.log('✅ MOV to MP4 conversion completed:', outputFilePath);
+        resolve(outputFilePath);
+      })
+      .on('error', (err) => {
+        console.error('❌ Error converting MOV to MP4:', err);
+        reject(err);
+      })
+      .run();
+  });
+};
 
+// Middleware to upload post media
 const uploadPostMedia = multer({
   storage: postStorage,
   fileFilter: postFileFilter,
   limits: postUploadLimits
-});
+}).single('postMedia');
 
-module.exports = { uploadProfilePicture, uploadPostMedia };
+// Middleware to handle MOV conversion after upload
+const uploadAndConvertPostMedia = (req, res, next) => {
+  uploadPostMedia(req, res, async (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+
+    if (req.file && path.extname(req.file.filename).toLowerCase() === '.mov') {
+      const movPath = req.file.path;
+      const mp4Path = movPath.replace('.mov', '.mp4');
+
+      try {
+        await convertMovToMp4(movPath, mp4Path);
+        req.file.filename = path.basename(mp4Path);
+        req.file.path = mp4Path;
+        fs.unlinkSync(movPath); // Delete original MOV file
+      } catch (error) {
+        return res.status(500).json({ error: 'Error converting video format.' });
+      }
+    }
+
+    next();
+  });
+};
+
+// Export the updated upload functions
+module.exports = { uploadProfilePicture: multer({ storage: profileStorage, fileFilter: profileFileFilter, limits: profileUploadLimits }), uploadAndConvertPostMedia };
