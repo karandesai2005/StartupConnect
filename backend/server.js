@@ -5,7 +5,7 @@ const path = require("path");
 const postRoutes = require("./routes/postRoutes");
 const { connectDB } = require("./config/db"); // Import Azure SQL connection
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080; // Use Azure's assigned port
 
 // ✅ Serve static files before connecting DB
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
