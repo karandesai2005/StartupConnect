@@ -61,7 +61,7 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems }) => {
     if (typeof mediaUrl === 'string') {
       if (mediaUrl.match(/\.(mp4|mov|avi|wmv|3gp|mkv)$/i)) {
         setIsVideo(true);
-        setImageHeight(width * 9 / 16); // 16:9 aspect ratio for videos
+        setImageHeight(width * 5 / 4); // 16:9 aspect ratio for videos
         setIsLoading(false);
       } else if (mediaUrl.startsWith('http')) {
         // Handle images as before
@@ -70,7 +70,7 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems }) => {
           (originalWidth, originalHeight) => {
             const aspectRatio = originalWidth / originalHeight;
             const calculatedHeight = width / aspectRatio;
-            setImageHeight(calculatedHeight);
+            setImageHeight(width * 5 / 4  );
             setIsLoading(false);
           },
           (error) => {
