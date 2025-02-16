@@ -1,7 +1,7 @@
 const express = require('express');
 const postController = require('../controllers/postController');
 const authenticateJWT = require('../middleware/authenticateJWT');
-const { uploadPostMedia } = require("../config/multer"); // Updated multer import
+const { uploadPostMedia } = require("../config/multerConfig"); // Updated multer import
 
 const router = express.Router();
 
