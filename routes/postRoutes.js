@@ -28,7 +28,15 @@ router.post('/posts',
   },
   postController.createPost
 );
+router.post('/posts/:postId/toggle-like', 
+  authenticateJWT, 
+  postController.toggleLike
+);
 
+router.get('/posts/:postId/likes', 
+  authenticateJWT, 
+  postController.getLikeStatus
+);
 // Fetch User's Own Posts
 router.get('/posts/myposts', authenticateJWT, postController.getUserPosts);
 
