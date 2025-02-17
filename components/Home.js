@@ -19,7 +19,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NGROK_URL } from '@env';
 import { Video } from 'expo-av';
-
+import { debounce } from 'lodash';
 const { width } = Dimensions.get('window');
 const formatTimestamp = (timestamp) => {
   if (!timestamp) return 'Just now';
@@ -51,8 +51,17 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems }) => {
   const [isVideo, setIsVideo] = useState(false);
   const [isPaused, setIsPaused] = useState(true);
   const videoRef = React.useRef(null);
-
+  const [isLikeLoading, setIsLikeLoading] = useState(false);
+  const debouncedHandleLike = useCallback(
+    debounce(async () => {
+      handleLike();
+    }, 300),
+    [handleLike]
+  );
   const isUserPost = item.hasOwnProperty('caption') || item.hasOwnProperty('content');
+  useEffect(() => {
+    fetchLikeStatus();
+  }, [item.post_id]);
 
   useEffect(() => {
     // Check if media is video by looking at URL extension
@@ -70,7 +79,7 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems }) => {
           (originalWidth, originalHeight) => {
             const aspectRatio = originalWidth / originalHeight;
             const calculatedHeight = width / aspectRatio;
-            setImageHeight(width * 5 / 4  );
+            setImageHeight(width * 5 / 4);
             setIsLoading(false);
           },
           (error) => {
@@ -116,21 +125,58 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems }) => {
     }).start();
   };
 
+  const fetchLikeStatus = async () => {
+    try {
+      const token = await AsyncStorage.getItem("token");
+      if (!token || !item.post_id) return;
+
+      const response = await axios.get(
+        `${NGROK_URL}/api/posts/${item.post_id}/like-status`,
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      if (response.data) {
+        setIsLiked(response.data.isLiked === 1);
+        setLikeCount(response.data.likeCount);
+      }
+    } catch (error) {
+      console.error('Error fetching like status:', error);
+    }
+  };
+
   const handleLike = async () => {
     try {
+      const token = await AsyncStorage.getItem("token");
+      if (!token || !item.post_id) return;
+      setIsLikeLoading(true);  // Add this
+
+
+      // Optimistic update
       setIsLiked(prev => !prev);
       setLikeCount(prev => isLiked ? prev - 1 : prev + 1);
 
-      // Here you would typically make an API call to update the like status
-      // const token = await AsyncStorage.getItem("token");
-      // await axios.post(`${NGROK_URL}/api/posts/${item._id}/like`, {}, {
-      //   headers: { Authorization: `Bearer ${token}` }
-      // });
+      const response = await axios.post(
+        `${NGROK_URL}/api/posts/${item.post_id}/toggle-like`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      // Update with actual server response
+      if (response.data) {
+        setIsLiked(response.data.liked === 1);
+        setLikeCount(response.data.likeCount);
+      }
     } catch (error) {
-      // Revert the optimistic update if the API call fails
+      // Revert optimistic update on error
+      console.error('Error updating like:', error);
       setIsLiked(prev => !prev);
       setLikeCount(prev => isLiked ? prev + 1 : prev - 1);
-      console.error('Error updating like:', error);
+    } finally {
+      setIsLikeLoading(false);  // Add this
     }
   };
 
@@ -219,14 +265,27 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems }) => {
         <Text style={styles.comments}>💬 {item.comments || 0} Comments</Text>
       </View>
       <View style={styles.actions}>
-        <TouchableOpacity style={styles.actionButton} onPress={handleLike}>
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={debouncedHandleLike}
+          activeOpacity={0.7}
+          disabled={isLikeLoading}
+        >
           <Image
             source={require('../assets/icon-like.png')}
             style={[
               styles.navIcon,
-              isLiked && { tintColor: '#1f219c' }
+              isLiked && { tintColor: '#1f219c' },
+              isLikeLoading && { opacity: 0.5 }  // Add this
             ]}
           />
+          {isLikeLoading && (  // Add this
+            <ActivityIndicator
+              size="small"
+              color="#1f219c"
+              style={styles.likeLoader}
+            />
+          )}
         </TouchableOpacity>
         <TouchableOpacity style={styles.actionButton}>
           <Image source={require('../assets/comment6.png')} style={styles.navIcon} />
@@ -308,26 +367,30 @@ export default function HomeScreen() {
   const fetchAllPosts = useCallback(async () => {
     try {
       setPostsError(null);
-      console.log("📡 Sending request to:", `${NGROK_URL}/api/posts/all`);
+      const token = await AsyncStorage.getItem("token");
 
-      const response = await axios.get(`${NGROK_URL}/api/posts/all`, {
-        headers: { "Content-Type": "application/json" },
-      });
-
-      console.log("✅ API Response:", JSON.stringify(response.data, null, 2));
+      const response = await axios.get(
+        `${NGROK_URL}/api/posts/all`,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          }
+        }
+      );
 
       if (response.data && Array.isArray(response.data)) {
-        // Map the backend fields to match what your component expects
         const mappedPosts = response.data.map(post => ({
           _id: post.post_id,
+          post_id: post.post_id, // Added for like functionality
           username: post.username,
           profile_picture: post.profile_picture,
-          image_url: post.media_url, // Map media_url to image_url
+          image_url: post.media_url,
           content: post.content,
           created_at: post.created_at,
-          likes: 0, // Default value since it's not provided by the API
-          comments: 0, // Default value
-          caption: post.content // Also map content to caption for the isUserPost check
+          likes: post.like_count || 0, // Updated to use backend like count
+          comments: 0,
+          caption: post.content
         }));
 
         const sortedPosts = mappedPosts
@@ -335,15 +398,10 @@ export default function HomeScreen() {
           .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
         setMyPosts(sortedPosts);
-      } else {
-        console.log("⚠️ No posts found in response.");
       }
     } catch (error) {
-      console.error('❌ Error fetching posts:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status
-      });
+      console.error('Error fetching posts:', error);
+      setPostsError(error.message);
     }
   }, []);
 
@@ -673,5 +731,14 @@ const styles = StyleSheet.create({
   video: {
     width: width,
     backgroundColor: 'black',
+  },
+  likeLoader: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: [
+      { translateX: -12 },
+      { translateY: -12 }
+    ]
   },
 });
