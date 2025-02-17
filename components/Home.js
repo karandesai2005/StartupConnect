@@ -131,7 +131,7 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems }) => {
       if (!token || !item.post_id) return;
 
       const response = await axios.get(
-        `${NGROK_URL}/api/posts/${item.post_id}/like-status`,
+        `${NGROK_URL}/api/posts/${item.post_id}/likes`,
         {
           headers: { Authorization: `Bearer ${token}` }
         }
@@ -463,6 +463,18 @@ export default function HomeScreen() {
       fetchUserData();
     }, [fetchUserData])
   );
+  const keyExtractor = useCallback((item, index) => {
+    // For user posts
+    if (item.post_id) {
+      return `post-${item.post_id}`;
+    }
+    // For random users
+    if (item.login?.uuid) {
+      return `user-${item.login.uuid}`;
+    }
+    // Fallback using just the index
+    return `item-${index}`;
+  }, []);
   // console.log("My Posts:", JSON.stringify(myPosts, null, 2));
   // console.log("Combined Data:", JSON.stringify(combinedData, null, 2));
 
@@ -496,24 +508,25 @@ export default function HomeScreen() {
       {/* Post List */}
       <FlatList
         data={combinedData}
-        extraData={combinedData} // Ensures re-render when data changes
-        renderItem={({ item, index }) => {
-          // console.log(`📸 Rendering Post #${index}:`, item); // ✅ Check each item being rendered
-          return (
-            <PostCard
-              key={index} // Force key for better re-renders
-              item={item}
-              index={index}
-              toggleExpand={toggleExpand}
-              expandedItems={expandedItems}
-            />
-          );
-        }}
-        keyExtractor={(item, index) => item._id ? item._id.toString() : index.toString()}
+        extraData={combinedData}
+        renderItem={({ item, index }) => (
+          <PostCard
+            item={item}
+            index={index}
+            toggleExpand={toggleExpand}
+            expandedItems={expandedItems}
+          />
+        )}
+        keyExtractor={keyExtractor}
         onEndReached={() => setCurrentPage(prev => prev + 1)}
         onEndReachedThreshold={0.5}
         ListFooterComponent={renderFooter}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+          />
+        }
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.listContentContainer}
       />
