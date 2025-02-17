@@ -33,6 +33,15 @@ const Profile = ({ route, isBusinessProfile = false }) => {
   const spacing = 2;
   const itemSize = (screenWidth - 32 - spacing * 2) / 3;
 
+  // Modal Visibility
+  const [isModalVisible, setModalVisible] = useState(false);
+  const openModal = () => {
+    setModalVisible(true);
+  };
+  const closeModal = () => {
+    setModalVisible(false);
+  };
+
   useEffect(() => {
     if (route.params?.updatedUser) {
       console.log("Received updated user data:", route.params.updatedUser);
@@ -482,6 +491,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 16,
     width: '100%',
+    position: 'relative', // Add this
+    height: '100%', 
   },
   centre: {
     alignItems: "center",
@@ -671,7 +682,8 @@ const styles = StyleSheet.create({
     color: "#000",
   },
   scrollViewContent: {
-    paddingBottom: 60, // Adjust based on your bottom nav height
+    paddingBottom: 100,
+    width: '100%',
   },
 
   bottomNav: {

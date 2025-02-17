@@ -503,6 +503,9 @@ export default function HomeScreen() {
         <TouchableOpacity onPress={() => navigation.navigate('Chat')}>
           <Image source={require('../assets/Arrow.png')} style={styles.chatIcon} />
         </TouchableOpacity>
+        <TouchableOpacity onPress={() => navigation.navigate('Chat')}>
+          <Image source={require('../assets/Arrow.png')} style={styles.chatIcon} />
+        </TouchableOpacity>
       </View>
 
       {/* Post List */}
@@ -540,7 +543,7 @@ export default function HomeScreen() {
         <TouchableOpacity onPress={() => navigation.navigate('CreatePost')}>
           <Image source={require('../assets/plus3.png')} style={styles.navIcon} />
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => navigation.navigate('Notifications')}>
+        <TouchableOpacity onPress={() => navigation.navigate('Reel')}>
           <Image source={require('../assets/bell.png')} style={styles.navIcon} />
         </TouchableOpacity>
         <TouchableOpacity onPress={() => navigation.navigate('Login')}>
@@ -581,7 +584,7 @@ const styles = StyleSheet.create({
     borderRadius: 20
   },
   searchBar: {
-    flex: 1,
+    width: '60%',
     marginHorizontal: 10,
     paddingHorizontal: 15,
     backgroundColor: '#eee',

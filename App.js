@@ -12,7 +12,7 @@ import Register1 from "./components/Register1";
 import Register2 from "./components/Register2";
 import Profile from './components/Profile/P_Profile/Profile';
 import EditProfilePage from './components/Profile/P_Profile/EditProfilePage';
-
+import ReelsScreen from './components/Reel';
 import Username from './components/username';
 import Preference from './components/preference';
 import HandlePersonal from './components/Profile/P_Profile/handlePersonal';
