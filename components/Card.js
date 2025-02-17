@@ -41,6 +41,10 @@ const styles = StyleSheet.create({
     marginVertical: 8,
     marginHorizontal: 16,
     shadowColor: '#000',
+<<<<<<< HEAD
+=======
+    paddingLeft: 5,
+>>>>>>> 542293e (ok)
     shadowOffset: {
       width: 0,
       height: 2,
