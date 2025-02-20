@@ -80,6 +80,25 @@ const chatController = {
       console.error('Error updating last read:', error);
       res.status(500).json({ message: 'Error updating last read' });
     }
+  },
+
+  // ✅ Get all users except the logged-in user
+  getAllUsers: async (req, res) => {
+    try {
+      const userId = req.user.userId;  // Get logged-in user ID
+
+      const query = `
+        SELECT user_id, username, profile_picture 
+        FROM users 
+        WHERE user_id != @param1
+      `;
+
+      const users = await queryDB(query, [userId]);
+      res.json(users);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      res.status(500).json({ message: 'Error fetching users' });
+    }
   }
 };
 
