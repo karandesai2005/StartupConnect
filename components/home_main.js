@@ -500,7 +500,10 @@ export default function HomeScreen() {
           placeholder="Search..."
           placeholderTextColor="#aaa"
         />
-        <TouchableOpacity onPress={() => navigation.navigate('ChatList')}>
+        <TouchableOpacity onPress={() => navigation.navigate('Chat')}>
+          <Image source={require('../assets/Arrow.png')} style={styles.chatIcon} />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => navigation.navigate('Chat')}>
           <Image source={require('../assets/Arrow.png')} style={styles.chatIcon} />
         </TouchableOpacity>
       </View>
@@ -547,7 +550,7 @@ export default function HomeScreen() {
           <Image source={require('../assets/settings.png')} style={styles.navIcon} />
         </TouchableOpacity>
       </View>
-    </View >
+    </View>
   );
 }
 
