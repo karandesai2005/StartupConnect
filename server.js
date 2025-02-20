@@ -5,7 +5,7 @@ const path = require("path");
 const cors = require("cors"); // Add this if not already included
 const { connectDB } = require("./config/db");
 const postRoutes = require("./routes/postRoutes");
-const chatRoutes = require("./routes/chatRoutes");
+const chatRoutes = require("./routes/chatRoute");
 
 const app = express();
 const PORT = process.env.PORT || 8080;
