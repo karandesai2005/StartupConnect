@@ -18,8 +18,17 @@ import { NGROK_URL } from '@env';
 import { BarChart, PieChart, LineChart } from 'react-native-gifted-charts';
 import Card from "../../Card";
 import { Video } from 'expo-av';
+// Add near other state declarations
+
 
 const Profile = ({ route, isBusinessProfile = false }) => {
+  const [stories, setStories] = useState([
+    { id: 1, username: "Story 1", hasStory: true, viewed: false },
+    { id: 2, username: "Story 2", hasStory: true, viewed: true },
+    { id: 3, username: "Story 3", hasStory: true, viewed: false },
+    { id: 4, username: "Story 4", hasStory: true, viewed: false },
+    { id: 5, username: "Story 5", hasStory: true, viewed: false },
+  ]);
   const navigation = useNavigation();
   const [userData, setUserData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -307,6 +316,41 @@ const renderGridItem = (post, index) => {
     </TouchableOpacity>
   );
 };
+const renderStories = () => (
+  <Card title="Milestones and others" style={[styles.storiesCard, { width: '100%' }]}>
+    <ScrollView 
+      horizontal 
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.storiesContainer}
+    >
+      {stories.map((story) => (
+        <TouchableOpacity
+          key={story.id}
+          onPress={() => {
+            console.log(`Story ${story.id} pressed`);
+          }}
+          style={styles.storyItem}
+        >
+          <View style={[
+            styles.storyRing,
+            { borderColor: story.viewed ? '#8e8e8e' : '#007bff' }
+          ]}>
+            <View style={styles.storyImageContainer}>
+              <Image
+                source={require('../../../assets/del.png')}
+                style={styles.storyImage}
+                resizeMode="cover"
+              />
+            </View>
+          </View>
+          <Text style={styles.storyUsername} numberOfLines={1}>
+            {story.username}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </ScrollView>
+  </Card>
+);
 
 const renderGrid = () => (
   <View style={styles.gridContainer}>
@@ -393,7 +437,7 @@ return (
           </TouchableOpacity>
         </View>
       </View>
-
+      {renderStories()} {/* Add curly braces here */}
       <View style={styles.tab}>
         {renderTab("stories", isBusinessProfile ? "The Startup" : "The Stories")}
         {renderTab("startups", "The Teams")}
@@ -418,8 +462,6 @@ return (
       </TouchableOpacity>
     </View>
   </View>
-
-
 );
 };
 
@@ -711,6 +753,52 @@ const styles = StyleSheet.create({
     ...(Platform.OS === 'android' && {
       tintColor: undefined
     })
+  },
+  // Add to your existing StyleSheet
+  storiesCard: {
+    marginTop: 20,
+    marginBottom: 10,
+    width: '100%',
+    alignSelf: 'center',
+  },
+  storiesContainer: {
+    padding: 10,
+    gap: 12,
+    flexDirection: 'row',
+    justifyContent: 'center', // Center stories horizontally
+    alignItems: 'center', // Center stories vertically
+  },
+  storyItem: {
+    alignItems: 'center',
+    width: 72,
+    marginHorizontal: 6, // Add some horizontal spacing between stories
+  },
+  storyRing: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    borderWidth: 2,
+    padding: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  storyImageContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    overflow: 'hidden',
+    backgroundColor: '#f0f0f0',
+  },
+  storyImage: {
+    width: '100%',
+    height: '100%',
+  },
+  storyUsername: {
+    marginTop: 4,
+    fontSize: 12,
+    textAlign: 'center',
+    color: '#666',
+    fontFamily: "AvenirNextCyr",
   },
 
 });
