@@ -1,46 +1,89 @@
-require("dotenv").config(); // Load environment variables
+// server.js
+require("dotenv").config();
 const express = require("express");
-const app = require("./app");
 const path = require("path");
+const cors = require("cors"); // Add this if not already included
+const { connectDB } = require("./config/db");
 const postRoutes = require("./routes/postRoutes");
-const { connectDB } = require("./config/db"); // Import Azure SQL connection
+const chatRoutes = require("./routes/chatRoutes");
 
-const PORT = process.env.PORT || 8080; // Use Azure's assigned port
+const app = express();
+const PORT = process.env.PORT || 8080;
 
-// ✅ Serve static files before connecting DB
+// Middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(cors());
+
+// Static files
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-app.use("/api", postRoutes);
 
-// Root route
+// Health check route
 app.get("/", (req, res) => {
   res.send("Welcome to the backend server!");
 });
 
-// Login route
-app.post("/api/auth/login", (req, res) => {
-  res.json({ message: "Login successful!" });
+// API Routes
+app.use("/api", postRoutes);
+app.use("/api", chatRoutes); // This means chat routes will be at /api/chats
+
+// Auth routes
+const authRoutes = {
+  login: async (req, res) => {
+    try {
+      // Your login logic here
+      res.json({ message: "Login successful!" });
+    } catch (error) {
+      console.error("Login error:", error);
+      res.status(500).json({ message: "Login failed", error: error.message });
+    }
+  },
+
+  saveUserDetails: async (req, res) => {
+    try {
+      // Your user details saving logic here
+      res.json({ message: "User details saved!" });
+    } catch (error) {
+      console.error("Save user details error:", error);
+      res.status(500).json({ message: "Failed to save user details", error: error.message });
+    }
+  }
+};
+
+app.post("/api/auth/login", authRoutes.login);
+app.post("/api/auth/save-user-details", authRoutes.saveUserDetails);
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ message: "Something went wrong!", error: err.message });
 });
 
-// Save user details route
-app.post("/api/auth/save-user-details", (req, res) => {
-  res.json({ message: "User details saved!" });
+// Handle 404s
+app.use((req, res) => {
+  res.status(404).json({ message: `Route ${req.url} not found` });
 });
 
-// ✅ Ensure DB connection before starting the server
+// Server startup
 async function startServer() {
   try {
-    await connectDB(); // Ensure DB connection before starting Express server
+    await connectDB();
     console.log("✅ Database connection successful!");
 
     app.listen(PORT, "0.0.0.0", () => {
       console.log(`🚀 Server running on http://0.0.0.0:${PORT}`);
+      console.log(`📝 Chat routes available at http://0.0.0.0:${PORT}/api/chats`);
     });
-
   } catch (err) {
-    console.error("❌ Failed to connect to the database. Server not started.");
-    process.exit(1); // Exit process if DB connection fails
+    console.error("❌ Failed to connect to the database:", err);
+    process.exit(1);
   }
 }
 
 // Start the server
-startServer();
+startServer().catch(console.error);
+
+process.on("unhandledRejection", (err) => {
+  console.error("Unhandled rejection:", err);
+  process.exit(1);
+});
