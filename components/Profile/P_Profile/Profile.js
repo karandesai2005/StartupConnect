@@ -18,8 +18,6 @@ import { NGROK_URL } from '@env';
 import { BarChart, PieChart, LineChart } from 'react-native-gifted-charts';
 import Card from "../../Card";
 import { Video } from 'expo-av';
-// Add near other state declarations
-
 
 const Profile = ({ route, isBusinessProfile = false }) => {
   const [stories, setStories] = useState([
@@ -36,6 +34,12 @@ const Profile = ({ route, isBusinessProfile = false }) => {
   const [lastUpdate, setLastUpdate] = useState(0);
   const [activeTab, setActiveTab] = useState('stories');
   const [userPosts, setUserPosts] = useState([]);
+  
+  const [isGraphModalVisible, setGraphModalVisible] = useState(false);
+  const [userGraphs, setUserGraphs] = useState([]);
+  const handleAddGraph = (graphData) => {
+    setUserGraphs(prev => [...prev, graphData]);
+  };
 
   // Calculate dimensions for the grid
   const screenWidth = Dimensions.get('window').width;
@@ -210,65 +214,111 @@ const data = [
   { value: 90, label: 'Apr', frontColor: '#000000', color: '#000000' },
 ];
 
+const cardStyle = {
+  width: '90%',
+  minHeight: 400,
+  marginBottom: 20,
+  backgroundColor: 'white',
+  borderRadius: 15,
+  shadowColor: '#000',
+  shadowOffset: {
+    width: 0,
+    height: 2,
+  },
+  shadowOpacity: 0.25,
+  shadowRadius: 3.84,
+  elevation: 5,
+};
+
+// Updated color palette for pie charts
+const pieColors = [
+  '#007bff',  // blue
+  '#004999',  // dark blue
+  '#002d5f',  // darker blue
+  '#000000',  // black
+  '#696969',  // grey
+];
+
 const renderTry = () => (
   <View style={styles.try}>
-    <Card title={"Bar Chart"}>
-      <View style={{ padding: 20 }}>
-        <BarChart
-          data={data}
-          isAnimated
-          animationDuration={300}
-          barWidth={18}
-          barBorderRadius={3}
-          height={200}
-          width={300}
-          minHeight={1}
-          spacing={20}
-          noOfSections={5}
-          yAxisThickness={0}
-          xAxisThickness={0}
-        />
+    {userGraphs.map((graph, index) => (
+      <View key={index} style={cardStyle}>
+        <Text style={styles.graphTitle}>{graph.title}</Text>
+        <View style={styles.graphContainer}>
+          {graph.type === 'pie' && (
+            <PieChart
+              data={graph.data.map((item, i) => ({
+                ...item,
+                color: pieColors[i % pieColors.length],
+                gradientCenterColor: pieColors[(i + 1) % pieColors.length],
+                focused: true
+              }))}
+              radius={120}
+              showText
+              textColor="black"
+              textSize={14}
+              textBackground={{
+                color: 'white',
+                opacity: 0.7
+              }}
+              labelPosition="onBorder"
+              showValuesAsLabels={true}
+              showGradient
+              gradientStyle={{
+                position: 'absolute',
+                top: 0,
+                left: 0
+              }}
+            />
+          )}
+          {graph.type === 'bar' && (
+            <BarChart
+              data={graph.data}
+              isAnimated
+              animationDuration={300}
+              barWidth={18}
+              barBorderRadius={3}
+              height={300}
+              width={300}
+              minHeight={1}
+              spacing={20}
+              noOfSections={5}
+              yAxisThickness={0}
+              xAxisThickness={0}
+            />
+          )}
+          {graph.type === 'line' && (
+            <LineChart
+              data={graph.data}
+              height={300}
+              width={300}
+              minHeight={1}
+              spacing={50}
+              noOfSections={5}
+              yAxisThickness={0}
+              xAxisThickness={0}
+              isAnimated
+              animationDuration={7000}
+            />
+          )}
+        </View>
+      </View>
+    ))}
+    
+    <TouchableOpacity 
+      style={styles.addGraphButton}
+      onPress={() => setGraphModalVisible(true)}
+    >
+      <Text style={styles.addGraphButtonText}>+ Add New Graph</Text>
+    </TouchableOpacity>
 
-      </View>
-    </Card>
-    <Card title={"Pie Chart"}>
-      <View style={{ alignItems: "center", padding: 20 }}>
-        <PieChart
-          data={data}
-          radius={80} // Adjust the size of the pie chart
-          showText
-          textColor="black"
-          textSize={10}
-          //donut
-          innerRadius={60} // If you want a donut-style chart
-        //focusOnPress
-        //showGradient
-        //isAnimated={true} // dont work
-        //animationDuration={800} // dont work
-        />
-      </View>
-    </Card>
-    <Card title={"Line Chart"}>
-      <View style={{ padding: 20 }}>
-        <LineChart
-          data={data}
-          barWidth={18}
-          barBorderRadius={30}
-          height={200}
-          width={300}
-          minHeight={1}
-          spacing={50}
-          noOfSections={5}
-          yAxisThickness={0}
-          xAxisThickness={0}
-          isAnimated
-          animationDuration={7000}
-        />
-
-      </View>
-    </Card>
+    <DynamicGraphs
+      visible={isGraphModalVisible}
+      onClose={() => setGraphModalVisible(false)}
+      onAddGraph={handleAddGraph}
+    />
   </View>
-)
+);
 
 const renderGridItem = (post, index) => {
   const isVideo = post.media_type === 'video' || post.image_url?.includes('.mp4');
@@ -466,15 +516,61 @@ return (
 };
 
 const styles = StyleSheet.create({
-  try: {
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: 20,
-    paddingBottom: 20,
-    width: '100%',
-  },
 
+    addGraphButton: {
+      backgroundColor: '#007bff',
+      padding: 15,
+      borderRadius: 10,
+      marginTop: 20,
+      alignItems: 'center',
+      width: '90%',
+    },
+    addGraphButtonText: {
+      color: 'white',
+      fontSize: 16,
+      fontWeight: '600',
+    },
+  
+    try: {
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingTop: 20,
+      paddingBottom: 20,
+      width: '100%',
+    },
+    
+    graphTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: '#333',
+      textAlign: 'center',
+      padding: 15,
+      borderBottomWidth: 1,
+      borderBottomColor: '#eee',
+    },
+
+    graphContainer: {
+      padding: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      height: 350,
+    },
+
+    addGraphButton: {
+      backgroundColor: '#007bff',
+      padding: 15,
+      borderRadius: 10,
+      marginTop: 20,
+      alignItems: 'center',
+      width: '90%',
+    },
+
+    addGraphButtonText: {
+      color: 'white',
+      fontSize: 16,
+      fontWeight: '600',
+    },
   // Video-related styles
   videoContainer: {
     position: 'relative',
