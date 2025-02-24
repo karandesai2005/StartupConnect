@@ -9,6 +9,11 @@ import {
   ActivityIndicator,
   Platform,
   Alert,
+  SafeAreaView,
+  StatusBar,
+  KeyboardAvoidingView,
+  ScrollView,
+  Keyboard,
 } from 'react-native';
 import { Video } from 'expo-av';
 import * as ImagePicker from 'expo-image-picker';
@@ -17,7 +22,6 @@ import { NGROK_URL } from '@env';
 import { useNavigation } from '@react-navigation/native';
 import * as FileSystem from 'expo-file-system';
 
-// Function to get a proper file URI (Fixes Android content:// issue)
 const getFileUri = async (uri) => {
   if (Platform.OS === 'android' && uri.startsWith('content://')) {
     const fileUri = `${FileSystem.cacheDirectory}tempUpload`;
@@ -29,12 +33,22 @@ const getFileUri = async (uri) => {
 
 export default function CreatePostScreen() {
   const [media, setMedia] = useState(null);
-  const [mediaType, setMediaType] = useState(null); // 'image' or 'video'
+  const [mediaType, setMediaType] = useState(null);
   const [caption, setCaption] = useState('');
   const [loading, setLoading] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const navigation = useNavigation();
 
   useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener(
+      'keyboardDidShow',
+      () => setKeyboardVisible(true)
+    );
+    const keyboardDidHideListener = Keyboard.addListener(
+      'keyboardDidHide',
+      () => setKeyboardVisible(false)
+    );
+
     (async () => {
       if (Platform.OS !== 'web') {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -46,6 +60,11 @@ export default function CreatePostScreen() {
         }
       }
     })();
+
+    return () => {
+      keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
+    };
   }, []);
 
   const pickMedia = async () => {
@@ -56,25 +75,17 @@ export default function CreatePostScreen() {
         return;
       }
 
-      console.log('Opening media picker...');
       let result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.All, // Allow images & videos
-        allowsEditing: true,
-        aspect: [4, 3],
+        mediaTypes: ImagePicker.MediaTypeOptions.All,
+        allowsEditing: false,
         quality: 1,
       });
 
-      console.log('Media Picker Result:', JSON.stringify(result, null, 2));
-
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const selectedMedia = result.assets[0];
-        const type = selectedMedia.type; // 'image' or 'video'
-
-        console.log(`Selected media type: ${type}`);
+        const type = selectedMedia.type;
         setMedia(selectedMedia.uri);
         setMediaType(type);
-      } else {
-        console.log('Media selection was canceled');
       }
     } catch (error) {
       console.error('Error picking media:', error);
@@ -97,7 +108,6 @@ export default function CreatePostScreen() {
         return;
       }
 
-      // Fix: Ensure correct file URI handling
       let fileUri = await getFileUri(media);
       let fileType = media.split('.').pop();
       let mimeType = mediaType === 'video' ? `video/${fileType}` : `image/${fileType}`;
@@ -109,8 +119,6 @@ export default function CreatePostScreen() {
         name: `upload.${fileType}`,
         type: mimeType,
       });
-
-      console.log('Uploading formData:', formData._parts);
 
       const response = await fetch(`${NGROK_URL}/api/posts/`, {
         method: 'POST',
@@ -134,84 +142,191 @@ export default function CreatePostScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <TouchableOpacity onPress={pickMedia} style={styles.mediaPicker}>
-        {media ? (
-          mediaType === 'image' ? (
-            <Image source={{ uri: media }} style={styles.media} />
-          ) : (
-            <Video
-              source={{ uri: media }}
-              style={styles.media}
-              useNativeControls
-              resizeMode="contain"
-            />
-          )
-        ) : (
-          <Text>Select an Image or Video</Text>
-        )}
-      </TouchableOpacity>
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" />
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardAvoid}
+      >
+        <ScrollView 
+          contentContainerStyle={styles.scrollContainer}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.container}>
+            <View style={styles.header}>
+              <Text style={styles.headerText}>Create New Post</Text>
+            </View>
 
-      <TextInput
-        style={styles.input}
-        placeholder='Write a caption...'
-        value={caption}
-        onChangeText={(text) => {
-          console.log('Caption updated:', text);
-          setCaption(text);
-        }}
-      />
+            <TouchableOpacity 
+              onPress={pickMedia} 
+              style={[
+                styles.mediaPicker,
+                !media && styles.mediaPickerEmpty
+              ]}
+            >
+              {media ? (
+                mediaType === 'image' ? (
+                  <Image source={{ uri: media }} style={styles.media} />
+                ) : (
+                  <Video
+                    source={{ uri: media }}
+                    style={styles.media}
+                    useNativeControls
+                    resizeMode="contain"
+                  />
+                )
+              ) : (
+                <View style={styles.mediaPickerContent}>
+                  <Text style={styles.uploadIconText}>📁</Text>
+                  <Text style={styles.mediaPickerText}>Tap to select media</Text>
+                  <Text style={styles.mediaPickerSubtext}>Choose an image or video</Text>
+                </View>
+              )}
+            </TouchableOpacity>
 
-      <TouchableOpacity onPress={uploadPost} style={styles.uploadButton}>
-        {loading ? (
-          <ActivityIndicator color='#fff' />
-        ) : (
-          <Text style={styles.uploadText}>Upload</Text>
-        )}
-      </TouchableOpacity>
-    </View>
+            <View style={styles.captionContainer}>
+              <TextInput
+                style={styles.input}
+                placeholder="Write a caption..."
+                placeholderTextColor="#666"
+                value={caption}
+                onChangeText={setCaption}
+                multiline
+                maxLength={2200}
+              />
+              <Text style={styles.characterCount}>
+                {caption.length}/2200
+              </Text>
+            </View>
+          </View>
+        </ScrollView>
+        
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity 
+            onPress={uploadPost} 
+            style={[
+              styles.uploadButton,
+              loading && styles.uploadButtonLoading
+            ]}
+            disabled={loading || !media}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.uploadText}>Share Post</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  keyboardAvoid: {
+    flex: 1,
+  },
+  scrollContainer: {
+    flexGrow: 1,
+  },
   container: {
+    flex: 1,
+    padding: 16,
+    alignItems: 'center', // Center content horizontally
+  },
+  header: {
+    width: '100%',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    marginBottom: 20,
+    alignItems: 'center', // Center header text
+  },
+  headerText: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#000',
+  },
+  mediaPicker: {
+    width: '100%', // Take full width
+    aspectRatio: 1,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 20,
+  },
+  mediaPickerEmpty: {
+    borderWidth: 2,
+    borderColor: '#007bff',
+    borderStyle: 'dashed',
+  },
+  mediaPickerContent: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-    backgroundColor: '#fff',
   },
-  mediaPicker: {
-    width: 300,
-    height: 300,
-    backgroundColor: '#eee',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 10,
-    marginBottom: 20,
+  uploadIconText: {
+    fontSize: 48,
+    marginBottom: 12,
+  },
+  mediaPickerText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#007bff',
+    marginBottom: 8,
+  },
+  mediaPickerSubtext: {
+    fontSize: 14,
+    color: '#666',
   },
   media: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 10,
+    flex: 1,
+    borderRadius: 12,
+  },
+  captionContainer: {
+    width: '100%', // Take full width
+    marginBottom: 20,
   },
   input: {
-    width: '100%',
-    padding: 10,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 5,
-    marginBottom: 10,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    color: '#000',
+    minHeight: 100,
+    textAlignVertical: 'top',
+    width: '100%', // Take full width
+  },
+  characterCount: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'right',
+    marginTop: 8,
+  },
+  buttonContainer: {
+    padding: 16,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
   },
   uploadButton: {
-    backgroundColor: '#1f219c',
-    padding: 15,
-    borderRadius: 5,
+    backgroundColor: '#007bff',
+    padding: 16,
+    borderRadius: 12,
     alignItems: 'center',
-    width: '100%',
+    width: '100%', // Take full width
+  },
+  uploadButtonLoading: {
+    backgroundColor: '#0056b3',
   },
   uploadText: {
     color: '#fff',
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
