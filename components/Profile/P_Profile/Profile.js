@@ -18,10 +18,201 @@ import { NGROK_URL } from '@env';
 import { BarChart, PieChart, LineChart } from 'react-native-gifted-charts';
 import Card from "../../Card";
 import { Video } from 'expo-av';
-// Add near other state declarations
+import Stories from '../../Stories'
+const TeamsContent = React.memo(() => {
+  const data = useMemo(() => [
+    { value: 50, label: 'Jan', frontColor: '#007bff', color: '#007bff' },
+    { value: 80, label: 'Feb', frontColor: '#B0B0B0', color: '#B0B0B0' },
+    { value: 60, label: 'Mar', frontColor: '#505050', color: '#505050' },
+    { value: 90, label: 'Apr', frontColor: '#000000', color: '#000000' },
+  ], []);
+
+  return (
+    <View style={styles.try}>
+      <Card title={"Bar Chart"}>
+        <View style={{ padding: 20 }}>
+          <BarChart
+            data={data}
+            isAnimated
+            animationDuration={300}
+            barWidth={18}
+            barBorderRadius={3}
+            height={200}
+            width={300}
+            minHeight={1}
+            spacing={20}
+            noOfSections={5}
+            yAxisThickness={0}
+            xAxisThickness={0}
+          />
+        </View>
+      </Card>
+      <Card title={"Pie Chart"}>
+        <View style={{ alignItems: "center", padding: 20 }}>
+          <PieChart
+            data={data}
+            radius={80}
+            showText
+            textColor="black"
+            textSize={10}
+            innerRadius={60}
+          />
+        </View>
+      </Card>
+      <Card title={"Line Chart"}>
+        <View style={{ padding: 20 }}>
+          <LineChart
+            data={data}
+            barWidth={18}
+            barBorderRadius={30}
+            height={200}
+            width={300}
+            minHeight={1}
+            spacing={50}
+            noOfSections={5}
+            yAxisThickness={0}
+            xAxisThickness={0}
+            isAnimated
+            animationDuration={7000}
+          />
+        </View>
+      </Card>
+    </View>
+  );
+});
+// Separate components for each tab content
+const StoriesGrid = React.memo(({ userPosts, itemSize, navigation }) => {
+  const renderGridItem = (post, index) => {
+    const isVideo = post.media_type === 'video' || post.image_url?.includes('.mp4');
+
+    return (
+      <TouchableOpacity
+        key={index}
+        style={[styles.gridItem, {
+          width: itemSize,
+          height: itemSize,
+          marginBottom: 2
+        }]}
+        onPress={() => navigation.navigate('PostView', {
+          posts: userPosts,
+          initialIndex: index
+        })}
+      >
+        {isVideo ? (
+          <View style={styles.videoContainer}>
+            <Video
+              source={{ uri: post.image_url }}
+              style={styles.gridImage}
+              resizeMode="cover"
+              shouldPlay={false}
+              isMuted={true}
+              useNativeControls={false}
+            />
+            <View style={styles.playIconContainer}>
+              <Text style={styles.playIcon}>▶</Text>
+            </View>
+          </View>
+        ) : (
+          <Image
+            source={
+              post?.image_url
+                ? { uri: post.image_url }
+                : post?.media_url
+                  ? { uri: post.media_url }
+                  : require('../../../assets/del.png')
+            }
+            style={styles.gridImage}
+            resizeMode="cover"
+          />
+        )}
+      </TouchableOpacity>
+    );
+  };
+
+  return (
+    <View style={styles.gridContainer}>
+      {userPosts.map((post, index) => renderGridItem(post, index))}
+    </View>
+  );
+});
+const ProfileHeader = React.memo(({ userData, lastUpdate, navigation }) => {
+  // Define isBusinessProfile based on userData (modify as per your actual data structure)
+  const isBusinessProfile = userData?.account_type === "business"; 
+
+  const avatarStyle = useMemo(() => ({
+    height: "100%",
+    width: "100%",
+    backgroundColor: "#f0f8ff",
+    borderRadius: isBusinessProfile ? 20 : 48,
+    overflow: "hidden",
+  }), [isBusinessProfile]);
+
+  return (
+    <View style={styles.profile}>
+      <View style={styles.profileSection}>
+        <View style={styles.statsContainer}>
+          <View style={styles.statsItem}>
+            <Text style={styles.statsNumber}>1.2K</Text>
+            <Text style={styles.statsLabel}>Followers</Text>
+          </View>
+        </View>
+
+        <View style={styles.avatarMultiVariants}>
+          <View style={avatarStyle}>
+            <Image
+              source={
+                userData?.profile_picture
+                  ? { uri: `${userData.profile_picture}?timestamp=${lastUpdate}` }
+                  : require('../../../assets/del.png')
+              }
+              style={styles.profileImage}
+              resizeMode="cover"
+              onError={(error) =>
+                console.log("Image load error:", error.nativeEvent.error)
+              }
+            />
+          </View>
+        </View>
+
+        <View style={styles.statsContainer}>
+          <View style={styles.statsItem}>
+            <Text style={styles.statsNumber}>856</Text>
+            <Text style={styles.statsLabel}>Following</Text>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.text}>
+        <View style={styles.id}>
+          <Text style={styles.userName}>{userData?.username || "Chir.a.g"}</Text>
+          <Text style={styles.checkCircleIcon}>✓</Text>
+        </View>
+        <Text style={[styles.about, { textAlign: 'center', paddingHorizontal: 10 }]}>
+          {userData?.bio || "CEO of PITCH. Entrepreneur investor and many more"}
+        </Text>
+      </View>
+
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity
+          style={styles.masterOutlineButton}
+          onPress={() => navigation.navigate('EditProfilePage', { userData })}
+        >
+          <Text style={styles.button}>Edit Profile</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+});
 
 
 const Profile = ({ route, isBusinessProfile = false }) => {
+  const [stories, setStories] = useState([
+    { id: 1, username: "Story 1", hasStory: true, viewed: false },
+    { id: 2, username: "Story 2", hasStory: true, viewed: true },
+    { id: 3, username: "Story 3", hasStory: true, viewed: false },
+    { id: 4, username: "Story 4", hasStory: true, viewed: false },
+    { id: 5, username: "Story 5", hasStory: true, viewed: false },
+  ]);
   const navigation = useNavigation();
   const [userData, setUserData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -29,6 +220,7 @@ const Profile = ({ route, isBusinessProfile = false }) => {
   const [lastUpdate, setLastUpdate] = useState(0);
   const [activeTab, setActiveTab] = useState('stories');
   const [userPosts, setUserPosts] = useState([]);
+  const [isModalVisible, setModalVisible] = useState(false);
 
   // Memoized values
   const screenWidth = Dimensions.get('window').width;
@@ -151,200 +343,157 @@ const Profile = ({ route, isBusinessProfile = false }) => {
     setRefreshing(false);
   }, [fetchUserData, fetchUserPosts]);
 
-// Update useFocusEffect to also fetch posts
-useFocusEffect(
-  useCallback(() => {
-    const shouldFetch = !userData || (Date.now() - lastUpdate > 5000);
-    if (shouldFetch) {
-      setIsLoading(true);
-      fetchUserData();
-      fetchUserPosts(); // Add this line
-    }
-    return () => { };
-  }, [fetchUserData, fetchUserPosts, userData, lastUpdate])
-);
+  // Memoized render functions
+  const renderGridItem = useCallback((post, index) => {
+    const isVideo = post.media_type === 'video' || post.image_url?.includes('.mp4');
 
-const avatarStyle = {
-  height: "100%",
-  width: "100%",
-  backgroundColor: "#f0f8ff",
-  borderRadius: isBusinessProfile ? 20 : 48,
-  overflow: "hidden",
-};
-const del = {
-  height: "100%",
-  width: "100%",
-  backgroundColor: "#f0f8ff",
-  borderRadius: isBusinessProfile ? 20 : 48,
-  overflow: "hidden",
-  marginLeft: 10,
-  marginRight: 10,
-};
+    return (
+      <TouchableOpacity
+        key={index}
+        style={[styles.gridItem, {
+          width: itemSize,
+          height: itemSize,
+          marginBottom: 2
+        }]}
+        onPress={() => navigation.navigate('PostView', {
+          posts: userPosts,
+          initialIndex: index
+        })}
+      >
+        {isVideo ? (
+          <View style={styles.videoContainer}>
+            <Video
+              source={{ uri: post.image_url }}
+              style={styles.gridImage}
+              resizeMode="cover"
+              shouldPlay={false}
+              isMuted={true}
+              useNativeControls={false}
+            />
+            <View style={styles.playIconContainer}>
+              <Text style={styles.playIcon}>▶</Text>
+            </View>
+          </View>
+        ) : (
+          <Image
+            source={
+              post?.image_url
+                ? { uri: post.image_url }
+                : post?.media_url
+                  ? { uri: post.media_url }
+                  : require('../../../assets/del.png')
+            }
+            style={styles.gridImage}
+            resizeMode="cover"
+          />
+        )}
+      </TouchableOpacity>
+    );
+  }, [itemSize, navigation, userPosts]);
 
+  const renderGrid = useCallback(() => (
+    <View style={styles.gridContainer}>
+      {userPosts.map((post, index) => renderGridItem(post, index))}
+    </View>
+  ), [userPosts, renderGridItem]);
+  const handleStoryPress = useCallback((story) => {
+    console.log(`Story ${story.id} pressed`);
+    // Add your story press handling logic here
+  }, []);
 
-
-const renderTab = (tabName, label) => (
-  <TouchableOpacity
-    style={[styles.tabButton, activeTab === tabName ? styles.tab1 : styles.tab2]}
-    onPress={() => setActiveTab(tabName)}
-  >
-    <Text style={activeTab === tabName ? styles.tabs : styles.tabs1}>
-      {label}
-    </Text>
-  </TouchableOpacity>
-);
-
-const data = [
-  { value: 50, label: 'Jan', frontColor: '#007bff', color: '#007bff' },
-  { value: 80, label: 'Feb', frontColor: '#B0B0B0', color: '#B0B0B0' },
-  { value: 60, label: 'Mar', frontColor: '#505050', color: '#505050' },
-  { value: 90, label: 'Apr', frontColor: '#000000', color: '#000000' },
-];
-
-const renderTry = () => (
-  <View style={styles.try}>
-    <Card title={"Bar Chart"}>
-      <View style={{ padding: 20 }}>
-        <BarChart
-          data={data}
-          isAnimated
-          animationDuration={300}
-          barWidth={18}
-          barBorderRadius={3}
-          height={200}
-          width={300}
-          minHeight={1}
-          spacing={20}
-          noOfSections={5}
-          yAxisThickness={0}
-          xAxisThickness={0}
-        />
-
-      </View>
-    </Card>
-    <Card title={"Pie Chart"}>
-      <View style={{ alignItems: "center", padding: 20 }}>
-        <PieChart
-          data={data}
-          radius={80} // Adjust the size of the pie chart
-          showText
-          textColor="black"
-          textSize={10}
-          //donut
-          innerRadius={60} // If you want a donut-style chart
-        //focusOnPress
-        //showGradient
-        //isAnimated={true} // dont work
-        //animationDuration={800} // dont work
-        />
-      </View>
-    </Card>
-    <Card title={"Line Chart"}>
-      <View style={{ padding: 20 }}>
-        <LineChart
-          data={data}
-          barWidth={18}
-          barBorderRadius={30}
-          height={200}
-          width={300}
-          minHeight={1}
-          spacing={50}
-          noOfSections={5}
-          yAxisThickness={0}
-          xAxisThickness={0}
-          isAnimated
-          animationDuration={7000}
-        />
-
-      </View>
-    </Card>
-  </View>
-)
+  const renderTry = useCallback(() => (
+    <View style={styles.try}>
+      <Card title={"Bar Chart"}>
+        <View style={{ padding: 20 }}>
+          <BarChart
+            data={data}
+            isAnimated
+            animationDuration={300}
+            barWidth={18}
+            barBorderRadius={3}
+            height={200}
+            width={300}
+            minHeight={1}
+            spacing={20}
+            noOfSections={5}
+            yAxisThickness={0}
+            xAxisThickness={0}
+          />
+        </View>
+      </Card>
+      <Card title={"Pie Chart"}>
+        <View style={{ alignItems: "center", padding: 20 }}>
+          <PieChart
+            data={data}
+            radius={80}
+            showText
+            textColor="black"
+            textSize={10}
+            innerRadius={60}
+          />
+        </View>
+      </Card>
+      <Card title={"Line Chart"}>
+        <View style={{ padding: 20 }}>
+          <LineChart
+            data={data}
+            barWidth={18}
+            barBorderRadius={30}
+            height={200}
+            width={300}
+            minHeight={1}
+            spacing={50}
+            noOfSections={5}
+            yAxisThickness={0}
+            xAxisThickness={0}
+            isAnimated
+            animationDuration={7000}
+          />
+        </View>
+      </Card>
+    </View>
+  ), [data]);
 
   const renderTab = useCallback((tabName, label) => (
     <TouchableOpacity
-      key={index}
-      style={[styles.gridItem, { 
-        width: itemSize, 
-        height: itemSize,
-        marginBottom: 2
-      }]}
-      onPress={() => navigation.navigate('PostView', {
-        posts: userPosts,
-        initialIndex: index
-      })}
+      style={[styles.tabButton, activeTab === tabName ? styles.tab1 : styles.tab2]}
+      onPress={() => setActiveTab(tabName)}
     >
-      {isVideo ? (
-        <View style={styles.videoContainer}>
-          <Video
-            source={{ uri: post.image_url }}
-            style={styles.gridImage}
-            resizeMode="cover"
-            shouldPlay={false}
-            isMuted={true}
-            useNativeControls={false}
-          />
-          <View style={styles.playIconContainer}>
-            <Text style={styles.playIcon}>▶</Text>
-          </View>
-        </View>
-      ) : (
-        <Image
-          source={
-            post?.image_url 
-              ? { uri: post.image_url }
-              : post?.media_url
-                ? { uri: post.media_url }
-                : require('../../../assets/del.png')
-          }
-          style={styles.gridImage}
-          resizeMode="cover"
-        />
-      )}
+      <Text style={activeTab === tabName ? styles.tabs : styles.tabs1}>
+        {label}
+      </Text>
     </TouchableOpacity>
-  );
-};
-const renderStories = () => (
-  <Card title="Milestones and others" style={[styles.storiesCard, { width: '100%' }]}>
-    <ScrollView 
-      horizontal 
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.storiesContainer}
-    >
-      {stories.map((story) => (
-        <TouchableOpacity
-          key={story.id}
-          onPress={() => {
-            console.log(`Story ${story.id} pressed`);
-          }}
-          style={styles.storyItem}
-        >
-          <View style={[
-            styles.storyRing,
-            { borderColor: story.viewed ? '#8e8e8e' : '#007bff' }
-          ]}>
-            <View style={styles.storyImageContainer}>
-              <Image
-                source={require('../../../assets/del.png')}
-                style={styles.storyImage}
-                resizeMode="cover"
-              />
-            </View>
-          </View>
-          <Text style={styles.storyUsername} numberOfLines={1}>
-            {story.username}
-          </Text>
-        </TouchableOpacity>
-      ))}
-    </ScrollView>
-  </Card>
-);
+  ), [activeTab]);
 
-const renderGrid = () => (
-  <View style={styles.gridContainer}>
-    {userPosts.map((post, index) => renderGridItem(post, index))}
-  </View>
-);
+  // Effects
+  useEffect(() => {
+    if (route.params?.updatedUser) {
+      console.log("Received updated user data:", route.params.updatedUser);
+      setUserData(prevData => ({
+        ...prevData,
+        ...route.params.updatedUser,
+        profile_picture: route.params.updatedUser.profile_picture,
+        bio: route.params.updatedUser.bio
+      }));
+      setLastUpdate(Date.now());
+
+      if (route.params.forceRefresh) {
+        fetchUserData();
+      }
+    }
+  }, [route.params?.updatedUser, fetchUserData]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const shouldFetch = !userData || (Date.now() - lastUpdate > 5000);
+      if (shouldFetch) {
+        setIsLoading(true);
+        fetchUserData();
+        fetchUserPosts();
+      }
+      return () => { };
+    }, [fetchUserData, fetchUserPosts, userData, lastUpdate])
+  );
 
   if (isLoading) {
     return (
@@ -372,144 +521,54 @@ const renderGrid = () => (
           <Text style={styles.backButtonText}>←</Text>
         </TouchableOpacity>
 
-      <View style={styles.profile}>
-        <View style={styles.profileSection}>
-          <View style={styles.statsContainer}>
-            <View style={styles.statsItem}>
-              <Text style={styles.statsNumber}>1.2K</Text>
-              <Text style={styles.statsLabel}>Followers</Text>
-            </View>
-          </View>
+        <ProfileHeader
+          userData={userData}
+          lastUpdate={lastUpdate}
+          navigation={navigation}
+          isBusinessProfile={isBusinessProfile}
 
-          <View style={styles.avatarMultiVariants}>
-  <View style={avatarStyle}>
-    <Image
-      source={
-        userData?.profile_picture
-          ? { uri: `${userData.profile_picture}?timestamp=${lastUpdate}` } // Corrected string interpolation
-          : require('../../../assets/del.png')
-      }
-      style={styles.profileImage}
-      resizeMode="cover"
-      onError={(error) =>
-        console.log("Image load error:", error.nativeEvent.error)
-      }
-    />
-  </View>
-</View>
+        />
 
+        <Stories stories={stories} onStoryPress={handleStoryPress} />
 
-          <View style={styles.statsContainer}>
-            <View style={styles.statsItem}>
-              <Text style={styles.statsNumber}>856</Text>
-              <Text style={styles.statsLabel}>Following</Text>
-            </View>
-          </View>
+        <View style={styles.tab}>
+          {renderTab("stories", isBusinessProfile ? "The Startup" : "The Stories")}
+          {renderTab("startups", "The Teams")}
+          {renderTab("bucks", "The Bucks")}
         </View>
 
-        <View style={styles.text}>
-          <View style={styles.id}>
-            <Text style={styles.userName}>{userData?.username || "Chir.a.g"}</Text>
-            <Text style={styles.checkCircleIcon}>✓</Text>
-          </View>
-          <Text style={[styles.about, { textAlign: 'center', paddingHorizontal: 10 }]}>
-            {userData?.bio || "CEO of PITCH. Entrepreneur investor and many more"}
-          </Text>
-        </View>
+        {activeTab === 'stories' && renderGrid()}
+        {activeTab === 'startups' && renderTry()}
+      </ScrollView>
 
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity
-            style={styles.masterOutlineButton}
-            onPress={() => navigation.navigate('EditProfilePage', { userData })}
-          >
-            <Text style={styles.button}>Edit Profile</Text>
-          </TouchableOpacity>
-        </View>
+      <View style={styles.bottomNav}>
+        <TouchableOpacity onPress={() => navigation.navigate('Home')}>
+          <Image source={require('../../../assets/home4.webp')} style={styles.navIcon} />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => navigation.navigate('CreatePost')}>
+          <Image source={require('../../../assets/plus3.png')} style={styles.navIcon} />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => navigation.navigate('Notifications')}>
+          <Image source={require('../../../assets/bell.png')} style={styles.navIcon} />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+          <Image source={require('../../../assets/settings.png')} style={styles.navIcon} />
+        </TouchableOpacity>
       </View>
-      {renderStories()} {/* Add curly braces here */}
-      <View style={styles.tab}>
-        {renderTab("stories", isBusinessProfile ? "The Startup" : "The Stories")}
-        {renderTab("startups", "The Teams")}
-        {renderTab("bucks", "The Bucks")}
-      </View>
-
-      {activeTab === 'stories' && renderGrid()}
-      {activeTab === 'startups' && renderTry()}
-    </ScrollView>
-    <View style={styles.bottomNav}>
-      <TouchableOpacity onPress={() => navigation.navigate('Home')}>
-        <Image source={require('../../../assets/home4.webp')} style={styles.navIcon} />
-      </TouchableOpacity>
-      <TouchableOpacity onPress={() => navigation.navigate('CreatePost')}>
-        <Image source={require('../../../assets/plus3.png')} style={styles.navIcon} />
-      </TouchableOpacity>
-      <TouchableOpacity onPress={() => navigation.navigate('Notifications')}>
-        <Image source={require('../../../assets/bell.png')} style={styles.navIcon} />
-      </TouchableOpacity>
-      <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-        <Image source={require('../../../assets/settings.png')} style={styles.navIcon} />
-      </TouchableOpacity>
     </View>
-  </View>
-);
+  );
 };
 
 const styles = StyleSheet.create({
+  try: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 20,
+    paddingBottom: 20,
+    width: '100%',
+  },
 
-    addGraphButton: {
-      backgroundColor: '#007bff',
-      padding: 15,
-      borderRadius: 10,
-      marginTop: 20,
-      alignItems: 'center',
-      width: '90%',
-    },
-    addGraphButtonText: {
-      color: 'white',
-      fontSize: 16,
-      fontWeight: '600',
-    },
-  
-    try: {
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingTop: 20,
-      paddingBottom: 20,
-      width: '100%',
-    },
-    
-    graphTitle: {
-      fontSize: 18,
-      fontWeight: '600',
-      color: '#333',
-      textAlign: 'center',
-      padding: 15,
-      borderBottomWidth: 1,
-      borderBottomColor: '#eee',
-    },
-
-    graphContainer: {
-      padding: 20,
-      alignItems: 'center',
-      justifyContent: 'center',
-      height: 350,
-    },
-
-    addGraphButton: {
-      backgroundColor: '#007bff',
-      padding: 15,
-      borderRadius: 10,
-      marginTop: 20,
-      alignItems: 'center',
-      width: '90%',
-    },
-
-    addGraphButtonText: {
-      color: 'white',
-      fontSize: 16,
-      fontWeight: '600',
-    },
   // Video-related styles
   videoContainer: {
     position: 'relative',
@@ -788,6 +847,52 @@ const styles = StyleSheet.create({
     ...(Platform.OS === 'android' && {
       tintColor: undefined
     })
+  },
+  // Add to your existing StyleSheet
+  storiesCard: {
+    marginTop: 20,
+    marginBottom: 10,
+    width: '100%',
+    alignSelf: 'center',
+  },
+  storiesContainer: {
+    padding: 10,
+    gap: 12,
+    flexDirection: 'row',
+    justifyContent: 'center', // Center stories horizontally
+    alignItems: 'center', // Center stories vertically
+  },
+  storyItem: {
+    alignItems: 'center',
+    width: 72,
+    marginHorizontal: 6, // Add some horizontal spacing between stories
+  },
+  storyRing: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    borderWidth: 2,
+    padding: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  storyImageContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    overflow: 'hidden',
+    backgroundColor: '#f0f0f0',
+  },
+  storyImage: {
+    width: '100%',
+    height: '100%',
+  },
+  storyUsername: {
+    marginTop: 4,
+    fontSize: 12,
+    textAlign: 'center',
+    color: '#666',
+    fontFamily: "AvenirNextCyr",
   },
 
 });
