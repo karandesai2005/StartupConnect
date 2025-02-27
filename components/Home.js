@@ -12,6 +12,7 @@ import {
   Dimensions,
   RefreshControl,
   Animated,
+  ScrollView,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import axios from 'axios';
@@ -20,27 +21,24 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NGROK_URL } from '@env';
 import { Video } from 'expo-av';
 import { debounce } from 'lodash';
+import Modal from 'react-native-modal';
+
 const { width } = Dimensions.get('window');
+
 const formatTimestamp = (timestamp) => {
   if (!timestamp) return 'Just now';
-
   const now = new Date();
   const postDate = new Date(timestamp);
   const diffInMinutes = Math.floor((now - postDate) / (1000 * 60));
-
   if (diffInMinutes < 1) return 'Just now';
   if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
-
   const diffInHours = Math.floor(diffInMinutes / 60);
   if (diffInHours < 24) return `${diffInHours}h ago`;
-
   const diffInDays = Math.floor(diffInHours / 24);
   if (diffInDays < 7) return `${diffInDays}d ago`;
-
   return postDate.toLocaleDateString();
 };
 
-// Memoized Post Card Component
 // Memoized Post Card Component
 const PostCard = memo(({ item, index, toggleExpand, expandedItems }) => {
   const [imageHeight, setImageHeight] = useState(width);
@@ -52,34 +50,26 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems }) => {
   const [isPaused, setIsPaused] = useState(true);
   const videoRef = React.useRef(null);
   const [isLikeLoading, setIsLikeLoading] = useState(false);
-  const debouncedHandleLike = useCallback(
-    debounce(async () => {
-      handleLike();
-    }, 300),
-    [handleLike]
-  );
+  const debouncedHandleLike = useCallback(debounce(async () => handleLike(), 300), [handleLike]);
   const isUserPost = item.hasOwnProperty('caption') || item.hasOwnProperty('content');
+
   useEffect(() => {
     fetchLikeStatus();
   }, [item.post_id]);
 
   useEffect(() => {
-    // Check if media is video by looking at URL extension
     const mediaUrl = item.image_url || item.media_url;
-
     if (typeof mediaUrl === 'string') {
       if (mediaUrl.match(/\.(mp4|mov|avi|wmv|3gp|mkv)$/i)) {
         setIsVideo(true);
-        setImageHeight(width * 5 / 4); // 16:9 aspect ratio for videos
+        setImageHeight(width * 5 / 4);
         setIsLoading(false);
       } else if (mediaUrl.startsWith('http')) {
-        // Handle images as before
         Image.getSize(
           mediaUrl,
           (originalWidth, originalHeight) => {
             const aspectRatio = originalWidth / originalHeight;
-            const calculatedHeight = width / aspectRatio;
-            setImageHeight(width * 5 / 4);
+            setImageHeight(width / aspectRatio);
             setIsLoading(false);
           },
           (error) => {
@@ -92,7 +82,6 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems }) => {
         setIsLoading(false);
       }
     } else {
-      // Default fallback image
       setIsLoading(false);
     }
   }, [item]);
@@ -101,42 +90,27 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems }) => {
     if (isVideo) {
       setIsPaused(!isPaused);
       if (videoRef.current) {
-        if (isPaused) {
-          videoRef.current.playAsync();
-        } else {
-          videoRef.current.pauseAsync();
-        }
+        isPaused ? videoRef.current.playAsync() : videoRef.current.pauseAsync();
       }
     }
     handlePressIn();
   };
 
   const handlePressIn = () => {
-    Animated.spring(animatedScale, {
-      toValue: 0.98,
-      useNativeDriver: true,
-    }).start();
+    Animated.spring(animatedScale, { toValue: 0.98, useNativeDriver: true }).start();
   };
 
   const handlePressOut = () => {
-    Animated.spring(animatedScale, {
-      toValue: 1,
-      useNativeDriver: true,
-    }).start();
+    Animated.spring(animatedScale, { toValue: 1, useNativeDriver: true }).start();
   };
 
   const fetchLikeStatus = async () => {
     try {
       const token = await AsyncStorage.getItem("token");
       if (!token || !item.post_id) return;
-
-      const response = await axios.get(
-        `${NGROK_URL}/api/posts/${item.post_id}/likes`,
-        {
-          headers: { Authorization: `Bearer ${token}` }
-        }
-      );
-
+      const response = await axios.get(`${NGROK_URL}/api/posts/${item.post_id}/likes`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       if (response.data) {
         setIsLiked(response.data.isLiked === 1);
         setLikeCount(response.data.likeCount);
@@ -150,46 +124,36 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems }) => {
     try {
       const token = await AsyncStorage.getItem("token");
       if (!token || !item.post_id) return;
-      setIsLikeLoading(true);  // Add this
-
-
-      // Optimistic update
+      setIsLikeLoading(true);
       setIsLiked(prev => !prev);
       setLikeCount(prev => isLiked ? prev - 1 : prev + 1);
-
       const response = await axios.post(
         `${NGROK_URL}/api/posts/${item.post_id}/toggle-like`,
         {},
-        {
-          headers: { Authorization: `Bearer ${token}` }
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
-
-      // Update with actual server response
       if (response.data) {
         setIsLiked(response.data.liked === 1);
         setLikeCount(response.data.likeCount);
       }
     } catch (error) {
-      // Revert optimistic update on error
       console.error('Error updating like:', error);
       setIsLiked(prev => !prev);
       setLikeCount(prev => isLiked ? prev + 1 : prev - 1);
     } finally {
-      setIsLikeLoading(false);  // Add this
+      setIsLikeLoading(false);
     }
   };
 
   return (
     <Animated.View style={[styles.card, { transform: [{ scale: animatedScale }] }]}>
-      {/* User Info Header */}
       <View style={styles.cardHeader}>
         <View style={styles.userInfo}>
           <Image
             source={
               typeof item.profile_picture === 'string' && item.profile_picture.startsWith('http')
                 ? { uri: item.profile_picture }
-                : require('../assets/del.png')  // Fallback avatar
+                : require('../assets/del.png')
             }
             style={styles.avatar}
           />
@@ -202,25 +166,18 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems }) => {
           <Text style={styles.moreButtonText}>•••</Text>
         </TouchableOpacity>
       </View>
-
-      {/* Post Media (Image or Video) */}
-      <TouchableOpacity
-        activeOpacity={0.95}
-        onPressIn={handleMediaPress}
-        onPressOut={handlePressOut}
-      >
+      <TouchableOpacity activeOpacity={0.95} onPressIn={handleMediaPress} onPressOut={handlePressOut}>
         <View style={[styles.imageContainer, { height: imageHeight }]}>
           {isLoading && (
             <View style={styles.imageLoader}>
               <ActivityIndicator size="large" color="#007AFF" />
             </View>
           )}
-
           {isVideo ? (
             <Video
               ref={videoRef}
               source={{ uri: item.image_url || item.media_url }}
-              style={[styles.video, { height: imageHeight }]}  // Changed here
+              style={[styles.video, { height: imageHeight }]}
               resizeMode="cover"
               shouldPlay={!isPaused}
               isLooping={true}
@@ -232,7 +189,6 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems }) => {
               }}
               useNativeControls={false}
             />
-
           ) : (
             <Image
               source={
@@ -240,52 +196,30 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems }) => {
                   ? { uri: item.image_url }
                   : typeof item.media_url === 'string' && item.media_url.startsWith('http')
                     ? { uri: item.media_url }
-                    : require('../assets/PITCH.png')  // Fallback image
+                    : require('../assets/PITCH.png')
               }
-              style={[styles.postImage, { height: imageHeight }]}  // Changed here
+              style={[styles.postImage, { height: imageHeight }]}
               onLoad={() => setIsLoading(false)}
             />
           )}
-
-          {/* Play button overlay for videos */}
           {isVideo && isPaused && (
             <View style={styles.playButtonOverlay}>
-              <Image
-                source={require('../assets/play-button.png')}
-                style={styles.playButton}
-              />
+              <Image source={require('../assets/play-button.png')} style={styles.playButton} />
             </View>
           )}
         </View>
       </TouchableOpacity>
-
-      {/* Engagement Section */}
       <View style={styles.cardFooter}>
         <Text style={styles.likes}>👍 {likeCount} Likes</Text>
         <Text style={styles.comments}>💬 {item.comments || 0} Comments</Text>
       </View>
       <View style={styles.actions}>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={debouncedHandleLike}
-          activeOpacity={0.7}
-          disabled={isLikeLoading}
-        >
+        <TouchableOpacity style={styles.actionButton} onPress={debouncedHandleLike} activeOpacity={0.7} disabled={isLikeLoading}>
           <Image
             source={require('../assets/icon-like.png')}
-            style={[
-              styles.navIcon,
-              isLiked && { tintColor: '#1f219c' },
-              isLikeLoading && { opacity: 0.5 }  // Add this
-            ]}
+            style={[styles.navIcon, isLiked && { tintColor: '#1f219c' }, isLikeLoading && { opacity: 0.5 }]}
           />
-          {isLikeLoading && (  // Add this
-            <ActivityIndicator
-              size="small"
-              color="#1f219c"
-              style={styles.likeLoader}
-            />
-          )}
+          {isLikeLoading && <ActivityIndicator size="small" color="#1f219c" style={styles.likeLoader} />}
         </TouchableOpacity>
         <TouchableOpacity style={styles.actionButton}>
           <Image source={require('../assets/comment6.png')} style={styles.navIcon} />
@@ -297,13 +231,8 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems }) => {
           <Image source={require('../assets/save.png')} style={styles.navIcon} />
         </TouchableOpacity>
       </View>
-
-      {/* Caption */}
       <View style={styles.captionContainer}>
-        <Text
-          style={styles.caption}
-          numberOfLines={expandedItems[index] ? undefined : 2}
-        >
+        <Text style={styles.caption} numberOfLines={expandedItems[index] ? undefined : 2}>
           <Text style={styles.username}>
             {isUserPost ? item.username : (item.name ? item.name.first : 'User')}{' '}
           </Text>
@@ -311,18 +240,17 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems }) => {
         </Text>
         {(item.content || item.caption) && (
           <TouchableOpacity onPress={() => toggleExpand(index)}>
-            <Text style={styles.showMoreText}>
-              {expandedItems[index] ? 'Show less' : 'Show more'}
-            </Text>
+            <Text style={styles.showMoreText}>{expandedItems[index] ? 'Show less' : 'Show more'}</Text>
           </TouchableOpacity>
         )}
       </View>
     </Animated.View>
   );
 });
+
 export default function HomeScreen() {
-  const [users, setUsers] = useState([]);  // To store random users
-  const [myPosts, setMyPosts] = useState([]);  // To store user posts
+  const [users, setUsers] = useState([]);
+  const [myPosts, setMyPosts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -330,25 +258,26 @@ export default function HomeScreen() {
   const [userData, setUserData] = useState(null);
   const navigation = useNavigation();
   const [postsError, setPostsError] = useState(null);
+  const [isFieldsModalVisible, setFieldsModalVisible] = useState(false);
+  const [selectedFields, setSelectedFields] = useState([]);
+
+  const FIELDS = [
+    "Tech", "AI", "Sustainability", "Finance", "Health", "Education",
+    "Gaming", "Robotics", "Marketing", "Blockchain", "Design", "Data Science"
+  ];
 
   const combinedData = useMemo(() => {
     const validPosts = myPosts.filter(post =>
       post && (post.image_url || post.media_url) &&
       !String(post.image_url || post.media_url).includes('undefined')
     );
-    const mergedData = [...validPosts, ...users];
-    return mergedData;
+    return [...validPosts, ...users];
   }, [myPosts, users]);
 
-
-
-  // Load posts (random users and user posts)
   const loadUsers = useCallback(async (refresh = false) => {
     try {
       setLoading(true);
-      const response = await axios.get(
-        `https://randomuser.me/api?results=10&page=${currentPage}`
-      );
+      const response = await axios.get(`https://randomuser.me/api?results=10&page=${currentPage}`);
       if (refresh) {
         setUsers(response.data.results);
       } else {
@@ -362,41 +291,32 @@ export default function HomeScreen() {
     }
   }, [currentPage]);
 
-  // Fetch the user's posts (simulate or fetch real posts)
-
   const fetchAllPosts = useCallback(async () => {
     try {
       setPostsError(null);
       const token = await AsyncStorage.getItem("token");
-
-      const response = await axios.get(
-        `${NGROK_URL}/api/posts/all`,
-        {
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`
-          }
+      const response = await axios.get(`${NGROK_URL}/api/posts/all`, {
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
         }
-      );
-
+      });
       if (response.data && Array.isArray(response.data)) {
         const mappedPosts = response.data.map(post => ({
           _id: post.post_id,
-          post_id: post.post_id, // Added for like functionality
+          post_id: post.post_id,
           username: post.username,
           profile_picture: post.profile_picture,
           image_url: post.media_url,
           content: post.content,
           created_at: post.created_at,
-          likes: post.like_count || 0, // Updated to use backend like count
+          likes: post.like_count || 0,
           comments: 0,
           caption: post.content
         }));
-
         const sortedPosts = mappedPosts
           .filter(post => post.image_url && !post.image_url.includes('undefined'))
           .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-
         setMyPosts(sortedPosts);
       }
     } catch (error) {
@@ -407,7 +327,7 @@ export default function HomeScreen() {
 
   useEffect(() => {
     loadUsers();
-    fetchAllPosts();  // Fetch the user's posts
+    fetchAllPosts();
   }, [currentPage]);
 
   const onRefresh = useCallback(() => {
@@ -415,15 +335,11 @@ export default function HomeScreen() {
     setRefreshing(true);
     setCurrentPage(1);
     loadUsers(true);
-    fetchAllPosts(); // ✅ Ensure user posts refresh too
+    fetchAllPosts();
   }, []);
 
-
   const toggleExpand = useCallback((index) => {
-    setExpandedItems(prev => ({
-      ...prev,
-      [index]: !prev[index],
-    }));
+    setExpandedItems(prev => ({ ...prev, [index]: !prev[index] }));
   }, []);
 
   const renderFooter = () => loading && (
@@ -436,7 +352,6 @@ export default function HomeScreen() {
     try {
       const token = await AsyncStorage.getItem("token");
       if (!token) return;
-
       const response = await fetch(`${NGROK_URL}/api/auth/profile`, {
         method: "GET",
         headers: {
@@ -444,7 +359,6 @@ export default function HomeScreen() {
           "Content-Type": "application/json"
         },
       });
-
       if (response.ok) {
         const data = await response.json();
         setUserData(data);
@@ -458,32 +372,39 @@ export default function HomeScreen() {
     fetchUserData();
   }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchUserData();
-    }, [fetchUserData])
-  );
+  useFocusEffect(useCallback(() => {
+    fetchUserData();
+  }, [fetchUserData]));
+
   const keyExtractor = useCallback((item, index) => {
-    // For user posts
-    if (item.post_id) {
-      return `post-${item.post_id}`;
-    }
-    // For random users
-    if (item.login?.uuid) {
-      return `user-${item.login.uuid}`;
-    }
-    // Fallback using just the index
+    if (item.post_id) return `post-${item.post_id}`;
+    if (item.login?.uuid) return `user-${item.login.uuid}`;
     return `item-${index}`;
   }, []);
-  // console.log("My Posts:", JSON.stringify(myPosts, null, 2));
-  // console.log("Combined Data:", JSON.stringify(combinedData, null, 2));
 
+  const toggleField = (field) => {
+    setSelectedFields(current =>
+      current.includes(field)
+        ? current.filter(item => item !== field)
+        : [...current, field]
+    );
+  };
+
+  const renderFieldBubble = ({ item }) => (
+    <TouchableOpacity
+      style={[
+        styles.fieldBubble,
+        selectedFields.includes(item) && styles.selectedFieldBubble
+      ]}
+      onPress={() => toggleField(item)}
+    >
+      <Text style={styles.fieldBubbleText}>{item}</Text>
+    </TouchableOpacity>
+  );
 
   return (
     <View style={styles.container}>
       <View style={styles.statusBarBackground} />
-
-      {/* Top Bar */}
       <View style={styles.topBar}>
         <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
           <Image
@@ -503,9 +424,11 @@ export default function HomeScreen() {
         <TouchableOpacity onPress={() => navigation.navigate('ChatList')}>
           <Image source={require('../assets/Arrow.png')} style={styles.chatIcon} />
         </TouchableOpacity>
+        <TouchableOpacity onPress={() => setFieldsModalVisible(true)}>
+          <Image source={require('../assets/film.png')} style={styles.filterIcon} />
+        </TouchableOpacity>
       </View>
 
-      {/* Post List */}
       <FlatList
         data={combinedData}
         extraData={combinedData}
@@ -521,18 +444,11 @@ export default function HomeScreen() {
         onEndReached={() => setCurrentPage(prev => prev + 1)}
         onEndReachedThreshold={0.5}
         ListFooterComponent={renderFooter}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-          />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.listContentContainer}
       />
 
-
-      {/* Bottom Navigation */}
       <View style={styles.bottomNav}>
         <TouchableOpacity onPress={() => navigation.navigate('Home')}>
           <Image source={require('../assets/film.png')} style={styles.navIcon} />
@@ -547,7 +463,38 @@ export default function HomeScreen() {
           <Image source={require('../assets/settings.png')} style={styles.navIcon} />
         </TouchableOpacity>
       </View>
-    </View >
+
+      {/* Fields Modal */}
+      <Modal
+        isVisible={isFieldsModalVisible}
+        onBackdropPress={() => setFieldsModalVisible(false)}
+        style={styles.modal}
+      >
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>Select Fields</Text>
+          <ScrollView contentContainerStyle={styles.fieldsContainer}>
+            {FIELDS.map((field) => (
+              <TouchableOpacity
+                key={field}
+                style={[
+                  styles.fieldBubble,
+                  selectedFields.includes(field) && styles.selectedFieldBubble
+                ]}
+                onPress={() => toggleField(field)}
+              >
+                <Text style={styles.fieldBubbleText}>{field}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          <TouchableOpacity
+            style={styles.closeButton}
+            onPress={() => setFieldsModalVisible(false)}
+          >
+            <Text style={styles.closeButtonText}>Close</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
+    </View>
   );
 }
 
@@ -570,10 +517,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#E9ECEF',
-    marginTop: Platform.select({
-      ios: -55,
-      android: null
-    })
+    marginTop: Platform.select({ ios: -55, android: null })
   },
   profilePic: {
     width: 40,
@@ -581,7 +525,7 @@ const styles = StyleSheet.create({
     borderRadius: 20
   },
   searchBar: {
-    width: '60%',
+    width: '55%', // Adjusted to fit new button
     marginHorizontal: 10,
     paddingHorizontal: 15,
     backgroundColor: '#eee',
@@ -589,6 +533,10 @@ const styles = StyleSheet.create({
     height: 40,
   },
   chatIcon: {
+    width: 24,
+    height: 24
+  },
+  filterIcon: {
     width: 24,
     height: 24
   },
@@ -684,12 +632,7 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     marginBottom: 4,
-    ...(Platform.OS === 'android' && {
-      tintColor: undefined
-    })
-  },
-  likedIcon: {
-    tintColor: '##3033ff', // Remove this if your red icon is already red
+    ...(Platform.OS === 'android' && { tintColor: undefined })
   },
   captionContainer: {
     paddingHorizontal: 12,
@@ -749,9 +692,59 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: '50%',
     left: '50%',
-    transform: [
-      { translateX: -12 },
-      { translateY: -12 }
-    ]
+    transform: [{ translateX: -12 }, { translateY: -12 }]
+  },
+  modal: {
+    justifyContent: 'center',
+    margin: 0,
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    padding: 20,
+    borderRadius: 15,
+    alignItems: 'center',
+    marginHorizontal: 20,
+    maxHeight: '80%',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 20,
+  },
+  fieldsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    paddingBottom: 20,
+  },
+  fieldBubble: {
+    margin: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    backgroundColor: '#d9d9d9',
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectedFieldBubble: {
+    backgroundColor: '#4CAF50',
+  },
+  fieldBubbleText: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#000',
+  },
+  closeButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderWidth: 1,
+    borderColor: '#007bff',
+    borderRadius: 8,
+  },
+  closeButtonText: {
+    fontSize: 16,
+    color: '#007bff',
+    fontWeight: '600',
   },
 });
