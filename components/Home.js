@@ -459,7 +459,7 @@ export default function HomeScreen() {
         <TouchableOpacity onPress={() => navigation.navigate('Reel')}>
           <Image source={require('../assets/bell.png')} style={styles.navIcon} />
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+        <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
           <Image source={require('../assets/settings.png')} style={styles.navIcon} />
         </TouchableOpacity>
       </View>
