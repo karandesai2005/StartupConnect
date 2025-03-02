@@ -326,6 +326,27 @@ const Profile = ({ route, isBusinessProfile = false }) => {
     </View>
   );
 
+  const renderVenturesContent = () => (
+    <View style={styles.venturesContainer}>
+      <Card 
+        title="Featured Achievement" 
+        style={{ width: '90%', marginBottom: 20 }}
+      >
+        <View style={styles.cardContent}>
+          <Text style={styles.cardHeader}>Top Venture Milestone</Text>
+          <Text style={styles.cardParagraph}>
+            This is a significant milestone in our venture journey, showcasing our success and dedication to innovation and growth in the entrepreneurial space.
+          </Text>
+          <Image
+            source={require('../../../assets/ok.png')} // Replace with your certificate image path
+            style={styles.certificateImage}
+            resizeMode="contain"
+          />
+        </View>
+      </Card>
+    </View>
+  );
+
   if (isLoading) {
     return (
       <View style={styles.container}>
@@ -419,6 +440,7 @@ const Profile = ({ route, isBusinessProfile = false }) => {
             <View style={styles.storiesWrapper}>
               <Stories stories={myStories} onStoryPress={handleStoryPress} title="Investments" />
             </View>
+            {renderVenturesContent()}
           </View>
         )}
         {activeTab === 'startups' && renderTry()}
@@ -546,7 +568,7 @@ const styles = StyleSheet.create({
     width: "100%",
     backgroundColor: "#fff",
     alignItems: "center",
-    padding: 14,
+    padding: 0,
     gap: 14,
     marginTop: 30,
   },
@@ -555,7 +577,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     width: '100%',
-    paddingHorizontal: 20,
+    paddingHorizontal: 40,
+    paddingTop: 20,
   },
   avatarMultiVariants: {
     width: 96,
@@ -723,6 +746,33 @@ const styles = StyleSheet.create({
     marginTop: 10,
     padding: 10,
     alignSelf: 'center',
+  },
+  venturesContainer: {
+    width: '100%',
+    alignItems: 'center',
+    marginTop: 20,
+    padding: 10,
+  },
+  cardContent: {
+    padding: 15,
+    gap: 0,
+  },
+  cardHeader: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#333',
+    fontFamily: "AvenirNextCyr",
+  },
+  cardParagraph: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#666',
+    fontFamily: "AvenirNextCyr",
+  },
+  certificateImage: {
+    width: '100%',
+    height: 400, // Adjusted for a certificate-like 2:1.5 ratio (approx. 8.5" x 11" scaled for mobile)
+    borderRadius: 8,
   },
 });
 
