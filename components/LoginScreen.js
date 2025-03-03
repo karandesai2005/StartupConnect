@@ -40,8 +40,7 @@ const LoginScreen = () => {
   };
 
   const handleLogin = async () => {
-    console.log("NGROK_URL:", NGROK_URL);
-
+    console.log("Starting login, NGROK_URL:", NGROK_URL);
     if (!validateInput()) {
       setPopupMessage("Please enter both username/email and password.");
       setIsPopupVisible(true);
@@ -52,6 +51,7 @@ const LoginScreen = () => {
     setServerError("");
   
     const isEmail = usernameOrEmail.includes("@");
+    console.log("Sending request with:", { usernameOrEmail, password, isEmail });
   
     try {
       const response = await fetch(`${NGROK_URL}/api/auth/login`, {
@@ -65,15 +65,19 @@ const LoginScreen = () => {
       });
   
       const result = await response.json();
+      console.log("Response:", { status: response.status, result });
   
       if (response.ok && result.token) {
         await AsyncStorage.setItem("token", result.token);
+        console.log("Token stored:", result.token);
+        console.log("Navigating to Home");
         navigation.replace("Home");
       } else {
         setPopupMessage(result.message || "Login failed. Please try again.");
         setIsPopupVisible(true);
       }
     } catch (err) {
+      console.error("Login error:", err);
       setPopupMessage("Network error. Please try again later.");
       setIsPopupVisible(true);
     } finally {
