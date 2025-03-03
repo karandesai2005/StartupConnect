@@ -5,7 +5,7 @@ const path = require("path");
 const cors = require("cors"); // Add this if not already included
 const { connectDB } = require("./config/db");
 const postRoutes = require("./routes/postRoutes");
-const chatRoutes = require("./routes/chatRoute");
+// const chatRoutes = require("./routes/chatRoute");
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -25,7 +25,7 @@ app.get("/", (req, res) => {
 
 // API Routes
 app.use("/api", postRoutes);
-app.use("/api", chatRoutes); // This means chat routes will be at /api/chats
+// app.use("/api", chatRoutes); // This means chat routes will be at /api/chats
 
 // Auth routes
 const authRoutes = {
@@ -72,7 +72,7 @@ async function startServer() {
 
     app.listen(PORT, "0.0.0.0", () => {
       console.log(`🚀 Server running on http://0.0.0.0:${PORT}`);
-      console.log(`📝 Chat routes available at http://0.0.0.0:${PORT}/api/chats`);
+      // console.log(`📝 Chat routes available at http://0.0.0.0:${PORT}/api/chats`);
     });
   } catch (err) {
     console.error("❌ Failed to connect to the database:", err);
