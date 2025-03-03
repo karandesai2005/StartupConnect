@@ -2,10 +2,11 @@
 require("dotenv").config();
 const express = require("express");
 const path = require("path");
-const cors = require("cors"); // Add this if not already included
+const cors = require("cors");
 const { connectDB } = require("./config/db");
 const postRoutes = require("./routes/postRoutes");
-// const chatRoutes = require("./routes/chatRoute");
+const chatRoutes = require("./routes/chatRoutes");
+const authController = require("./controllers/authController"); // Import authController
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -25,33 +26,11 @@ app.get("/", (req, res) => {
 
 // API Routes
 app.use("/api", postRoutes);
-// app.use("/api", chatRoutes); // This means chat routes will be at /api/chats
+app.use("/api", chatRoutes);
 
 // Auth routes
-const authRoutes = {
-  login: async (req, res) => {
-    try {
-      // Your login logic here
-      res.json({ message: "Login successful!" });
-    } catch (error) {
-      console.error("Login error:", error);
-      res.status(500).json({ message: "Login failed", error: error.message });
-    }
-  },
-
-  saveUserDetails: async (req, res) => {
-    try {
-      // Your user details saving logic here
-      res.json({ message: "User details saved!" });
-    } catch (error) {
-      console.error("Save user details error:", error);
-      res.status(500).json({ message: "Failed to save user details", error: error.message });
-    }
-  }
-};
-
-app.post("/api/auth/login", authRoutes.login);
-app.post("/api/auth/save-user-details", authRoutes.saveUserDetails);
+app.post("/api/auth/login", authController.login); // Use authController.login
+app.post("/api/auth/save-user-details", authController.saveUserDetails); // Update this too if needed
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -72,7 +51,7 @@ async function startServer() {
 
     app.listen(PORT, "0.0.0.0", () => {
       console.log(`🚀 Server running on http://0.0.0.0:${PORT}`);
-      // console.log(`📝 Chat routes available at http://0.0.0.0:${PORT}/api/chats`);
+      console.log(`📝 Chat routes available at http://0.0.0.0:${PORT}/api/chats`);
     });
   } catch (err) {
     console.error("❌ Failed to connect to the database:", err);
@@ -80,7 +59,6 @@ async function startServer() {
   }
 }
 
-// Start the server
 startServer().catch(console.error);
 
 process.on("unhandledRejection", (err) => {
