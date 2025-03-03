@@ -46,13 +46,13 @@ const LoginScreen = () => {
       setIsPopupVisible(true);
       return;
     }
-  
+
     setIsLoading(true);
     setServerError("");
-  
+
     const isEmail = usernameOrEmail.includes("@");
     console.log("Sending request with:", { usernameOrEmail, password, isEmail });
-  
+
     try {
       const response = await fetch(`${NGROK_URL}/api/auth/login`, {
         method: "POST",
@@ -63,19 +63,26 @@ const LoginScreen = () => {
           password,
         }),
       });
-  
+
       const result = await response.json();
       console.log("Response:", { status: response.status, result });
-  
-      if (response.ok && result.token) {
-        await AsyncStorage.setItem("token", result.token);
-        console.log("Token stored:", result.token);
-        console.log("Navigating to Home");
-        navigation.replace("Home");
+      if (response.ok) {
+        console.log("Login response:", result);
+        if (result.token) {
+          console.log("Token received:", result.token);
+          await AsyncStorage.setItem("token", result.token);
+          navigation.replace("Home");
+        } else {
+          console.log("No token received.");
+          setPopupMessage("Login failed: No token received.");
+          setIsPopupVisible(true);
+        }
       } else {
+        console.log("Login failed:", result.message);
         setPopupMessage(result.message || "Login failed. Please try again.");
         setIsPopupVisible(true);
       }
+
     } catch (err) {
       console.error("Login error:", err);
       setPopupMessage("Network error. Please try again later.");
@@ -178,8 +185,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     paddingHorizontal: 20,
     paddingVertical: Platform.select({
-      ios:null,
-      android:210
+      ios: null,
+      android: 210
     })  // Add padding to prevent overlap
   },
   title: {
