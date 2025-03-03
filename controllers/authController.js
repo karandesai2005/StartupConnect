@@ -89,8 +89,10 @@ const login = async (req, res) => {
       expiresIn: "1h",
     });
     console.log("Generated token:", token);
-    console.log("Sending response:", { message: "Login successful", token });
-    res.status(200).json({ message: "Login successful", token });
+
+    // ✅ Fix: Ensure the token is included in the response
+    res.status(200).json({ message: "Login successful!", token });
+
   } catch (err) {
     console.error("Login error:", err);
     res.status(500).json({ message: "Internal server error", error: err.message });
