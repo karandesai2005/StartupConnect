@@ -391,6 +391,30 @@ const getUserPostsByUsername = async (req, res) => {
   }
 };
 
+const searchUsers = async (req, res) => {
+  try {
+    const { q } = req.query; // Query parameter 'q' for search term
+    if (!q || q.length < 1) {
+      return res.status(400).json({ message: "Search query is required." });
+    }
+
+    const query = `
+      SELECT user_id, username, profile_picture
+      FROM users
+      WHERE username LIKE @param1
+      ORDER BY username
+    `;
+    const searchTerm = `%${q.toLowerCase()}%`;
+    const result = await queryDB(query, [searchTerm]);
+
+    res.status(200).json(result);
+  } catch (err) {
+    console.error("Error searching users:", err.message);
+    res.status(500).json({ message: "Internal server error", error: err.message });
+  }
+};
+
+// Updated exports
 module.exports = {
   register,
   login,
@@ -398,6 +422,7 @@ module.exports = {
   saveUserDetails,
   getUserProfile,
   updateProfile,
-  getUserProfileByUsername, // New export
-  getUserPostsByUsername    // New export
+  getUserProfileByUsername,
+  getUserPostsByUsername,
+  searchUsers // New export
 };

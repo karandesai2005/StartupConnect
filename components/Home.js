@@ -271,6 +271,9 @@ export default function HomeScreen() {
   const [isFieldsModalVisible, setFieldsModalVisible] = useState(false);
   const [selectedFields, setSelectedFields] = useState([]);
   const [viewableItems, setViewableItems] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearchActive, setIsSearchActive] = useState(false);
 
   const onViewableItemsChanged = useCallback(debounce(({ viewableItems }) => {
     setViewableItems(viewableItems.map(item => item.index));
@@ -343,6 +346,27 @@ export default function HomeScreen() {
       setPostsError(error.message);
     }
   }, []);
+
+  const searchUsers = useCallback(debounce(async (query) => {
+    if (!query) {
+      setSearchResults([]);
+      return;
+    }
+    try {
+      const token = await AsyncStorage.getItem("token");
+      const response = await axios.get(`${NGROK_URL}/api/auth/search-users`, {
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        params: { q: query }
+      });
+      setSearchResults(response.data);
+    } catch (error) {
+      console.error('Error searching users:', error);
+      setSearchResults([]);
+    }
+  }, 300), []);
 
   useEffect(() => {
     loadUsers();
@@ -421,6 +445,41 @@ export default function HomeScreen() {
     </TouchableOpacity>
   );
 
+  const handleSearchFocus = () => {
+    setIsSearchActive(true);
+  };
+
+  const handleSearchBlur = () => {
+    setTimeout(() => setIsSearchActive(false), 200); // Delay to allow click on results
+  };
+
+  const handleSearchChange = (text) => {
+    setSearchQuery(text);
+    searchUsers(text);
+  };
+
+  const handleUserPress = (username) => {
+    setSearchQuery('');
+    setSearchResults([]);
+    setIsSearchActive(false);
+    navigation.navigate('Profile', { username, isOtherUser: true });
+  };
+
+  const renderSearchResult = ({ item }) => (
+    <TouchableOpacity
+      style={styles.searchResultItem}
+      onPress={() => handleUserPress(item.username)}
+    >
+      <Image
+        source={
+          item.profile_picture ? { uri: item.profile_picture } : require('../assets/del.png')
+        }
+        style={styles.searchAvatar}
+      />
+      <Text style={styles.searchUsername}>{item.username}</Text>
+    </TouchableOpacity>
+  );
+
   return (
     <View style={styles.container}>
       <View style={styles.statusBarBackground} />
@@ -435,11 +494,26 @@ export default function HomeScreen() {
             style={styles.profilePic}
           />
         </TouchableOpacity>
-        <TextInput
-          style={styles.searchBar}
-          placeholder="Search..."
-          placeholderTextColor="#aaa"
-        />
+        <View style={styles.searchContainer}>
+          <TextInput
+            style={styles.searchBar}
+            placeholder="Search..."
+            placeholderTextColor="#aaa"
+            value={searchQuery}
+            onChangeText={handleSearchChange}
+            onFocus={handleSearchFocus}
+            onBlur={handleSearchBlur}
+          />
+          {isSearchActive && searchResults.length > 0 && (
+            <FlatList
+              data={searchResults}
+              renderItem={renderSearchResult}
+              keyExtractor={(item) => item.user_id.toString()}
+              style={styles.searchResultsList}
+              keyboardShouldPersistTaps="handled"
+            />
+          )}
+        </View>
         <TouchableOpacity onPress={() => navigation.navigate('Chat')}>
           <Image source={require('../assets/Arrow.png')} style={styles.chatIcon} />
         </TouchableOpacity>
@@ -546,13 +620,49 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20
   },
-  searchBar: {
-    width: '55%',
+  searchContainer: {
+    flex: 1,
+    position: 'relative',
     marginHorizontal: 10,
+  },
+  searchBar: {
+    width: '100%',
     paddingHorizontal: 15,
     backgroundColor: '#eee',
     borderRadius: 20,
     height: 40,
+  },
+  searchResultsList: {
+    position: 'absolute',
+    top: 45,
+    left: 0,
+    right: 0,
+    backgroundColor: '#fff',
+    borderRadius: 5,
+    maxHeight: 200,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    zIndex: 10,
+  },
+  searchResultItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  searchAvatar: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    marginRight: 10,
+  },
+  searchUsername: {
+    fontSize: 16,
+    color: '#212529',
   },
   chatIcon: {
     width: 24,
