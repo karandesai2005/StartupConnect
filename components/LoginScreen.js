@@ -18,6 +18,7 @@ import Popup from "./Popup";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Linking } from "react-native";
 import { NGROK_URL } from '@env';
+
 const LoginScreen = () => {
   const [usernameOrEmail, setUsernameOrEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -51,23 +52,35 @@ const LoginScreen = () => {
     setServerError("");
 
     const isEmail = usernameOrEmail.includes("@");
-    console.log("Sending request with:", { usernameOrEmail, password, isEmail });
+    const payload = {
+      [isEmail ? "email" : "username"]: usernameOrEmail,
+      password,
+    };
+    console.log("Sending request with:", payload);
 
     try {
       const response = await fetch(`${NGROK_URL}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username: isEmail ? undefined : usernameOrEmail,
-          email: isEmail ? usernameOrEmail : undefined,
-          password,
-        }),
+        body: JSON.stringify(payload),
       });
 
-      const result = await response.json();
-      console.log("Response:", { status: response.status, result });
+      // Log raw response before parsing
+      const rawResponse = await response.text();
+      console.log("Raw server response:", rawResponse);
+
+      // Attempt to parse as JSON
+      let result;
+      try {
+        result = JSON.parse(rawResponse);
+      } catch (jsonError) {
+        console.error("JSON parsing error:", jsonError);
+        throw new Error("Server response is not valid JSON: " + rawResponse.substring(0, 100)); // Show first 100 chars
+      }
+
+      console.log("Parsed response:", { status: response.status, result });
+
       if (response.ok) {
-        console.log("Login response:", result);
         if (result.token) {
           console.log("Token received:", result.token);
           await AsyncStorage.setItem("token", result.token);
@@ -82,10 +95,9 @@ const LoginScreen = () => {
         setPopupMessage(result.message || "Login failed. Please try again.");
         setIsPopupVisible(true);
       }
-
     } catch (err) {
       console.error("Login error:", err);
-      setPopupMessage("Network error. Please try again later.");
+      setPopupMessage(err.message || "Network error. Please try again later.");
       setIsPopupVisible(true);
     } finally {
       setIsLoading(false);
@@ -96,14 +108,13 @@ const LoginScreen = () => {
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "NULL" : "height"}
       style={{ flex: 1 }}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 60 : 0} // Adjust offset for iOS
+      keyboardVerticalOffset={Platform.OS === "ios" ? 60 : 0}
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <ScrollView
           contentContainerStyle={styles.container}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Popup Component */}
           {isPopupVisible && (
             <Popup
               message={popupMessage}
@@ -130,7 +141,6 @@ const LoginScreen = () => {
             onChangeText={setPassword}
           />
 
-          {/* Server error message */}
           {serverError ? (
             <Text style={styles.errorText}>{serverError}</Text>
           ) : null}
@@ -187,7 +197,7 @@ const styles = StyleSheet.create({
     paddingVertical: Platform.select({
       ios: null,
       android: 210
-    })  // Add padding to prevent overlap
+    })
   },
   title: {
     fontSize: 32,

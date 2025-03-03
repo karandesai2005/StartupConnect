@@ -5,7 +5,7 @@ const path = require("path");
 const cors = require("cors");
 const { connectDB } = require("./config/db");
 const postRoutes = require("./routes/postRoutes");
-const authRoutes = require("./routes/authRoute"); // Import authRoute.js
+const authRoutes = require("./routes/authRoutes"); // Import authRoute.js
 // const chatRoutes = require("./routes/chatRoutes");
 
 const app = express();
