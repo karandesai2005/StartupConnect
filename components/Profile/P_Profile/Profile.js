@@ -53,19 +53,6 @@ const Profile = ({ route, isBusinessProfile = false }) => {
   const spacing = 2;
   const itemSize = (screenWidth - 32 - spacing * 2) / 3;
 
-  const [isModalVisible, setModalVisible] = useState(false);
-  const openModal = () => setModalVisible(true);
-  const closeModal = () => setModalVisible(false);
-
-  const cardStyle = {
-    width: '90%',
-    minHeight: 400,
-    marginBottom: 20,
-    backgroundColor: 'white',
-    borderRadius: 15,
-  };
-  const pieColors = ['#007bff', '#004999', '#002d5f', '#000000', '#696969'];
-
   useEffect(() => {
     if (route.params?.updatedUser) {
       console.log("Received updated user data:", route.params.updatedUser);
@@ -80,14 +67,17 @@ const Profile = ({ route, isBusinessProfile = false }) => {
     }
   }, [route.params?.updatedUser]);
 
-  const fetchUserPosts = useCallback(async () => {
+  const fetchUserPosts = useCallback(async (username) => {
     try {
       const token = await AsyncStorage.getItem("token");
       if (!token) {
         navigation.navigate('Login');
         return;
       }
-      const response = await fetch(`${NGROK_URL}/api/posts/myposts`, {
+      const endpoint = username
+        ? `${NGROK_URL}/api/posts/user/${username}`
+        : `${NGROK_URL}/api/posts/myposts`;
+      const response = await fetch(endpoint, {
         method: "GET",
         headers: {
           "Authorization": `Bearer ${token}`,
@@ -104,10 +94,10 @@ const Profile = ({ route, isBusinessProfile = false }) => {
           image_url: post.media_url,
           content: post.content,
           created_at: post.created_at,
-          likes: 0,
+          likes: post.like_count || 0,
           comments: 0,
           caption: post.content,
-          media_type: post.media_type || (post.media_url?.includes('.mp4') ? 'video' : 'image')
+          media_type: post.media_type || (post.media_url?.includes('.mp4') ? 'video' : 'image'),
         }));
         const validPosts = mappedPosts
           .filter(post => post.image_url && !post.image_url.includes('undefined'))
@@ -129,21 +119,41 @@ const Profile = ({ route, isBusinessProfile = false }) => {
         navigation.navigate('Login');
         return;
       }
-      const response = await fetch(`${NGROK_URL}/api/auth/profile?timestamp=${Date.now()}`, {
-        method: "GET",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json",
-          "Cache-Control": "no-cache",
-          "Pragma": "no-cache",
-        },
-      });
+      const { username, isOtherUser } = route.params || {};
+
+      let response;
+      if (isOtherUser && username) {
+        // Fetch another user's profile
+        response = await fetch(`${NGROK_URL}/api/users/${username}`, {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json",
+            "Cache-Control": "no-cache",
+            "Pragma": "no-cache",
+          },
+        });
+      } else {
+        // Fetch current user's profile
+        response = await fetch(`${NGROK_URL}/api/auth/profile?timestamp=${Date.now()}`, {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json",
+            "Cache-Control": "no-cache",
+            "Pragma": "no-cache",
+          },
+        });
+      }
+
       if (response.ok) {
         const data = await response.json();
         console.log("Fetched profile data:", data);
         setUserData(data);
         setLastUpdate(Date.now());
         await AsyncStorage.setItem('userData', JSON.stringify(data));
+        // Fetch posts for the user (current or other)
+        await fetchUserPosts(isOtherUser ? username : null);
       } else {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -154,13 +164,13 @@ const Profile = ({ route, isBusinessProfile = false }) => {
       setIsLoading(false);
       setRefreshing(false);
     }
-  }, [navigation]);
+  }, [navigation, route.params]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
-    await Promise.all([fetchUserData(), fetchUserPosts()]);
+    await fetchUserData();
     setRefreshing(false);
-  }, [fetchUserData, fetchUserPosts]);
+  }, [fetchUserData]);
 
   useFocusEffect(
     useCallback(() => {
@@ -168,10 +178,9 @@ const Profile = ({ route, isBusinessProfile = false }) => {
       if (shouldFetch) {
         setIsLoading(true);
         fetchUserData();
-        fetchUserPosts();
       }
       return () => { };
-    }, [fetchUserData, fetchUserPosts, userData, lastUpdate])
+    }, [fetchUserData, userData, lastUpdate])
   );
 
   const avatarStyle = {
@@ -180,15 +189,6 @@ const Profile = ({ route, isBusinessProfile = false }) => {
     backgroundColor: "#f0f8ff",
     borderRadius: isBusinessProfile ? 20 : 48,
     overflow: "hidden",
-  };
-  const del = {
-    height: "100%",
-    width: "100%",
-    backgroundColor: "#f0f8ff",
-    borderRadius: isBusinessProfile ? 20 : 48,
-    overflow: "hidden",
-    marginLeft: 10,
-    marginRight: 10,
   };
 
   const renderTab = (tabName, label) => (
@@ -209,10 +209,12 @@ const Profile = ({ route, isBusinessProfile = false }) => {
     { value: 90, label: 'Apr', frontColor: '#000000', color: '#000000' },
   ];
 
+  const pieColors = ['#007bff', '#004999', '#002d5f', '#000000', '#696969'];
+
   const renderTry = () => (
     <View style={styles.try}>
       {userGraphs.map((graph, index) => (
-        <View key={index} style={cardStyle}>
+        <View key={index} style={styles.cardStyle}>
           <Text style={styles.graphTitle}>{graph.title}</Text>
           <View style={styles.graphContainer}>
             {graph.type === 'pie' && (
@@ -231,7 +233,6 @@ const Profile = ({ route, isBusinessProfile = false }) => {
                 labelPosition="onBorder"
                 showValuesAsLabels={true}
                 showGradient
-                gradientStyle={{ position: 'absolute', top: 0, left: 0 }}
               />
             )}
             {graph.type === 'bar' && (
@@ -338,7 +339,7 @@ const Profile = ({ route, isBusinessProfile = false }) => {
             This is a significant milestone in our venture journey, showcasing our success and dedication to innovation and growth in the entrepreneurial space.
           </Text>
           <Image
-            source={require('../../../assets/ok.png')} // Replace with your certificate image path
+            source={require('../../../assets/ok.png')}
             style={styles.certificateImage}
             resizeMode="contain"
           />
@@ -410,12 +411,14 @@ const Profile = ({ route, isBusinessProfile = false }) => {
             </Text>
           </View>
           <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              style={styles.masterOutlineButton}
-              onPress={() => navigation.navigate('EditProfilePage', { userData })}
-            >
-              <Text style={styles.button}>Edit Profile</Text>
-            </TouchableOpacity>
+            {!route.params?.isOtherUser && (
+              <TouchableOpacity
+                style={styles.masterOutlineButton}
+                onPress={() => navigation.navigate('EditProfilePage', { userData })}
+              >
+                <Text style={styles.button}>Edit Profile</Text>
+              </TouchableOpacity>
+            )}
             <View style={styles.storiesWrapper}>
               <Stories
                 stories={myStories}
@@ -459,8 +462,6 @@ const Profile = ({ route, isBusinessProfile = false }) => {
         <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Settings')}>
           <Image source={require('../../../assets/settings.png')} style={styles.navIcon} />
         </TouchableOpacity>
-
-        {/* Center indicator line */}
         <View style={styles.navIndicator} />
       </View>
     </View>
@@ -720,8 +721,6 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
   },
-  // Updated styles for bottom navigation
-  // Update these styles in your StyleSheet
   bottomNav: {
     flexDirection: 'row',
     justifyContent: 'space-around',
@@ -759,11 +758,6 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     alignSelf: 'center',
   },
-  navIcon: {
-    width: 22,
-    height: 22,
-    marginBottom: Platform.OS === 'ios' ? 3 : 0,
-  },
   storiesWrapper: {
     width: '95%',
     marginTop: 10,
@@ -794,8 +788,15 @@ const styles = StyleSheet.create({
   },
   certificateImage: {
     width: '100%',
-    height: 400, // Adjusted for a certificate-like 2:1.5 ratio (approx. 8.5" x 11" scaled for mobile)
+    height: 400,
     borderRadius: 8,
+  },
+  cardStyle: {
+    width: '90%',
+    minHeight: 400,
+    marginBottom: 20,
+    backgroundColor: 'white',
+    borderRadius: 15,
   },
 });
 

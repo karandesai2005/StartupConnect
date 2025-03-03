@@ -1,7 +1,7 @@
 const express = require('express');
 const postController = require('../controllers/postController');
 const authenticateJWT = require('../middleware/authenticateJWT');
-const { uploadAndConvertPostMedia } = require("../config/multerConfig"); // Updated multer import
+const { uploadAndConvertPostMedia } = require("../config/multerConfig");
 
 const router = express.Router();
 
@@ -16,8 +16,8 @@ const debugMiddleware = (req, res, next) => {
 // Post Creation Route (Supports Image & Video, Converts MOV to MP4)
 router.post('/posts',
   debugMiddleware,
-  authenticateJWT, // Authenticate user first
-  uploadAndConvertPostMedia, // Upload + MOV-to-MP4 conversion
+  authenticateJWT,
+  uploadAndConvertPostMedia,
   (req, res, next) => {
     if (req.file) {
       console.log('Processed File:', req.file.filename, '| Type:', req.file.mimetype);
@@ -28,25 +28,40 @@ router.post('/posts',
   },
   postController.createPost
 );
+
+// Toggle Like on a Post
 router.post('/posts/:postId/toggle-like', 
   authenticateJWT, 
   postController.toggleLike
 );
 
+// Get Like Status for a Post
 router.get('/posts/:postId/likes', 
   authenticateJWT, 
   postController.getLikeStatus
 );
-// Fetch User's Own Posts
-router.get('/posts/myposts', authenticateJWT, postController.getUserPosts);
 
-// Fetch Posts by Specific User
-router.get('/users/:user_id/posts', authenticateJWT, postController.getUserPosts);
+// Fetch User's Own Posts
+router.get('/posts/myposts', 
+  authenticateJWT, 
+  postController.getUserPosts
+);
+
+// Fetch Posts by Specific User (Updated to use username)
+router.get('/posts/user/:username', 
+  authenticateJWT, 
+  postController.getPostsByUsername
+);
 
 // Fetch All Posts (Authenticated)
-router.get('/posts', authenticateJWT, postController.getAllPosts);
+router.get('/posts', 
+  authenticateJWT, 
+  postController.getAllPosts
+);
 
 // Fetch All Posts (Public Access)
-router.get('/posts/all', postController.getAllPosts);
+router.get('/posts/all', 
+  postController.getAllPosts
+);
 
 module.exports = router;

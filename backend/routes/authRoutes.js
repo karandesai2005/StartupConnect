@@ -1,4 +1,4 @@
-// routes/appRoute.js
+// routes/authRoute.js
 const express = require("express");
 const { 
   register, 
@@ -6,7 +6,9 @@ const {
   validateUsername, 
   saveUserDetails, 
   getUserProfile,
-  updateProfile
+  updateProfile,
+  getUserProfileByUsername, // New endpoint
+  getUserPostsByUsername    // New endpoint
 } = require("../controllers/authController");
 
 const { 
@@ -14,12 +16,12 @@ const {
   validateSaveUserDetailsInput 
 } = require("../middleware/validator");
 
-const authenticateJWT = require("../middleware/authenticateJWT");  // Import the middleware
-
+const authenticateJWT = require("../middleware/authenticateJWT");  
 const { uploadProfilePicture } = require("../config/multerConfig");
+
 const router = express.Router();
 
-// Register user (add validation middleware if needed for step 1 data)
+// Register user
 router.post("/register", validateSaveUserDetailsInput, register);
 
 // Login user
@@ -31,13 +33,20 @@ router.post("/validate-username", validateUsernameInput, validateUsername);
 // Save user details step-by-step
 router.post("/save-user-details", validateSaveUserDetailsInput, saveUserDetails);
 
-// Fetch user profile (protected route)
-router.get("/profile", authenticateJWT, getUserProfile);  // Apply authenticateJWT middleware here
+// Fetch current user's profile (protected)
+router.get("/profile", authenticateJWT, getUserProfile);
 
+// Update current user's profile (protected)
 router.put("/update-profile",  
   authenticateJWT,  
-  uploadProfilePicture.single('profile_picture'),  // Corrected multer upload handler
+  uploadProfilePicture.single('profile_picture'),
   updateProfile
 );
+
+// New route: Fetch user profile by username (protected)
+router.get("/users/:username", authenticateJWT, getUserProfileByUsername);
+
+// New route: Fetch user posts by username (protected)
+router.get("/posts/user/:username", authenticateJWT, getUserPostsByUsername);
 
 module.exports = router;

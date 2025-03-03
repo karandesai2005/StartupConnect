@@ -3,7 +3,6 @@ const jwt = require("jsonwebtoken");
 const { getUserByEmail, createUser } = require("../models/userModel");
 const { queryDB } = require("../config/db");
 
-
 // Register user
 const register = async (req, res) => {
   try {
@@ -15,7 +14,6 @@ const register = async (req, res) => {
 
     const normalizedEmail = email.toLowerCase();
 
-    // Check for existing user
     const existingUsers = await queryDB(
       'SELECT * FROM users WHERE email = @param1',
       [normalizedEmail]
@@ -27,7 +25,6 @@ const register = async (req, res) => {
 
     const passwordHash = await bcrypt.hash(password, parseInt(process.env.SALT_ROUNDS, 10));
 
-    // Insert new user
     const query = `
       INSERT INTO users (username, email, password_hash, is_founder, is_investor)
       VALUES (@param1, @param2, @param3, @param4, @param5);
@@ -55,6 +52,8 @@ const register = async (req, res) => {
     res.status(500).json({ message: "Internal server error", error: err.message });
   }
 };
+
+// Login user
 const login = async (req, res) => {
   try {
     const { email, username, password } = req.body;
@@ -84,22 +83,19 @@ const login = async (req, res) => {
       return res.status(400).json({ message: "Invalid email/username or password" });
     }
 
-    console.log("JWT_SECRET:", process.env.JWT_SECRET); // Check if secret is set
+    console.log("JWT_SECRET:", process.env.JWT_SECRET);
     const token = jwt.sign({ userId: user.user_id }, process.env.JWT_SECRET, {
       expiresIn: "1h",
     });
     console.log("Generated token:", token);
 
-    // ✅ Fix: Ensure the token is included in the response
     res.status(200).json({ message: "Login successful!", token });
-
   } catch (err) {
     console.error("Login error:", err);
     res.status(500).json({ message: "Internal server error", error: err.message });
   }
 };
 
-// Save user details step-by-step
 // Save user details step-by-step
 const saveUserDetails = async (req, res) => {
   console.log("Request Body:", req.body);
@@ -121,7 +117,6 @@ const saveUserDetails = async (req, res) => {
 
         const normalizedEmail = data.email.toLowerCase();
 
-        // Check if email exists
         const existingUsers = await queryDB(
           'SELECT * FROM users WHERE email = @param1',
           [normalizedEmail]
@@ -133,7 +128,6 @@ const saveUserDetails = async (req, res) => {
 
         const tempUsername = `user_${Date.now()}`;
 
-        // Insert new user and get ID
         query = `
           INSERT INTO users (email, username, created_at)
           VALUES (@param1, @param2, GETDATE());
@@ -216,7 +210,6 @@ const saveUserDetails = async (req, res) => {
 
     const result = await queryDB(query, params);
     res.status(200).json({ message: "Data saved successfully", result });
-
   } catch (err) {
     console.error("Error saving user details:", err);
     res.status(500).json({ message: "Internal server error", error: err.message });
@@ -227,9 +220,8 @@ const saveUserDetails = async (req, res) => {
 const validateUsername = async (req, res) => {
   try {
     const { username } = req.body;
-    console.log("Validating username:", username); // Debug log
+    console.log("Validating username:", username);
 
-    // Validate length first
     if (username.length < 3 || username.length > 20) {
       return res.status(400).json({
         available: false,
@@ -237,13 +229,12 @@ const validateUsername = async (req, res) => {
       });
     }
 
-    // Check if username exists using queryDB
     const existingUsers = await queryDB(
       'SELECT * FROM users WHERE username = @param1',
       [username]
     );
 
-    console.log("Query result:", existingUsers); // Debug log
+    console.log("Query result:", existingUsers);
 
     if (existingUsers.length > 0) {
       return res.status(200).json({
@@ -266,7 +257,7 @@ const validateUsername = async (req, res) => {
   }
 };
 
-// Get user profile
+// Get current user's profile
 const getUserProfile = async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -290,7 +281,7 @@ const getUserProfile = async (req, res) => {
   }
 };
 
-
+// Update current user's profile
 const updateProfile = async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -298,7 +289,7 @@ const updateProfile = async (req, res) => {
     const profilePicture = req.file;
 
     console.log("Received bio:", bio);
-    console.log("Received file:", profilePicture); // Debugging file upload
+    console.log("Received file:", profilePicture);
 
     let updates = [];
     let values = [];
@@ -314,7 +305,7 @@ const updateProfile = async (req, res) => {
       values.push(profilePicturePath);
     }
 
-    values.push(userId); // Last parameter is the userId
+    values.push(userId);
 
     if (updates.length === 0) {
       return res.status(400).json({ message: "No fields to update." });
@@ -330,16 +321,83 @@ const updateProfile = async (req, res) => {
     `;
 
     const result = await queryDB(query, values);
-    console.log("Updated user:", result[0]); // Debugging database response
+    console.log("Updated user:", result[0]);
 
     return res.status(200).json(result[0]);
-
   } catch (err) {
     console.error("Update error:", err);
     return res.status(500).json({ message: "Internal server error", error: err.message });
   }
 };
 
+// New endpoint: Get user profile by username
+const getUserProfileByUsername = async (req, res) => {
+  try {
+    const { username } = req.params;
 
+    const query = `
+      SELECT user_id, username, email, name, bio, profile_picture, is_personal, is_business 
+      FROM users 
+      WHERE username = @param1
+    `;
 
-module.exports = { register, login, validateUsername, saveUserDetails, getUserProfile, updateProfile };
+    const result = await queryDB(query, [username]);
+
+    if (result.length === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json(result[0]);
+  } catch (err) {
+    console.error("Error fetching user profile by username:", err.message);
+    res.status(500).json({ message: "Internal server error", error: err.message });
+  }
+};
+
+// New endpoint: Get user posts by username
+const getUserPostsByUsername = async (req, res) => {
+  try {
+    const { username } = req.params;
+
+    // First, get the user_id from the username
+    const userQuery = `
+      SELECT user_id 
+      FROM users 
+      WHERE username = @param1
+    `;
+    const userResult = await queryDB(userQuery, [username]);
+
+    if (userResult.length === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const userId = userResult[0].user_id;
+
+    // Then, fetch posts for that user_id
+    const postsQuery = `
+      SELECT p.post_id, p.user_id, u.username, p.media_url, p.content, p.created_at, p.media_type,
+             (SELECT COUNT(*) FROM likes WHERE post_id = p.post_id) AS like_count
+      FROM posts p
+      JOIN users u ON p.user_id = u.user_id
+      WHERE p.user_id = @param1
+      ORDER BY p.created_at DESC
+    `;
+    const posts = await queryDB(postsQuery, [userId]);
+
+    res.status(200).json(posts);
+  } catch (err) {
+    console.error("Error fetching user posts by username:", err.message);
+    res.status(500).json({ message: "Internal server error", error: err.message });
+  }
+};
+
+module.exports = {
+  register,
+  login,
+  validateUsername,
+  saveUserDetails,
+  getUserProfile,
+  updateProfile,
+  getUserProfileByUsername, // New export
+  getUserPostsByUsername    // New export
+};

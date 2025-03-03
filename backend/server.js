@@ -5,8 +5,8 @@ const path = require("path");
 const cors = require("cors");
 const { connectDB } = require("./config/db");
 const postRoutes = require("./routes/postRoutes");
+const authRoutes = require("./routes/authRoute"); // Import authRoute.js
 // const chatRoutes = require("./routes/chatRoutes");
-const authController = require("./controllers/authController"); // Import authController
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -27,10 +27,7 @@ app.get("/", (req, res) => {
 // API Routes
 app.use("/api", postRoutes);
 // app.use("/api", chatRoutes);
-
-// Auth routes
-app.post("/api/auth/login", authController.login); // Use authController.login
-app.post("/api/auth/save-user-details", authController.saveUserDetails); // Update this too if needed
+app.use("/api/auth", authRoutes); // Mount authRoutes at /api/auth
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -51,7 +48,6 @@ async function startServer() {
 
     app.listen(PORT, "0.0.0.0", () => {
       console.log(`🚀 Server running on http://0.0.0.0:${PORT}`);
-      // console.log(`📝 Chat routes available at http://0.0.0.0:${PORT}/api/chats`);
     });
   } catch (err) {
     console.error("❌ Failed to connect to the database:", err);

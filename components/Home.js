@@ -40,14 +40,13 @@ const formatTimestamp = (timestamp) => {
 };
 
 // Memoized Post Card Component
-const PostCard = memo(({ item, index, toggleExpand, expandedItems }) => {
+const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, navigation }) => {
   const [imageHeight, setImageHeight] = useState(width);
   const [isLoading, setIsLoading] = useState(true);
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(item.likes || 0);
   const animatedScale = new Animated.Value(1);
   const [isVideo, setIsVideo] = useState(false);
-  const [isPaused, setIsPaused] = useState(true);
   const videoRef = React.useRef(null);
   const [isLikeLoading, setIsLikeLoading] = useState(false);
   const debouncedHandleLike = useCallback(debounce(async () => handleLike(), 300), [handleLike]);
@@ -86,15 +85,20 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems }) => {
     }
   }, [item]);
 
-  const handleMediaPress = () => {
-    if (isVideo) {
-      setIsPaused(!isPaused);
-      if (videoRef.current) {
-        isPaused ? videoRef.current.playAsync() : videoRef.current.pauseAsync();
+  useEffect(() => {
+    if (isVideo && videoRef.current) {
+      if (isVisible) {
+        videoRef.current.playAsync().catch((error) => console.error('Play error:', error));
+      } else {
+        videoRef.current.pauseAsync().catch((error) => console.error('Pause error:', error));
       }
     }
-    handlePressIn();
-  };
+    return () => {
+      if (isVideo && videoRef.current) {
+        videoRef.current.pauseAsync().catch(() => {});
+      }
+    };
+  }, [isVisible, isVideo]);
 
   const handlePressIn = () => {
     Animated.spring(animatedScale, { toValue: 0.98, useNativeDriver: true }).start();
@@ -145,18 +149,25 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems }) => {
     }
   };
 
+  const handleProfilePress = () => {
+    const username = isUserPost ? item.username : (item.name ? `${item.name.first} ${item.name.last}` : 'User');
+    navigation.navigate('Profile', { username, isOtherUser: true });
+  };
+
   return (
     <Animated.View style={[styles.card, { transform: [{ scale: animatedScale }] }]}>
       <View style={styles.cardHeader}>
         <View style={styles.userInfo}>
-          <Image
-            source={
-              typeof item.profile_picture === 'string' && item.profile_picture.startsWith('http')
-                ? { uri: item.profile_picture }
-                : require('../assets/del.png')
-            }
-            style={styles.avatar}
-          />
+          <TouchableOpacity onPress={handleProfilePress}>
+            <Image
+              source={
+                typeof item.profile_picture === 'string' && item.profile_picture.startsWith('http')
+                  ? { uri: item.profile_picture }
+                  : require('../assets/del.png')
+              }
+              style={styles.avatar}
+            />
+          </TouchableOpacity>
           <View>
             <Text style={styles.name}>{isUserPost ? item.username : (item.name ? item.name.first : 'User')}</Text>
             <Text style={styles.timeStamp}>{formatTimestamp(item.created_at)}</Text>
@@ -166,7 +177,7 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems }) => {
           <Text style={styles.moreButtonText}>•••</Text>
         </TouchableOpacity>
       </View>
-      <TouchableOpacity activeOpacity={0.95} onPressIn={handleMediaPress} onPressOut={handlePressOut}>
+      <TouchableOpacity activeOpacity={0.95} onPressIn={handlePressIn} onPressOut={handlePressOut}>
         <View style={[styles.imageContainer, { height: imageHeight }]}>
           {isLoading && (
             <View style={styles.imageLoader}>
@@ -179,11 +190,10 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems }) => {
               source={{ uri: item.image_url || item.media_url }}
               style={[styles.video, { height: imageHeight }]}
               resizeMode="cover"
-              shouldPlay={!isPaused}
               isLooping={true}
               onLoad={() => setIsLoading(false)}
               onError={(error) => {
-                console.log("Video loading error:", error);
+                console.error(`Video loading error for ${item.image_url || item.media_url}:`, error);
                 setIsLoading(false);
                 setIsVideo(false);
               }}
@@ -202,7 +212,7 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems }) => {
               onLoad={() => setIsLoading(false)}
             />
           )}
-          {isVideo && isPaused && (
+          {isVideo && !isVisible && (
             <View style={styles.playButtonOverlay}>
               <Image source={require('../assets/play-button.png')} style={styles.playButton} />
             </View>
@@ -260,6 +270,15 @@ export default function HomeScreen() {
   const [postsError, setPostsError] = useState(null);
   const [isFieldsModalVisible, setFieldsModalVisible] = useState(false);
   const [selectedFields, setSelectedFields] = useState([]);
+  const [viewableItems, setViewableItems] = useState([]);
+
+  const onViewableItemsChanged = useCallback(debounce(({ viewableItems }) => {
+    setViewableItems(viewableItems.map(item => item.index));
+  }, 100), []);
+
+  const viewabilityConfig = {
+    itemVisiblePercentThreshold: 50,
+  };
 
   const FIELDS = [
     "Tech", "AI", "Sustainability", "Finance", "Health", "Education",
@@ -421,7 +440,7 @@ export default function HomeScreen() {
           placeholder="Search..."
           placeholderTextColor="#aaa"
         />
-        <TouchableOpacity onPress={() => navigation.navigate('ChatList')}>
+        <TouchableOpacity onPress={() => navigation.navigate('Chat')}>
           <Image source={require('../assets/Arrow.png')} style={styles.chatIcon} />
         </TouchableOpacity>
         <TouchableOpacity onPress={() => setFieldsModalVisible(true)}>
@@ -438,6 +457,8 @@ export default function HomeScreen() {
             index={index}
             toggleExpand={toggleExpand}
             expandedItems={expandedItems}
+            isVisible={viewableItems.includes(index)}
+            navigation={navigation}
           />
         )}
         keyExtractor={keyExtractor}
@@ -447,6 +468,8 @@ export default function HomeScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.listContentContainer}
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={viewabilityConfig}
       />
 
       <View style={[styles.bottomNav, { borderTopColor: '#E9ECEF' }]}>
@@ -464,8 +487,6 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
-
-      {/* Fields Modal */}
       <Modal
         isVisible={isFieldsModalVisible}
         onBackdropPress={() => setFieldsModalVisible(false)}
@@ -526,7 +547,7 @@ const styles = StyleSheet.create({
     borderRadius: 20
   },
   searchBar: {
-    width: '55%', // Adjusted to fit new button
+    width: '55%',
     marginHorizontal: 10,
     paddingHorizontal: 15,
     backgroundColor: '#eee',

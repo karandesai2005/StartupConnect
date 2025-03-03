@@ -97,11 +97,57 @@ const Post = {
     }
   },
 
+  getPostsByUsername: async (username) => {
+    console.log('=== 🔹 Fetching Posts for Username:', username);
+
+    const query = `
+      SELECT 
+        p.post_id,
+        p.content,
+        p.media_url,
+        p.created_at,
+        p.user_id,
+        u.username,
+        u.name,
+        u.profile_picture,
+        (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.post_id) as like_count
+      FROM posts p
+      JOIN users u ON p.user_id = u.user_id 
+      WHERE u.username = @username
+      ORDER BY p.created_at DESC;
+    `;
+
+    try {
+      const pool = await connectDB();
+      const request = pool.request()
+        .input('username', sql.NVarChar, username);
+      const result = await request.query(query);
+
+      if (result.recordset.length === 0) {
+        // Check if the user exists to differentiate between no posts and no user
+        const userCheck = await pool.request()
+          .input('username', sql.NVarChar, username)
+          .query('SELECT 1 FROM users WHERE username = @username');
+        if (userCheck.recordset.length === 0) {
+          throw new Error('User not found');
+        }
+      }
+
+      console.log(`✅ Found ${result.recordset.length} posts for username ${username}`);
+      return result.recordset;
+    } catch (error) {
+      console.error('❌ Database error in getPostsByUsername:', error);
+      if (error.message === 'User not found') {
+        throw new Error('User not found');
+      }
+      throw new Error('Database error: Unable to fetch posts by username.');
+    }
+  },
+
   toggleLike: async (postId, userId) => {
     console.log('=== 🔹 Toggling Like ===');
     console.log('Post ID:', postId, 'User ID:', userId);
 
-    // First verify the post exists
     const verifyQuery = `
       IF NOT EXISTS (SELECT 1 FROM posts WHERE post_id = @postId)
         THROW 50404, 'Post not found.', 1;
@@ -137,12 +183,10 @@ const Post = {
       await transaction.begin();
 
       try {
-        // Verify post exists
         await pool.request()
           .input('postId', sql.Int, postId)
           .query(verifyQuery);
 
-        // Perform like toggle
         const result = await pool.request()
           .input('postId', sql.Int, postId)
           .input('userId', sql.Int, userId)
