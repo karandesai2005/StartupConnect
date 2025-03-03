@@ -8,7 +8,8 @@ const {
   getUserProfile,
   updateProfile,
   getUserProfileByUsername, // New endpoint
-  getUserPostsByUsername    // New endpoint
+  getUserPostsByUsername,    // New endpoint
+  searchUsers
 } = require("../controllers/authController");
 
 const { 
@@ -49,4 +50,5 @@ router.get("/users/:username", authenticateJWT, getUserProfileByUsername);
 // New route: Fetch user posts by username (protected)
 router.get("/posts/user/:username", authenticateJWT, getUserPostsByUsername);
 
+router.get("/search-users", authenticateJWT, searchUsers);
 module.exports = router;
