@@ -5,9 +5,7 @@ const path = require("path");
 const cors = require("cors");
 const { connectDB } = require("./config/db");
 const postRoutes = require("./routes/postRoutes");
-const authRoutes = require("./routes/authRoutes"); // Import authRoute.js
-// const chatRoutes = require("./routes/chatRoutes");
-
+const authRoutes = require("./routes/authRoutes"); // Corrected to match your file name (authRoutes.js)
 const app = express();
 const PORT = process.env.PORT || 8080;
 
@@ -26,7 +24,6 @@ app.get("/", (req, res) => {
 
 // API Routes
 app.use("/api", postRoutes);
-// app.use("/api", chatRoutes);
 app.use("/api/auth", authRoutes); // Mount authRoutes at /api/auth
 
 // Error handling middleware
