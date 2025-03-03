@@ -449,20 +449,21 @@ export default function HomeScreen() {
         contentContainerStyle={styles.listContentContainer}
       />
 
-      <View style={styles.bottomNav}>
+      <View style={[styles.bottomNav, { borderTopColor: '#E9ECEF' }]}>
         <TouchableOpacity onPress={() => navigation.navigate('Home')}>
-          <Image source={require('../assets/film.png')} style={styles.navIcon} />
+          <Image source={require('../assets/film.png')} style={[styles.navIcon]} />
         </TouchableOpacity>
         <TouchableOpacity onPress={() => navigation.navigate('CreatePost')}>
-          <Image source={require('../assets/plus3.png')} style={styles.navIcon} />
+          <Image source={require('../assets/plus3.png')} style={[styles.navIcon]} />
         </TouchableOpacity>
         <TouchableOpacity onPress={() => navigation.navigate('Reel')}>
-          <Image source={require('../assets/bell.png')} style={styles.navIcon} />
+          <Image source={require('../assets/bell.png')} style={[styles.navIcon]} />
         </TouchableOpacity>
         <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
-          <Image source={require('../assets/settings.png')} style={styles.navIcon} />
+          <Image source={require('../assets/settings.png')} style={[styles.navIcon]} />
         </TouchableOpacity>
       </View>
+
 
       {/* Fields Modal */}
       <Modal
@@ -629,10 +630,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   navIcon: {
-    width: 24,
-    height: 24,
-    marginBottom: 4,
-    ...(Platform.OS === 'android' && { tintColor: undefined })
+    width: 22,
+    height: 22,
+    marginBottom: Platform.OS === 'ios' ? 3 : 0,
   },
   captionContainer: {
     paddingHorizontal: 12,
@@ -656,12 +656,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    paddingVertical: Platform.OS === 'ios' ? 20 : 12,
-    paddingBottom: Platform.OS === 'ios' ? 34 : 12,
+    paddingVertical: Platform.OS === 'ios' ? 12 : 8,
+    paddingBottom: Platform.OS === 'ios' ? 24 : 8,
     borderTopWidth: 1,
-    borderTopColor: '#eee',
-    backgroundColor: '#fff',
-    height: Platform.OS === 'ios' ? 84 : 60,
+    height: Platform.OS === 'ios' ? 70 : 48,
   },
   listContentContainer: {
     paddingBottom: 8,

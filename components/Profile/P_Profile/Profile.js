@@ -42,7 +42,7 @@ const Profile = ({ route, isBusinessProfile = false }) => {
   const [lastUpdate, setLastUpdate] = useState(0);
   const [activeTab, setActiveTab] = useState('stories');
   const [userPosts, setUserPosts] = useState([]);
-  
+
   const [isGraphModalVisible, setGraphModalVisible] = useState(false);
   const [userGraphs, setUserGraphs] = useState([]);
   const handleAddGraph = (graphData) => {
@@ -82,11 +82,11 @@ const Profile = ({ route, isBusinessProfile = false }) => {
 
   const fetchUserPosts = useCallback(async () => {
     try {
-      const token = await AsyncStorage.getItem("token");
-      if (!token) {
-        navigation.navigate('Login');
-        return;
-      }
+      // const token = await AsyncStorage.getItem("token");
+      // if (!token) {
+      //   navigation.navigate('Login');
+      //   return;
+      // }
       const response = await fetch(`${NGROK_URL}/api/posts/myposts`, {
         method: "GET",
         headers: {
@@ -124,11 +124,11 @@ const Profile = ({ route, isBusinessProfile = false }) => {
 
   const fetchUserData = useCallback(async () => {
     try {
-      const token = await AsyncStorage.getItem("token");
-      if (!token) {
-        navigation.navigate('Login');
-        return;
-      }
+      // const token = await AsyncStorage.getItem("token");
+      // if (!token) {
+      //   navigation.navigate('Login');
+      //   return;
+      // }
       const response = await fetch(`${NGROK_URL}/api/auth/profile?timestamp=${Date.now()}`, {
         method: "GET",
         headers: {
@@ -170,7 +170,7 @@ const Profile = ({ route, isBusinessProfile = false }) => {
         fetchUserData();
         fetchUserPosts();
       }
-      return () => {};
+      return () => { };
     }, [fetchUserData, fetchUserPosts, userData, lastUpdate])
   );
 
@@ -267,7 +267,7 @@ const Profile = ({ route, isBusinessProfile = false }) => {
           </View>
         </View>
       ))}
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.addGraphButton}
         onPress={() => setGraphModalVisible(true)}
       >
@@ -306,7 +306,7 @@ const Profile = ({ route, isBusinessProfile = false }) => {
         ) : (
           <Image
             source={
-              post?.image_url 
+              post?.image_url
                 ? { uri: post.image_url }
                 : post?.media_url
                   ? { uri: post.media_url }
@@ -328,8 +328,8 @@ const Profile = ({ route, isBusinessProfile = false }) => {
 
   const renderVenturesContent = () => (
     <View style={styles.venturesContainer}>
-      <Card 
-        title="Featured Achievement" 
+      <Card
+        title="Featured Achievement"
         style={{ width: '90%', marginBottom: 20 }}
       >
         <View style={styles.cardContent}>
@@ -417,10 +417,10 @@ const Profile = ({ route, isBusinessProfile = false }) => {
               <Text style={styles.button}>Edit Profile</Text>
             </TouchableOpacity>
             <View style={styles.storiesWrapper}>
-              <Stories 
-                stories={myStories} 
-                onStoryPress={handleStoryPress} 
-                title="Milestones and others" 
+              <Stories
+                stories={myStories}
+                onStoryPress={handleStoryPress}
+                title="Milestones and others"
               />
             </View>
           </View>
@@ -446,20 +446,22 @@ const Profile = ({ route, isBusinessProfile = false }) => {
         {activeTab === 'startups' && renderTry()}
         {activeTab === 'bucks' && renderGrid()}
       </ScrollView>
-
       <View style={styles.bottomNav}>
-        <TouchableOpacity onPress={() => navigation.navigate('Home')}>
-          <Image source={require('../../../assets/home4.webp')} style={styles.navIcon} />
+        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Home')}>
+          <Image source={require('../../../assets/film.png')} style={styles.navIcon} />
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => navigation.navigate('CreatePost')}>
+        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('CreatePost')}>
           <Image source={require('../../../assets/plus3.png')} style={styles.navIcon} />
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => navigation.navigate('Notifications')}>
+        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Reel')}>
           <Image source={require('../../../assets/bell.png')} style={styles.navIcon} />
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Settings')}>
           <Image source={require('../../../assets/settings.png')} style={styles.navIcon} />
         </TouchableOpacity>
+
+        {/* Center indicator line */}
+        <View style={styles.navIndicator} />
       </View>
     </View>
   );
@@ -718,28 +720,49 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
   },
+  // Updated styles for bottom navigation
+  // Update these styles in your StyleSheet
   bottomNav: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
+    paddingVertical: Platform.OS === 'ios' ? 12 : 10,
+    paddingBottom: Platform.OS === 'ios' ? 30 : 12,
+    paddingHorizontal: 20,
+    borderTopWidth: 0.5,
+    borderTopColor: '#E0E0E0',
+    backgroundColor: '#FFFFFF',
+    height: Platform.OS === 'ios' ? 80 : 60,
     position: 'absolute',
-    paddingVertical: Platform.OS === 'ios' ? 20 : 12,
-    paddingBottom: Platform.OS === 'ios' ? 34 : 12,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-    backgroundColor: '#ffff',
-    width: "100%",
     bottom: 0,
-    zIndex: 10,
     left: 0,
     right: 0,
-    height: Platform.OS === 'ios' ? 84 : 60,
+    zIndex: 10,
+  },
+  navItem: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 50,
+    height: 50,
   },
   navIcon: {
-    width: 24,
-    height: 24,
-    marginBottom: 4,
-    ...(Platform.OS === 'android' && { tintColor: undefined })
+    width: 22,
+    height: 22,
+    marginBottom: Platform.OS === 'ios' ? 3 : 0,
+  },
+  navIndicator: {
+    position: 'absolute',
+    bottom: Platform.OS === 'ios' ? 25 : 8,
+    width: '40%',
+    height: 4,
+    backgroundColor: '#CCCCCC',
+    borderRadius: 2,
+    alignSelf: 'center',
+  },
+  navIcon: {
+    width: 22,
+    height: 22,
+    marginBottom: Platform.OS === 'ios' ? 3 : 0,
   },
   storiesWrapper: {
     width: '95%',
