@@ -82,11 +82,11 @@ const Profile = ({ route, isBusinessProfile = false }) => {
 
   const fetchUserPosts = useCallback(async () => {
     try {
-      // const token = await AsyncStorage.getItem("token");
-      // if (!token) {
-      //   navigation.navigate('Login');
-      //   return;
-      // }
+      const token = await AsyncStorage.getItem("token");
+      if (!token) {
+        navigation.navigate('Login');
+        return;
+      }
       const response = await fetch(`${NGROK_URL}/api/posts/myposts`, {
         method: "GET",
         headers: {
@@ -124,11 +124,11 @@ const Profile = ({ route, isBusinessProfile = false }) => {
 
   const fetchUserData = useCallback(async () => {
     try {
-      // const token = await AsyncStorage.getItem("token");
-      // if (!token) {
-      //   navigation.navigate('Login');
-      //   return;
-      // }
+      const token = await AsyncStorage.getItem("token");
+      if (!token) {
+        navigation.navigate('Login');
+        return;
+      }
       const response = await fetch(`${NGROK_URL}/api/auth/profile?timestamp=${Date.now()}`, {
         method: "GET",
         headers: {
