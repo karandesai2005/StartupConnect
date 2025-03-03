@@ -20,7 +20,7 @@ const register = async (req, res) => {
       'SELECT * FROM users WHERE email = @param1',
       [normalizedEmail]
     );
-    
+
     if (existingUsers.length > 0) {
       return res.status(400).json({ message: "Email already in use" });
     }
@@ -33,7 +33,7 @@ const register = async (req, res) => {
       VALUES (@param1, @param2, @param3, @param4, @param5);
       SELECT SCOPE_IDENTITY() AS user_id;
     `;
-    
+
     const result = await queryDB(query, [
       username,
       normalizedEmail,
@@ -42,9 +42,9 @@ const register = async (req, res) => {
       isInvestor ? 1 : 0
     ]);
 
-    res.status(201).json({ 
-      message: "User registered successfully", 
-      user: { 
+    res.status(201).json({
+      message: "User registered successfully",
+      user: {
         user_id: result[0].user_id,
         username,
         email: normalizedEmail
@@ -58,49 +58,39 @@ const register = async (req, res) => {
 const login = async (req, res) => {
   try {
     const { email, username, password } = req.body;
-    console.log("Login attempt with:", { email, username }); // Debug log
-    
+    console.log("Login attempt with:", { email, username });
+
     if (!email && !username) {
       return res.status(400).json({ message: "Email or username is required." });
     }
 
-    let query;
-    let paramValue;
+    let query = email ? "SELECT * FROM users WHERE email = @param1" : "SELECT * FROM users WHERE username = @param1";
+    let paramValue = (email || username).toLowerCase();
 
-    if (email) {
-      query = "SELECT * FROM users WHERE email = @param1";
-      paramValue = email.toLowerCase();
-    } else {
-      query = "SELECT * FROM users WHERE username = @param1";
-      paramValue = username.toLowerCase();
-    }
-
-    // Use queryDB instead of pool.request()
     const users = await queryDB(query, [paramValue]);
-    console.log("Query result:", users); // Debug log
+    console.log("Query result:", users);
 
     if (users.length === 0) {
       return res.status(400).json({ message: "Invalid email/username or password" });
     }
 
     const user = users[0];
-    console.log("Found user:", { userId: user.user_id }); // Debug log
+    console.log("Found user:", { userId: user.user_id });
 
-    // Compare hashed password
     const isMatch = await bcrypt.compare(password, user.password_hash);
-    console.log("Password match:", isMatch); // Debug log
-    
+    console.log("Password match:", isMatch);
+
     if (!isMatch) {
       return res.status(400).json({ message: "Invalid email/username or password" });
     }
 
-    // Generate JWT token
+    console.log("JWT_SECRET:", process.env.JWT_SECRET); // Check if secret is set
     const token = jwt.sign({ userId: user.user_id }, process.env.JWT_SECRET, {
       expiresIn: "1h",
     });
-
+    console.log("Generated token:", token);
+    console.log("Sending response:", { message: "Login successful", token });
     res.status(200).json({ message: "Login successful", token });
-
   } catch (err) {
     console.error("Login error:", err);
     res.status(500).json({ message: "Internal server error", error: err.message });
@@ -250,7 +240,7 @@ const validateUsername = async (req, res) => {
       'SELECT * FROM users WHERE username = @param1',
       [username]
     );
-    
+
     console.log("Query result:", existingUsers); // Debug log
 
     if (existingUsers.length > 0) {
@@ -350,4 +340,4 @@ const updateProfile = async (req, res) => {
 
 
 
-module.exports = { register, login, validateUsername, saveUserDetails, getUserProfile,updateProfile };
+module.exports = { register, login, validateUsername, saveUserDetails, getUserProfile, updateProfile };
