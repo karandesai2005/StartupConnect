@@ -360,7 +360,9 @@ export default function HomeScreen() {
           "Content-Type": "application/json",
         },
         params: { q: query }
+        
       });
+      console.log("Search results:", response.data);
       setSearchResults(response.data);
     } catch (error) {
       console.error('Error searching users:', error);
@@ -459,10 +461,12 @@ export default function HomeScreen() {
   };
 
   const handleUserPress = (username) => {
+    console.log("User pressed:", username); // Debug log
     setSearchQuery('');
     setSearchResults([]);
     setIsSearchActive(false);
     navigation.navigate('Profile', { username, isOtherUser: true });
+    console.log("Navigation triggered to Profile with:", { username, isOtherUser: true }); // Debug log
   };
 
   const renderSearchResult = ({ item }) => (

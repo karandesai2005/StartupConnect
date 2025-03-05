@@ -5,7 +5,7 @@ const { uploadAndConvertPostMedia } = require("../config/multerConfig");
 
 const router = express.Router();
 
-// Debug Middleware
+
 const debugMiddleware = (req, res, next) => {
   console.log('=== Route Debug ===');
   console.log('Route:', req.path, '| Method:', req.method);
@@ -13,7 +13,7 @@ const debugMiddleware = (req, res, next) => {
   next();
 };
 
-// Post Creation Route (Supports Image & Video, Converts MOV to MP4)
+
 router.post('/posts',
   debugMiddleware,
   authenticateJWT,

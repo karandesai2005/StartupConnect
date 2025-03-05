@@ -124,7 +124,7 @@ const Profile = ({ route, isBusinessProfile = false }) => {
       let response;
       if (isOtherUser && username) {
         // Fetch another user's profile
-        response = await fetch(`${NGROK_URL}/api/users/${username}`, {
+        response = await fetch(`${NGROK_URL}/api/auth/users/${username}`, {
           method: "GET",
           headers: {
             "Authorization": `Bearer ${token}`,
