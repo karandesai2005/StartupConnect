@@ -99,7 +99,7 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
     }
     return () => {
       if (isVideo && videoRef.current) {
-        videoRef.current.pauseAsync().catch(() => {});
+        videoRef.current.pauseAsync().catch(() => { });
       }
     };
   }, [isVisible, isVideo]);
@@ -178,21 +178,56 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
   };
 
   const handleAddComment = async () => {
-    if (!newComment.trim()) return;
+    if (!newComment.trim()) {
+      console.log('❌ Comment not posted: New comment is empty or just whitespace');
+      return;
+    }
     try {
+      console.log('🔍 Starting to add comment - Post ID:', item.post_id);
+      console.log('📝 Comment content:', newComment);
+
       const token = await AsyncStorage.getItem("token");
-      if (!token || !item.post_id) return;
+      console.log('🔑 Retrieved token from AsyncStorage:', token ? 'Token found' : 'No token found');
+
+      if (!token) {
+        console.error('❌ No token found in AsyncStorage - Authentication required');
+        return;
+      }
+      if (!item.post_id) {
+        console.error('❌ No post_id found - Cannot post comment without a post ID');
+        return;
+      }
+
+      console.log('🚀 Sending POST request to:', `${NGROK_URL}/api/posts/${item.post_id}/comments`);
+      console.log('📤 Request payload:', { content: newComment });
+      console.log('🔐 Authorization header:', `Bearer ${token}`);
+
       const response = await axios.post(
         `${NGROK_URL}/api/posts/${item.post_id}/comments`,
         { content: newComment },
         { headers: { Authorization: `Bearer ${token}` } }
       );
+
+      console.log('✅ Comment posted successfully - Response:', response.data);
       if (response.data) {
         setComments(prev => [...prev, response.data]); // Add new comment to the list
         setNewComment(''); // Clear input
+        console.log('📋 Updated comments state:', [...prev, response.data]);
+        console.log('🧹 Cleared newComment input');
       }
     } catch (error) {
-      console.error('Error adding comment:', error);
+      console.error('❌ Error adding comment:', {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data,
+      });
+      if (error.response) {
+        console.error('🌐 Server response:', error.response.data);
+      } else if (error.request) {
+        console.error('📡 No response received - Network issue:', error.request);
+      } else {
+        console.error('⚠️ Error setting up request:', error.message);
+      }
     }
   };
 

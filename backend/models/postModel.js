@@ -35,7 +35,7 @@ const Post = {
   },
 
   getAllPosts: async () => {
-    console.log('=== 🔹 Fetching All Posts With Likes ===');
+    console.log('=== 🔹 Fetching All Posts With Likes and Comments ===');
 
     const query = `
       SELECT 
@@ -47,7 +47,8 @@ const Post = {
         u.username,
         u.name,
         u.profile_picture,
-        (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.post_id) as like_count
+        (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.post_id) as like_count,
+        (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.post_id) as comment_count  -- Add comment count
       FROM posts p
       JOIN users u ON p.user_id = u.user_id
       ORDER BY p.created_at DESC;
@@ -77,7 +78,8 @@ const Post = {
         u.username,
         u.name,
         u.profile_picture,
-        (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.post_id) as like_count
+        (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.post_id) as like_count,
+        (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.post_id) as comment_count  -- Add comment count
       FROM posts p
       JOIN users u ON p.user_id = u.user_id 
       WHERE p.user_id = @user_id
@@ -110,7 +112,8 @@ const Post = {
         u.username,
         u.name,
         u.profile_picture,
-        (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.post_id) as like_count
+        (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.post_id) as like_count,
+        (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.post_id) as comment_count  -- Add comment count
       FROM posts p
       JOIN users u ON p.user_id = u.user_id 
       WHERE u.username = @username
@@ -244,6 +247,7 @@ const Post = {
       throw new Error('Database error: Unable to get like status.');
     }
   },
+
   getCommentsByPostId: async (postId) => {
     console.log('=== 🔹 Fetching Comments for Post:', postId);
   
@@ -297,10 +301,10 @@ const Post = {
       const result = await request.query(query);
       console.log('✅ Comment created successfully:', result.recordset[0]);
   
-      // Optionally increment the post's comment count
-      await pool.request()
-        .input('postId', sql.Int, postId)
-        .query('UPDATE posts SET comments = comments + 1 WHERE post_id = @postId');
+      // Optionally increment the post's comment count (removed since no column exists in dbo_posts)
+      // await pool.request()
+      //   .input('postId', sql.Int, postId)
+      //   .query('UPDATE posts SET comments = comments + 1 WHERE post_id = @postId');
   
       return result.recordset[0];
     } catch (error) {
@@ -309,7 +313,5 @@ const Post = {
     }
   }
 };
-
-
 
 module.exports = Post;
