@@ -45,6 +45,9 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
   const [isLoading, setIsLoading] = useState(true);
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(item.likes || 0);
+  const [comments, setComments] = useState([]); // State to store comments
+  const [newComment, setNewComment] = useState(''); // State for new comment input
+  const [isCommentModalVisible, setIsCommentModalVisible] = useState(false); // State for comment modal
   const animatedScale = new Animated.Value(1);
   const [isVideo, setIsVideo] = useState(false);
   const videoRef = React.useRef(null);
@@ -54,6 +57,7 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
 
   useEffect(() => {
     fetchLikeStatus();
+    fetchComments(); // Fetch comments when the component mounts
   }, [item.post_id]);
 
   useEffect(() => {
@@ -124,6 +128,21 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
     }
   };
 
+  const fetchComments = async () => {
+    try {
+      const token = await AsyncStorage.getItem("token");
+      if (!token || !item.post_id) return;
+      const response = await axios.get(`${NGROK_URL}/api/posts/${item.post_id}/comments`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (response.data) {
+        setComments(response.data); // Assuming response.data is an array of comments
+      }
+    } catch (error) {
+      console.error('Error fetching comments:', error);
+    }
+  };
+
   const handleLike = async () => {
     try {
       const token = await AsyncStorage.getItem("token");
@@ -152,6 +171,29 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
   const handleProfilePress = () => {
     const username = isUserPost ? item.username : (item.name ? `${item.name.first} ${item.name.last}` : 'User');
     navigation.navigate('Profile', { username, isOtherUser: true });
+  };
+
+  const toggleCommentModal = () => {
+    setIsCommentModalVisible(!isCommentModalVisible);
+  };
+
+  const handleAddComment = async () => {
+    if (!newComment.trim()) return;
+    try {
+      const token = await AsyncStorage.getItem("token");
+      if (!token || !item.post_id) return;
+      const response = await axios.post(
+        `${NGROK_URL}/api/posts/${item.post_id}/comments`,
+        { content: newComment },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (response.data) {
+        setComments(prev => [...prev, response.data]); // Add new comment to the list
+        setNewComment(''); // Clear input
+      }
+    } catch (error) {
+      console.error('Error adding comment:', error);
+    }
   };
 
   return (
@@ -221,7 +263,7 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
       </TouchableOpacity>
       <View style={styles.cardFooter}>
         <Text style={styles.likes}>👍 {likeCount} Likes</Text>
-        <Text style={styles.comments}>💬 {item.comments || 0} Comments</Text>
+        <Text style={styles.comments}>💬 {comments.length || 0} Comments</Text> {/* Updated to show actual comment count */}
       </View>
       <View style={styles.actions}>
         <TouchableOpacity style={styles.actionButton} onPress={debouncedHandleLike} activeOpacity={0.7} disabled={isLikeLoading}>
@@ -231,7 +273,7 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
           />
           {isLikeLoading && <ActivityIndicator size="small" color="#1f219c" style={styles.likeLoader} />}
         </TouchableOpacity>
-        <TouchableOpacity style={styles.actionButton}>
+        <TouchableOpacity style={styles.actionButton} onPress={toggleCommentModal}>
           <Image source={require('../assets/comment6.png')} style={styles.navIcon} />
         </TouchableOpacity>
         <TouchableOpacity style={styles.actionButton}>
@@ -254,6 +296,44 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
           </TouchableOpacity>
         )}
       </View>
+
+      {/* Comment Modal */}
+      <Modal
+        isVisible={isCommentModalVisible}
+        onBackdropPress={toggleCommentModal}
+        style={styles.commentModal}
+        animationIn="slideInUp"
+        animationOut="slideOutDown"
+      >
+        <View style={styles.commentModalContent}>
+          <Text style={styles.commentModalTitle}>Comments</Text>
+          <FlatList
+            data={comments}
+            renderItem={({ item }) => (
+              <View style={styles.commentItem}>
+                <Text style={styles.commentUsername}>{item.username || 'User'}</Text>
+                <Text style={styles.commentText}>{item.content}</Text>
+                <Text style={styles.commentTimestamp}>{formatTimestamp(item.created_at)}</Text>
+              </View>
+            )}
+            keyExtractor={(item) => item.comment_id.toString()}
+            style={styles.commentList}
+          />
+          <View style={styles.commentInputContainer}>
+            <TextInput
+              style={styles.commentInput}
+              placeholder="Add a comment..."
+              value={newComment}
+              onChangeText={setNewComment}
+              onSubmitEditing={handleAddComment}
+              returnKeyType="send"
+            />
+            <TouchableOpacity style={styles.postCommentButton} onPress={handleAddComment}>
+              <Text style={styles.postCommentText}>Post</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </Animated.View>
   );
 });
@@ -333,7 +413,7 @@ export default function HomeScreen() {
           content: post.content,
           created_at: post.created_at,
           likes: post.like_count || 0,
-          comments: 0,
+          comments: 0, // This can be updated to fetch actual comment count if needed
           caption: post.content
         }));
         const sortedPosts = mappedPosts
@@ -360,7 +440,6 @@ export default function HomeScreen() {
           "Content-Type": "application/json",
         },
         params: { q: query }
-        
       });
       console.log("Search results:", response.data);
       setSearchResults(response.data);
@@ -878,6 +957,74 @@ const styles = StyleSheet.create({
   closeButtonText: {
     fontSize: 16,
     color: '#007bff',
+    fontWeight: '600',
+  },
+  // New styles for comment modal
+  commentModal: {
+    justifyContent: 'flex-end',
+    margin: 0,
+  },
+  commentModalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 15,
+    borderTopRightRadius: 15,
+    padding: 15,
+    maxHeight: '70%',
+  },
+  commentModalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 10,
+  },
+  commentList: {
+    flex: 1,
+  },
+  commentItem: {
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  commentUsername: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#212529',
+  },
+  commentText: {
+    fontSize: 14,
+    color: '#495057',
+    marginTop: 5,
+  },
+  commentTimestamp: {
+    fontSize: 12,
+    color: '#868E96',
+    marginTop: 5,
+  },
+  commentInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    paddingTop: 10,
+  },
+  commentInput: {
+    flex: 1,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 20,
+    marginRight: 10,
+  },
+  postCommentButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    backgroundColor: '#007AFF',
+    borderRadius: 20,
+  },
+  postCommentText: {
+    color: '#fff',
+    fontSize: 14,
     fontWeight: '600',
   },
 });

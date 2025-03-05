@@ -64,4 +64,15 @@ router.get('/posts/all',
   postController.getAllPosts
 );
 
+router.get('/posts/:postId/comments', 
+  authenticateJWT, 
+  postController.getComments
+);
+
+// Create a new comment for a specific post
+router.post('/posts/:postId/comments', 
+  authenticateJWT, 
+  postController.createComment
+);
+
 module.exports = router;
