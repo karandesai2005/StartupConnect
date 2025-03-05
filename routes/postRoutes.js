@@ -5,7 +5,7 @@ const { uploadAndConvertPostMedia } = require("../config/multerConfig");
 
 const router = express.Router();
 
-// Debug Middleware
+
 const debugMiddleware = (req, res, next) => {
   console.log('=== Route Debug ===');
   console.log('Route:', req.path, '| Method:', req.method);
@@ -13,7 +13,7 @@ const debugMiddleware = (req, res, next) => {
   next();
 };
 
-// Post Creation Route (Supports Image & Video, Converts MOV to MP4)
+
 router.post('/posts',
   debugMiddleware,
   authenticateJWT,
@@ -62,6 +62,17 @@ router.get('/posts',
 // Fetch All Posts (Public Access)
 router.get('/posts/all', 
   postController.getAllPosts
+);
+
+router.get('/posts/:postId/comments', 
+  authenticateJWT, 
+  postController.getComments
+);
+
+// Create a new comment for a specific post
+router.post('/posts/:postId/comments', 
+  authenticateJWT, 
+  postController.createComment
 );
 
 module.exports = router;

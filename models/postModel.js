@@ -243,7 +243,73 @@ const Post = {
       }
       throw new Error('Database error: Unable to get like status.');
     }
+  },
+  getCommentsByPostId: async (postId) => {
+    console.log('=== 🔹 Fetching Comments for Post:', postId);
+  
+    const query = `
+      SELECT 
+        c.comment_id,
+        c.content,
+        c.created_at,
+        c.user_id,
+        u.username
+      FROM comments c
+      JOIN users u ON c.user_id = u.user_id
+      WHERE c.post_id = @postId
+      ORDER BY c.created_at DESC;
+    `;
+  
+    try {
+      const pool = await connectDB();
+      const request = pool.request()
+        .input('postId', sql.Int, postId);
+      const result = await request.query(query);
+      console.log(`✅ Found ${result.recordset.length} comments for post ${postId}`);
+      return result.recordset;
+    } catch (error) {
+      console.error('❌ Database error in getCommentsByPostId:', error);
+      throw new Error('Database error: Unable to fetch comments.');
+    }
+  },
+  
+  // Create a new comment for a post
+  createComment: async (postId, userId, content) => {
+    console.log('=== 🔹 Creating Comment for Post:', postId);
+  
+    const query = `
+      INSERT INTO comments (post_id, user_id, content, created_at) 
+      OUTPUT 
+        INSERTED.comment_id,
+        INSERTED.content,
+        INSERTED.created_at,
+        INSERTED.user_id
+      VALUES (@postId, @userId, @content, GETDATE());
+    `;
+  
+    try {
+      const pool = await connectDB();
+      const request = pool.request()
+        .input('postId', sql.Int, postId)
+        .input('userId', sql.Int, userId)
+        .input('content', sql.NVarChar, content);
+      
+      const result = await request.query(query);
+      console.log('✅ Comment created successfully:', result.recordset[0]);
+  
+      // Optionally increment the post's comment count
+      await pool.request()
+        .input('postId', sql.Int, postId)
+        .query('UPDATE posts SET comments = comments + 1 WHERE post_id = @postId');
+  
+      return result.recordset[0];
+    } catch (error) {
+      console.error('❌ Database error in createComment:', error);
+      throw new Error('Database error: Unable to create comment.');
+    }
   }
 };
+
+
 
 module.exports = Post;

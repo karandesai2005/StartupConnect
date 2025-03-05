@@ -138,6 +138,59 @@ const postController = {
       }
       res.status(500).json({ error: 'Server error', details: error.message });
     }
+  },
+  getComments: async (req, res) => {
+    try {
+      console.log('=== Get Comments Debug ===');
+      const { postId } = req.params;
+      const userId = req.user?.userId || req.user?.id;
+
+      if (!userId) {
+        return res.status(400).json({ error: "User ID is required." });
+      }
+
+      if (!postId) {
+        return res.status(400).json({ error: "Post ID is required." });
+      }
+
+      console.log('Fetching comments for post:', postId);
+      const comments = await Post.getCommentsByPostId(parseInt(postId));
+      console.log('Comments retrieved:', comments);
+      res.status(200).json(comments);
+    } catch (error) {
+      console.error('Error in getComments:', error);
+      res.status(500).json({ error: 'Server error', details: error.message });
+    }
+  },
+
+  // Create a new comment for a post
+  createComment: async (req, res) => {
+    try {
+      console.log('=== Create Comment Debug ===');
+      const { postId } = req.params;
+      const { content } = req.body;
+      const userId = req.user?.userId || req.user?.id;
+
+      if (!userId) {
+        return res.status(400).json({ error: "User ID is required." });
+      }
+
+      if (!postId) {
+        return res.status(400).json({ error: "Post ID is required." });
+      }
+
+      if (!content || content.trim() === '') {
+        return res.status(400).json({ error: "Comment content is required." });
+      }
+
+      console.log('Creating comment for post:', { postId, userId, content });
+      const newComment = await Post.createComment(parseInt(postId), userId, content);
+      console.log('Comment created:', newComment);
+      res.status(201).json(newComment);
+    } catch (error) {
+      console.error('Error in createComment:', error);
+      res.status(500).json({ error: 'Server error', details: error.message });
+    }
   }
 };
 
