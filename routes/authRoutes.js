@@ -1,54 +1,41 @@
-// routes/authRoute.js
 const express = require("express");
-const { 
-  register, 
-  login, 
-  validateUsername, 
-  saveUserDetails, 
+const {
+  register,
+  login,
+  logout,
+  deleteAccount,
+  validateUsername,
+  saveUserDetails,
   getUserProfile,
   updateProfile,
-  getUserProfileByUsername, // New endpoint
-  getUserPostsByUsername,    // New endpoint
+  getUserProfileByUsername,
+  getUserPostsByUsername,
   searchUsers
 } = require("../controllers/authController");
 
-const { 
-  validateUsernameInput, 
-  validateSaveUserDetailsInput 
+const {
+  validateUsernameInput,
+  validateSaveUserDetailsInput
 } = require("../middleware/validator");
 
-const authenticateJWT = require("../middleware/authenticateJWT");  
+const authenticateJWT = require("../middleware/authenticateJWT");
 const { uploadProfilePicture } = require("../config/multerConfig");
 
 const router = express.Router();
 
-// Register user
+// Public routes
 router.post("/register", validateSaveUserDetailsInput, register);
-
-// Login user
 router.post("/login", login);
-
-// Validate username availability
 router.post("/validate-username", validateUsernameInput, validateUsername);
-
-// Save user details step-by-step
 router.post("/save-user-details", validateSaveUserDetailsInput, saveUserDetails);
 
-// Fetch current user's profile (protected)
+// Protected routes
+router.post("/logout", authenticateJWT, logout);
+router.delete("/delete-account", authenticateJWT, deleteAccount);
 router.get("/profile", authenticateJWT, getUserProfile);
-
-// Update current user's profile (protected)
-router.put("/update-profile",  
-  authenticateJWT,  
-  uploadProfilePicture.single('profile_picture'),
-  updateProfile
-);
-
-// New route: Fetch user profile by username (protected)
+router.put("/update-profile", authenticateJWT, uploadProfilePicture.single('profile_picture'), updateProfile);
 router.get("/users/:username", authenticateJWT, getUserProfileByUsername);
-
-// New route: Fetch user posts by username (protected)
 router.get("/posts/user/:username", authenticateJWT, getUserPostsByUsername);
-
 router.get("/search-users", authenticateJWT, searchUsers);
+
 module.exports = router;
