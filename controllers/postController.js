@@ -74,7 +74,7 @@ const postController = {
       }
 
       console.log('Fetching posts for username:', username);
-      const posts = await Post.getPostsByUsername(username); // Assumes postModel has this method
+      const posts = await Post.getPostsByUsername(username);
       console.log(`Posts found for user ${username}:`, posts.length);
       res.status(200).json(posts);
     } catch (error) {
@@ -139,6 +139,7 @@ const postController = {
       res.status(500).json({ error: 'Server error', details: error.message });
     }
   },
+
   getComments: async (req, res) => {
     try {
       console.log('=== Get Comments Debug ===');
@@ -163,42 +164,50 @@ const postController = {
     }
   },
 
-  // Create a new comment for a post
-  createComment: async (postId, userId, content) => {
-    console.log('=== 🔹 Creating Comment for Post:', postId);
-    console.log('Comment details:', { postId, userId, content });
-  
-    const query = `
-      INSERT INTO comments (post_id, user_id, content, created_at) 
-      OUTPUT 
-        INSERTED.comment_id,
-        INSERTED.content,
-        INSERTED.created_at,
-        INSERTED.user_id
-      VALUES (@postId, @userId, @content, GETDATE());
-    `;
-  
-    try {
-      const pool = await connectDB();
-      const request = pool.request()
-        .input('postId', sql.Int, postId)
-        .input('userId', sql.Int, userId)
-        .input('content', sql.NVarChar, content);
-      
-      const result = await request.query(query);
-      console.log('✅ Comment created successfully:', result.recordset[0]);
-  
-      // Optionally increment the post's comment count (remove or comment out since no column exists)
-      // await pool.request()
-      //   .input('postId', sql.Int, postId)
-      //   .query('UPDATE posts SET comments = comments + 1 WHERE post_id = @postId');
-  
-      return result.recordset[0];
-    } catch (error) {
-      console.error('❌ Database error in createComment:', error);
-      throw new Error('Database error: Unable to create comment.');
+  // Corrected createComment method to delegate to postModel.js
+  createComment: async (req, res) => {
+    console.log('=== Create Comment Debug ===');
+    console.log('Request body:', req.body);
+    console.log('Request params:', req.params);
+    console.log('Request headers:', req.headers);
+
+    const { postId } = req.params;
+    const { content } = req.body;
+    const userId = req.user?.userId || req.user?.id;
+
+    if (!userId) {
+      return res.status(400).json({ error: "User ID is required." });
     }
-  }
+
+    if (!postId) {
+      return res.status(400).json({ error: "Post ID is required." });
+    }
+
+    if (!content || content.trim() === '') {
+      return res.status(400).json({ error: "Comment content is required." });
+    }
+
+    console.log('Creating comment for post:', { postId, userId, content });
+
+    try {
+      const newComment = await Post.createComment(parseInt(postId), userId, content);
+      console.log('✅ Comment created:', newComment);
+      res.status(201).json(newComment);
+    } catch (error) {
+      console.error('❌ Error in createComment:', {
+        message: error.message,
+        number: error.number, // SQL error number (if applicable)
+        state: error.state,   // SQL error state
+      });
+      if (error.message.includes('Post not found')) {
+        return res.status(404).json({ error: 'Post not found' });
+      }
+      if (error.message.includes('Foreign key constraint')) {
+        return res.status(400).json({ error: 'Invalid post or user ID.' });
+      }
+      res.status(500).json({ error: 'Server error', details: error.message });
+    }
+  },
 };
 
 module.exports = postController;
