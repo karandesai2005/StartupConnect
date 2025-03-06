@@ -96,6 +96,118 @@ const login = async (req, res) => {
   }
 };
 
+// Logout user
+const logout = async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(" ")[1]; // Extract token from "Bearer <token>"
+    if (!token) {
+      return res.status(400).json({ message: "No token provided" });
+    }
+
+    // Decode the token to get its expiration time
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const expiresAt = new Date(decoded.exp * 1000); // Convert expiration time to Date object
+
+    // Add the token to the blacklist
+    const query = `
+      INSERT INTO token_blacklist (token, expires_at)
+      VALUES (@param1, @param2)
+    `;
+    await queryDB(query, [token, expiresAt]);
+
+    res.status(200).json({ message: "Logged out successfully" });
+  } catch (err) {
+    console.error("Logout error:", err);
+    res.status(500).json({ message: "Internal server error", error: err.message });
+  }
+};
+
+// Middleware to check if token is blacklisted
+const checkTokenBlacklist = async (req, res, next) => {
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) {
+      return res.status(401).json({ message: "No token provided" });
+    }
+
+    // Check if token is in the blacklist
+    const query = `
+      SELECT * FROM token_blacklist WHERE token = @param1
+    `;
+    const result = await queryDB(query, [token]);
+
+    if (result.length > 0) {
+      return res.status(401).json({ message: "Token has been invalidated" });
+    }
+
+    next();
+  } catch (err) {
+    console.error("Token blacklist check error:", err);
+    res.status(500).json({ message: "Internal server error", error: err.message });
+  }
+};
+
+// Delete user account
+const deleteAccount = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const token = req.headers.authorization?.split(" ")[1]; // Extract token for blacklisting
+
+    // Begin transaction to ensure data integrity
+    const transactionQueries = [
+      // Delete user's comments
+      {
+        query: `
+          DELETE FROM comments WHERE user_id = @param1
+        `,
+        params: [userId]
+      },
+      // Delete user's likes
+      {
+        query: `
+          DELETE FROM likes WHERE user_id = @param1
+        `,
+        params: [userId]
+      },
+      // Delete user's posts
+      {
+        query: `
+          DELETE FROM posts WHERE user_id = @param1
+        `,
+        params: [userId]
+      },
+      // Delete user
+      {
+        query: `
+          DELETE FROM users WHERE user_id = @param1
+        `,
+        params: [userId]
+      }
+    ];
+
+    // Execute all delete queries in a transaction
+    for (const { query, params } of transactionQueries) {
+      await queryDB(query, params);
+    }
+
+    // Blacklist the token
+    if (token) {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const expiresAt = new Date(decoded.exp * 1000);
+      const blacklistQuery = `
+        INSERT INTO token_blacklist (token, expires_at)
+        VALUES (@param1, @param2)
+      `;
+      await queryDB(blacklistQuery, [token, expiresAt]);
+    }
+
+    res.status(200).json({ message: "Account deleted successfully" });
+  } catch (err) {
+    console.error("Delete account error:", err);
+    res.status(500).json({ message: "Internal server error", error: err.message });
+  }
+};
+
 // Save user details step-by-step
 const saveUserDetails = async (req, res) => {
   console.log("Request Body:", req.body);
@@ -418,11 +530,14 @@ const searchUsers = async (req, res) => {
 module.exports = {
   register,
   login,
+  logout, // Added logout endpoint
+  deleteAccount, // Updated deleteAccount endpoint
   validateUsername,
   saveUserDetails,
   getUserProfile,
   updateProfile,
   getUserProfileByUsername,
   getUserPostsByUsername,
-  searchUsers // New export
+  searchUsers,
+  checkTokenBlacklist // Middleware for token blacklist checking
 };

@@ -13,6 +13,7 @@ import {
   RefreshControl,
   Animated,
   ScrollView,
+  BackHandler,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import axios from 'axios';
@@ -48,6 +49,7 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
   const [comments, setComments] = useState([]); // State to store comments
   const [newComment, setNewComment] = useState(''); // State for new comment input
   const [isCommentModalVisible, setIsCommentModalVisible] = useState(false); // State for comment modal
+  const [isCommentsLoading, setIsCommentsLoading] = useState(false); // State for loading comments
   const animatedScale = new Animated.Value(1);
   const [isVideo, setIsVideo] = useState(false);
   const videoRef = React.useRef(null);
@@ -57,7 +59,6 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
 
   useEffect(() => {
     fetchLikeStatus();
-    fetchComments(); // Fetch comments when the component mounts
   }, [item.post_id]);
 
   useEffect(() => {
@@ -104,6 +105,26 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
     };
   }, [isVisible, isVideo]);
 
+  useEffect(() => {
+    console.log('Comments state updated:', comments);
+  }, [comments]);
+
+  useEffect(() => {
+    console.log('isCommentModalVisible changed:', isCommentModalVisible);
+  }, [isCommentModalVisible]);
+
+  // Handle hardware back press on Android
+  useEffect(() => {
+    if (isCommentModalVisible) {
+      const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+        console.log('Hardware back press detected, closing modal');
+        setIsCommentModalVisible(false);
+        return true; // Prevent default back navigation
+      });
+      return () => backHandler.remove();
+    }
+  }, [isCommentModalVisible]);
+
   const handlePressIn = () => {
     Animated.spring(animatedScale, { toValue: 0.98, useNativeDriver: true }).start();
   };
@@ -116,7 +137,8 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
     try {
       const token = await AsyncStorage.getItem("token");
       if (!token || !item.post_id) return;
-      const response = await axios.get(`${NGROK_URL}/api/posts/${item.post_id}/likes`, {
+      const baseUrl = NGROK_URL.replace(/\/+$/, '');
+      const response = await axios.get(`${baseUrl}/api/posts/${item.post_id}/likes`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (response.data) {
@@ -130,16 +152,25 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
 
   const fetchComments = async () => {
     try {
+      console.log('Fetching comments for post:', item.post_id);
+      setIsCommentsLoading(true);
       const token = await AsyncStorage.getItem("token");
       if (!token || !item.post_id) return;
-      const response = await axios.get(`${NGROK_URL}/api/posts/${item.post_id}/comments`, {
+      const baseUrl = NGROK_URL.replace(/\/+$/, '');
+      const response = await axios.get(`${baseUrl}/api/posts/${item.post_id}/comments`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (response.data) {
-        setComments(response.data); // Assuming response.data is an array of comments
+        setComments(response.data || []);
+        console.log(`Fetched comments for post ${item.post_id}:`, response.data);
+      } else {
+        console.warn('No data returned from comments API');
       }
     } catch (error) {
       console.error('Error fetching comments:', error);
+      setComments([]);
+    } finally {
+      setIsCommentsLoading(false);
     }
   };
 
@@ -150,8 +181,9 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
       setIsLikeLoading(true);
       setIsLiked(prev => !prev);
       setLikeCount(prev => isLiked ? prev - 1 : prev + 1);
+      const baseUrl = NGROK_URL.replace(/\/+$/, '');
       const response = await axios.post(
-        `${NGROK_URL}/api/posts/${item.post_id}/toggle-like`,
+        `${baseUrl}/api/posts/${item.post_id}/toggle-like`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -174,6 +206,10 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
   };
 
   const toggleCommentModal = () => {
+    console.log('Toggling comment modal for post:', item.post_id, 'isVisible:', !isCommentModalVisible);
+    if (!isCommentModalVisible) {
+      fetchComments();
+    }
     setIsCommentModalVisible(!isCommentModalVisible);
   };
 
@@ -198,21 +234,22 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
         return;
       }
 
-      console.log('🚀 Sending POST request to:', `${NGROK_URL}/api/posts/${item.post_id}/comments`);
+      const baseUrl = NGROK_URL.replace(/\/+$/, '');
+      console.log('🚀 Sending POST request to:', `${baseUrl}/api/posts/${item.post_id}/comments`);
       console.log('📤 Request payload:', { content: newComment });
       console.log('🔐 Authorization header:', `Bearer ${token}`);
 
       const response = await axios.post(
-        `${NGROK_URL}/api/posts/${item.post_id}/comments`,
+        `${baseUrl}/api/posts/${item.post_id}/comments`,
         { content: newComment },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
       console.log('✅ Comment posted successfully - Response:', response.data);
       if (response.data) {
-        setComments(prev => [...prev, response.data]); // Add new comment to the list
+        await fetchComments();
         setNewComment(''); // Clear input
-        console.log('📋 Updated comments state:', [...prev, response.data]);
+        console.log('📋 Refreshed comments state from server');
         console.log('🧹 Cleared newComment input');
       }
     } catch (error) {
@@ -220,6 +257,7 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
         message: error.message,
         status: error.response?.status,
         data: error.response?.data,
+        config: error.config,
       });
       if (error.response) {
         console.error('🌐 Server response:', error.response.data);
@@ -227,6 +265,9 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
         console.error('📡 No response received - Network issue:', error.request);
       } else {
         console.error('⚠️ Error setting up request:', error.message);
+      }
+      if (error.response?.status === 401) {
+        console.error('🔒 Token invalid or expired - Attempting to refresh or login again');
       }
     }
   };
@@ -298,7 +339,7 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
       </TouchableOpacity>
       <View style={styles.cardFooter}>
         <Text style={styles.likes}>👍 {likeCount} Likes</Text>
-        <Text style={styles.comments}>💬 {comments.length || 0} Comments</Text> {/* Updated to show actual comment count */}
+        <Text style={styles.comments}>💬 {item.comment_count || comments.length || 0} Comments</Text>
       </View>
       <View style={styles.actions}>
         <TouchableOpacity style={styles.actionButton} onPress={debouncedHandleLike} activeOpacity={0.7} disabled={isLikeLoading}>
@@ -336,24 +377,44 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
       <Modal
         isVisible={isCommentModalVisible}
         onBackdropPress={toggleCommentModal}
+        onSwipeComplete={toggleCommentModal} // Added to allow swipe to dismiss
+        swipeDirection="down" // Enable swipe down to close
+        backdropOpacity={0.5} // Make backdrop visible and interactive
+        backdropColor="#000" // Ensure backdrop is dark
         style={styles.commentModal}
         animationIn="slideInUp"
         animationOut="slideOutDown"
+        useNativeDriver={true} // Improve performance
       >
         <View style={styles.commentModalContent}>
-          <Text style={styles.commentModalTitle}>Comments</Text>
-          <FlatList
-            data={comments}
-            renderItem={({ item }) => (
-              <View style={styles.commentItem}>
-                <Text style={styles.commentUsername}>{item.username || 'User'}</Text>
-                <Text style={styles.commentText}>{item.content}</Text>
-                <Text style={styles.commentTimestamp}>{formatTimestamp(item.created_at)}</Text>
-              </View>
-            )}
-            keyExtractor={(item) => item.comment_id.toString()}
-            style={styles.commentList}
-          />
+          <View style={styles.commentModalHeader}>
+            <Text style={styles.commentModalTitle}>Comments</Text>
+            <TouchableOpacity onPress={toggleCommentModal}>
+              <Text style={styles.closeButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+          {console.log('Rendering comment modal with comments:', comments)}
+          {isCommentsLoading ? (
+            <ActivityIndicator size="large" color="#007AFF" style={styles.commentLoader} />
+          ) : (
+            <FlatList
+              data={comments}
+              renderItem={({ item }) => {
+                console.log('Rendering comment:', item);
+                return (
+                  <View style={styles.commentItem}>
+                    <Text style={styles.commentUsername}>{item.username || 'User'}</Text>
+                    <Text style={styles.commentText}>{item.content}</Text>
+                    <Text style={styles.commentTimestamp}>{formatTimestamp(item.created_at)}</Text>
+                  </View>
+                );
+              }}
+              keyExtractor={(item) => item.comment_id.toString()}
+              style={styles.commentList}
+              contentContainerStyle={styles.commentListContent}
+              ListEmptyComponent={<Text style={styles.noCommentsText}>No comments yet.</Text>}
+            />
+          )}
           <View style={styles.commentInputContainer}>
             <TextInput
               style={styles.commentInput}
@@ -372,7 +433,6 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
     </Animated.View>
   );
 });
-
 export default function HomeScreen() {
   const [users, setUsers] = useState([]);
   const [myPosts, setMyPosts] = useState([]);
@@ -432,7 +492,8 @@ export default function HomeScreen() {
     try {
       setPostsError(null);
       const token = await AsyncStorage.getItem("token");
-      const response = await axios.get(`${NGROK_URL}/api/posts/all`, {
+      const baseUrl = NGROK_URL.replace(/\/+$/, '');
+      const response = await axios.get(`${baseUrl}/api/posts/all`, {
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`
@@ -448,7 +509,7 @@ export default function HomeScreen() {
           content: post.content,
           created_at: post.created_at,
           likes: post.like_count || 0,
-          comments: 0, // This can be updated to fetch actual comment count if needed
+          comments: post.comment_count || 0, // Use comment_count from backend
           caption: post.content
         }));
         const sortedPosts = mappedPosts
@@ -469,7 +530,8 @@ export default function HomeScreen() {
     }
     try {
       const token = await AsyncStorage.getItem("token");
-      const response = await axios.get(`${NGROK_URL}/api/auth/search-users`, {
+      const baseUrl = NGROK_URL.replace(/\/+$/, '');
+      const response = await axios.get(`${baseUrl}/api/auth/search-users`, {
         headers: {
           "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -511,7 +573,8 @@ export default function HomeScreen() {
     try {
       const token = await AsyncStorage.getItem("token");
       if (!token) return;
-      const response = await fetch(`${NGROK_URL}/api/auth/profile`, {
+      const baseUrl = NGROK_URL.replace(/\/+$/, '');
+      const response = await fetch(`${baseUrl}/api/auth/profile`, {
         method: "GET",
         headers: {
           "Authorization": `Bearer ${token}`,
@@ -575,12 +638,12 @@ export default function HomeScreen() {
   };
 
   const handleUserPress = (username) => {
-    console.log("User pressed:", username); // Debug log
+    console.log("User pressed:", username);
     setSearchQuery('');
     setSearchResults([]);
     setIsSearchActive(false);
     navigation.navigate('Profile', { username, isOtherUser: true });
-    console.log("Navigation triggered to Profile with:", { username, isOtherUser: true }); // Debug log
+    console.log("Navigation triggered to Profile with:", { username, isOtherUser: true });
   };
 
   const renderSearchResult = ({ item }) => (
@@ -711,7 +774,6 @@ export default function HomeScreen() {
     </View>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -994,7 +1056,7 @@ const styles = StyleSheet.create({
     color: '#007bff',
     fontWeight: '600',
   },
-  // New styles for comment modal
+  // Styles for comment modal
   commentModal: {
     justifyContent: 'flex-end',
     margin: 0,
@@ -1004,21 +1066,39 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 15,
     borderTopRightRadius: 15,
     padding: 15,
-    maxHeight: '70%',
+    flex: 1,
+    maxHeight: '90%',
+  },
+  commentModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
   },
   commentModalTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#333',
-    marginBottom: 10,
+  },
+  closeButtonText: {
+    fontSize: 16,
+    color: '#007AFF',
+    fontWeight: '600',
   },
   commentList: {
     flex: 1,
+    marginBottom: 15,
+    // backgroundColor: 'rgba(0, 255, 0, 0.1)', // Keep for debugging
+  },
+  commentListContent: {
+    paddingBottom: 10,
   },
   commentItem: {
     paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
+    minHeight: 60,
+    // backgroundColor: 'rgba(255, 0, 0, 0.1)', // Keep for debugging
   },
   commentUsername: {
     fontSize: 14,
@@ -1061,5 +1141,14 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: '600',
+  },
+  commentLoader: {
+    marginVertical: 20,
+  },
+  noCommentsText: {
+    fontSize: 14,
+    color: '#868E96',
+    textAlign: 'center',
+    marginVertical: 20,
   },
 });
