@@ -148,7 +148,14 @@ const Profile = ({ route, isBusinessProfile = false }) => {
       return null;
     }
     try {
-      const response = await fetch(`${NGROK_URL}/api${endpoint}`, {
+      // Make sure NGROK_URL doesn't end with a slash and endpoint starts with one
+      const baseUrl = NGROK_URL.endsWith('/') ? NGROK_URL.slice(0, -1) : NGROK_URL;
+      const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+      
+      const url = `${baseUrl}/api/profile${cleanEndpoint}`;
+      console.log(`Fetching: ${url}`); // Debug log
+      
+      const response = await fetch(url, {
         method,
         headers: {
           "Authorization": `Bearer ${token}`,
@@ -156,112 +163,17 @@ const Profile = ({ route, isBusinessProfile = false }) => {
         },
         body: body ? JSON.stringify(body) : null,
       });
+      
       if (!response.ok) {
         console.error(`Failed to fetch ${endpoint}: ${response.status}`);
         return null;
       }
+      
       return await response.json();
     } catch (error) {
       console.error(`Error fetching ${endpoint}:`, error);
       return null;
     }
-  };
-
-  const fetchStories = useCallback(async () => {
-    const data = await fetchWithAuth('/profile/stories');
-    if (data) setStories(data);
-  }, []);
-
-  const fetchSections = useCallback(async () => {
-    const data = await fetchWithAuth('/profile/sections');
-    if (data) setSections(data);
-  }, []);
-
-  const fetchGraphs = useCallback(async () => {
-    const data = await fetchWithAuth('/profile/graphs');
-    if (data) {
-      setUserGraphs(data.map(graph => ({
-        ...graph,
-        data: typeof graph.data === 'string' ? JSON.parse(graph.data) : graph.data
-      })));
-    }
-  }, []);
-
-  const handleAddStory = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') return;
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 1,
-    });
-
-    if (!result.canceled) {
-      const newStory = {
-        username: userData?.username || 'User',
-        image_url: result.assets[0].uri,
-        has_story: true,
-        viewed: false
-      };
-      const data = await fetchWithAuth('/profile/stories', 'POST', newStory);
-      if (data) setStories(prev => [...prev, { ...newStory, story_id: data.story_id }]);
-    }
-  };
-
-  const handleAddGraph = (graphData) => {
-    fetchWithAuth('/profile/graphs', 'POST', graphData).then(data => {
-      if (data) {
-        setUserGraphs(prev => [...prev, { 
-          ...graphData, 
-          graph_id: data.graph_id,
-          data: typeof graphData.data === 'string' ? JSON.parse(graphData.data) : graphData.data 
-        }]);
-      }
-    });
-  };
-
-  const handleAddSection = () => {
-    setSectionModalVisible(true);
-    setSectionType(null);
-    setSectionTitle('');
-    setSectionContent('');
-    setImageUri(null);
-  };
-
-  const handleSectionSubmit = async () => {
-    if (!sectionTitle || !sectionType) return;
-
-    let newSection = { type: sectionType, title: sectionTitle };
-
-    if (sectionType === 'image' && imageUri) {
-      newSection.image_uri = imageUri; // Note: You'll need to upload this to your server
-    } else if (sectionType === 'text') {
-      newSection.content = sectionContent;
-    }
-
-    const data = await fetchWithAuth('/profile/sections', 'POST', newSection);
-    if (data) {
-      setSections(prev => [...prev, { ...newSection, section_id: data.section_id }]);
-      setSectionModalVisible(false);
-      setSectionType(null);
-      setSectionTitle('');
-      setSectionContent('');
-      setImageUri(null);
-    }
-  };
-
-  const pickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') return;
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 1,
-    });
-
-    if (!result.canceled) setImageUri(result.assets[0].uri);
   };
 
   useEffect(() => {
@@ -317,6 +229,127 @@ const Profile = ({ route, isBusinessProfile = false }) => {
       console.error("Posts fetch error:", error);
     }
   }, [navigation]);
+
+  // Add these functions inside your Profile component before the fetchUserData function
+
+const fetchStories = useCallback(async () => {
+  try {
+    const storiesData = await fetchWithAuth('/stories');
+    if (storiesData) {
+      const validStories = storiesData.filter(story => 
+        story && (story.story_id || story.id)
+      );
+      setStories(validStories);
+    }
+  } catch (error) {
+    console.error("Stories fetch error:", error);
+  }
+}, [fetchWithAuth]);
+
+const fetchSections = useCallback(async () => {
+  try {
+    const sectionsData = await fetchWithAuth('/sections');
+    if (sectionsData) {
+      setSections(sectionsData);
+    }
+  } catch (error) {
+    console.error("Sections fetch error:", error);
+  }
+}, [fetchWithAuth]);
+
+const fetchGraphs = useCallback(async () => {
+  try {
+    const graphsData = await fetchWithAuth('/graphs');
+    if (graphsData) {
+      setUserGraphs(graphsData);
+    }
+  } catch (error) {
+    console.error("Graphs fetch error:", error);
+  }
+}, [fetchWithAuth]);
+
+// Add these handler functions for creating new content
+const handleAddStory = async () => {
+  navigation.navigate('AddStory', { onStoryAdded: fetchStories });
+};
+
+const handleAddSection = () => {
+  setSectionType(null);
+  setSectionTitle('');
+  setSectionContent('');
+  setImageUri(null);
+  setSectionModalVisible(true);
+};
+
+const handleSectionSubmit = async () => {
+  if (!sectionTitle) {
+    alert('Please provide a section title');
+    return;
+  }
+
+  // Validate section content based on type
+  if (sectionType === 'text' && !sectionContent) {
+    alert('Please provide section content');
+    return;
+  }
+
+  if (sectionType === 'image' && !imageUri) {
+    alert('Please select an image');
+    return;
+  }
+
+  try {
+    const sectionData = {
+      type: sectionType,
+      title: sectionTitle,
+      content: sectionType === 'text' ? sectionContent : null,
+      image_uri: sectionType === 'image' ? imageUri : null
+    };
+
+    const response = await fetchWithAuth('/sections', 'POST', sectionData);
+    if (response) {
+      await fetchSections();
+      setSectionModalVisible(false);
+      setSectionType(null);
+      setSectionTitle('');
+      setSectionContent('');
+      setImageUri(null);
+    }
+  } catch (error) {
+    console.error("Error creating section:", error);
+    alert('Failed to create section');
+  }
+};
+
+const handleAddGraph = async (graphData) => {
+  try {
+    const response = await fetchWithAuth('/graphs', 'POST', graphData);
+    if (response) {
+      await fetchGraphs();
+      setGraphModalVisible(false);
+    }
+  } catch (error) {
+    console.error("Error creating graph:", error);
+    alert('Failed to create graph');
+  }
+};
+
+const pickImage = async () => {
+  try {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      setImageUri(result.assets[0].uri);
+    }
+  } catch (error) {
+    console.error("Error picking image:", error);
+  }
+};
 
   const fetchUserData = useCallback(async () => {
     try {
