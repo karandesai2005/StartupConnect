@@ -1,11 +1,11 @@
-// server.js
 require("dotenv").config();
 const express = require("express");
 const path = require("path");
 const cors = require("cors");
 const { connectDB } = require("./config/db");
 const postRoutes = require("./routes/postRoutes");
-const authRoutes = require("./routes/authRoutes"); // Corrected to match your file name (authRoutes.js)
+const authRoutes = require("./routes/authRoutes");
+const profileRoutes = require("./routes/profileRoutes"); // Add this line to import profileRoutes
 const app = express();
 const PORT = process.env.PORT || 8080;
 
@@ -24,7 +24,8 @@ app.get("/", (req, res) => {
 
 // API Routes
 app.use("/api", postRoutes);
-app.use("/api/auth", authRoutes); // Mount authRoutes at /api/auth
+app.use("/api/auth", authRoutes);
+app.use("/api/profile", profileRoutes); // Mount profileRoutes at /api/profile
 
 // Error handling middleware
 app.use((err, req, res, next) => {
