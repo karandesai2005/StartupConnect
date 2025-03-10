@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect } from "react";
-import { Platform } from "react-native";
 import {
+  Platform,
   StyleSheet,
   View,
   Text,
@@ -9,21 +9,22 @@ import {
   ActivityIndicator,
   ScrollView,
   RefreshControl,
-  Alert,
+  Modal,
+  TextInput,
   Dimensions,
+  Keyboard
 } from "react-native";
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { NGROK_URL } from '@env';
 import { BarChart, PieChart, LineChart } from 'react-native-gifted-charts';
-import Card from "../../Card";
 import { Video } from 'expo-av';
 import DynamicGraphs from "./DynamicGraphs";
-import Stories from "../../Stories";
+import * as ImagePicker from 'expo-image-picker';
+import Bottomnav from '../../BottamNav';
 
-// Sample data for Stories
 const myStories = [
-  { id: '3', username: 'Alice', imageUrl: '', hasStory: false, viewed: false },
+  { id: '3', username: 'no', imageUrl: '', hasStory: false, viewed: false },
   { id: '4', username: 'Bob', imageUrl: '', hasStory: false, viewed: false },
   { id: '5', username: 'Charlie', imageUrl: '', hasStory: false, viewed: false },
   { id: '6', username: 'Dave', imageUrl: '', hasStory: false, viewed: false },
@@ -34,6 +35,118 @@ const handleStoryPress = (story) => {
   console.log('Story clicked:', story);
 };
 
+const StoryItem = React.memo(({ story, onPress, isAddButton }) => {
+  const imageSource = story.imageUrl
+    ? { uri: story.imageUrl }
+    : require('../../../assets/del.png');
+
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      style={styles.storyItem}
+      activeOpacity={0.7}
+    >
+      <View style={[
+        styles.storyRing,
+        { borderColor: story.viewed ? '#8e8e8e' : '#007bff' },
+        story.hasStory && styles.activeStoryRing,
+        isAddButton
+      ]}>
+        <View style={styles.storyImageContainer}>
+          {isAddButton ? (
+            <Text style={styles.addStoryText}>+</Text>
+          ) : (
+            <Image
+              source={imageSource}
+              style={styles.storyImage}
+              resizeMode="cover"
+              defaultSource={require('../../../assets/del.png')}
+            />
+          )}
+          {story.hasStory && !story.viewed && !isAddButton && (
+            <View style={styles.unreadIndicator} />
+          )}
+        </View>
+      </View>
+      <Text style={styles.storyUsername} numberOfLines={1}>
+        {isAddButton ? 'Add Story' : story.username}
+      </Text>
+    </TouchableOpacity>
+  );
+});
+
+const Stories = React.memo(({ stories, onStoryPress, onAddStory, title }) => {
+  const addStoryItem = { id: 'add', username: 'Add Story', hasStory: false, viewed: false };
+
+  return (
+    <View style={styles.sectionContainer}>
+      <View style={styles.divider} />
+      <Text style={styles.sectionHeader}>{title}</Text>
+      <View style={styles.divider} />
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.storiesContainer}
+        decelerationRate="fast"
+        snapToAlignment="center"
+        alwaysBounceHorizontal={true}
+      >
+        <StoryItem
+          story={addStoryItem}
+          onPress={onAddStory}
+          isAddButton={true}
+        />
+        {stories.map((story) => (
+          <StoryItem
+            key={story.id}
+            story={story}
+            onPress={() => onStoryPress?.(story)}
+          />
+        ))}
+      </ScrollView>
+      <View style={styles.divider} />
+    </View>
+  );
+});
+
+const StorySection = ({ title, stories }) => (
+  <Stories
+    stories={stories}
+    onStoryPress={handleStoryPress}
+    onAddStory={() => console.log("Add story pressed")}
+    title={title}
+  />
+);
+
+const ImageSection = ({ title, imageUri }) => (
+  <View style={styles.sectionContainer}>
+    <View style={styles.divider} />
+    <Text style={styles.sectionHeader}>{title}</Text>
+    <View style={styles.divider} />
+    {imageUri ? (
+      <Image
+        source={{ uri: imageUri }}
+        style={styles.sectionImage}
+        resizeMode="cover"
+        defaultSource={require('../../../assets/del.png')}
+      />
+    ) : (
+      <Text style={styles.placeholderText}>No image uploaded</Text>
+    )}
+    <View style={styles.divider} />
+  </View>
+);
+
+const TextSection = ({ title, content }) => (
+  <View style={styles.sectionContainer}>
+    <View style={styles.divider} />
+    <Text style={styles.sectionHeader}>{title}</Text>
+    <View style={styles.divider} />
+    <Text style={styles.sectionContent}>{content}</Text>
+    <View style={styles.divider} />
+  </View>
+);
+
 const Profile = ({ route, isBusinessProfile = false }) => {
   const navigation = useNavigation();
   const [userData, setUserData] = useState(null);
@@ -42,11 +155,55 @@ const Profile = ({ route, isBusinessProfile = false }) => {
   const [lastUpdate, setLastUpdate] = useState(0);
   const [activeTab, setActiveTab] = useState('stories');
   const [userPosts, setUserPosts] = useState([]);
-
   const [isGraphModalVisible, setGraphModalVisible] = useState(false);
   const [userGraphs, setUserGraphs] = useState([]);
+  const [sections, setSections] = useState([]);
+  const [isSectionModalVisible, setSectionModalVisible] = useState(false);
+  const [sectionType, setSectionType] = useState(null);
+  const [sectionTitle, setSectionTitle] = useState('');
+  const [sectionContent, setSectionContent] = useState('');
+
   const handleAddGraph = (graphData) => {
     setUserGraphs(prev => [...prev, graphData]);
+  };
+
+  const handleAddSection = () => {
+    setSectionModalVisible(true);
+    setSectionType(null);
+    setSectionTitle('');
+    setSectionContent('');
+  };
+
+  const handleSectionSubmit = async () => {
+    if (!sectionTitle || !sectionType) return;
+
+    if (sectionType === 'story') {
+      setSections(prev => [...prev, { type: 'story', title: sectionTitle, stories: myStories }]);
+    } else if (sectionType === 'image') {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        console.log("Permission denied");
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 1,
+      });
+      if (!result.canceled) {
+        setSections(prev => [...prev, {
+          type: 'image',
+          title: sectionTitle,
+          imageUri: result.assets[0].uri
+        }]);
+      }
+    } else if (sectionType === 'text') {
+      setSections(prev => [...prev, { type: 'text', title: sectionTitle, content: sectionContent }]);
+    }
+    setSectionModalVisible(false);
+    setSectionType(null);
+    setSectionTitle('');
+    setSectionContent('');
   };
 
   const screenWidth = Dimensions.get('window').width;
@@ -55,7 +212,6 @@ const Profile = ({ route, isBusinessProfile = false }) => {
 
   useEffect(() => {
     if (route.params?.updatedUser) {
-      console.log("Received updated user data:", route.params.updatedUser);
       setUserData(prevData => ({
         ...prevData,
         ...route.params.updatedUser,
@@ -86,7 +242,6 @@ const Profile = ({ route, isBusinessProfile = false }) => {
       });
       if (response.ok) {
         const data = await response.json();
-        console.log("Fetched user posts:", data);
         const mappedPosts = data.map(post => ({
           _id: post.post_id,
           username: post.username,
@@ -97,18 +252,17 @@ const Profile = ({ route, isBusinessProfile = false }) => {
           likes: post.like_count || 0,
           comments: 0,
           caption: post.content,
-          media_type: post.media_type || (post.media_url?.includes('.mp4') ? 'video' : 'image'),
+          media_type: post.media_type || (post.media_url?.includes('.mp4') ? 'video' : 'image')
         }));
         const validPosts = mappedPosts
           .filter(post => post.image_url && !post.image_url.includes('undefined'))
           .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
         setUserPosts(validPosts);
       } else {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        console.error(`Failed to fetch posts: ${response.status}`);
       }
     } catch (error) {
       console.error("Posts fetch error:", error);
-      Alert.alert('Error', 'Failed to fetch posts');
     }
   }, [navigation]);
 
@@ -148,18 +302,16 @@ const Profile = ({ route, isBusinessProfile = false }) => {
 
       if (response.ok) {
         const data = await response.json();
-        console.log("Fetched profile data:", data);
         setUserData(data);
         setLastUpdate(Date.now());
         await AsyncStorage.setItem('userData', JSON.stringify(data));
         // Fetch posts for the user (current or other)
         await fetchUserPosts(isOtherUser ? username : null);
       } else {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        console.error(`Failed to fetch profile: ${response.status}`);
       }
     } catch (error) {
       console.error("Profile fetch error:", error);
-      Alert.alert('Error', 'Failed to fetch profile data');
     } finally {
       setIsLoading(false);
       setRefreshing(false);
@@ -202,15 +354,6 @@ const Profile = ({ route, isBusinessProfile = false }) => {
     </TouchableOpacity>
   );
 
-  const data = [
-    { value: 50, label: 'Jan', frontColor: '#007bff', color: '#007bff' },
-    { value: 80, label: 'Feb', frontColor: '#B0B0B0', color: '#B0B0B0' },
-    { value: 60, label: 'Mar', frontColor: '#505050', color: '#505050' },
-    { value: 90, label: 'Apr', frontColor: '#000000', color: '#000000' },
-  ];
-
-  const pieColors = ['#007bff', '#004999', '#002d5f', '#000000', '#696969'];
-
   const renderTry = () => (
     <View style={styles.try}>
       {userGraphs.map((graph, index) => (
@@ -221,18 +364,24 @@ const Profile = ({ route, isBusinessProfile = false }) => {
               <PieChart
                 data={graph.data.map((item, i) => ({
                   ...item,
-                  color: pieColors[i % pieColors.length],
-                  gradientCenterColor: pieColors[(i + 1) % pieColors.length],
+                  color: ['#007bff', '#004999', '#002d5f', '#000000', '#696969'][i % 5],
+                  gradientCenterColor: ['#007bff', '#004999', '#002d5f', '#000000', '#696969'][(i + 1) % 5],
                   focused: true
                 }))}
-                radius={120}
+                donut
+                innerRadius={40}
+                radius={100}
                 showText
                 textColor="black"
                 textSize={14}
                 textBackground={{ color: 'white', opacity: 0.7 }}
-                labelPosition="onBorder"
                 showValuesAsLabels={true}
                 showGradient
+                centerLabelComponent={() => (
+                  <Text style={{ fontSize: 16, color: '#333' }}>
+                    Total: {graph.data.reduce((sum, item) => sum + item.value, 0)}
+                  </Text>
+                )}
               />
             )}
             {graph.type === 'bar' && (
@@ -242,27 +391,29 @@ const Profile = ({ route, isBusinessProfile = false }) => {
                 animationDuration={300}
                 barWidth={18}
                 barBorderRadius={3}
-                height={300}
-                width={300}
-                minHeight={1}
+                height={200}
+                width={350}
                 spacing={20}
                 noOfSections={5}
                 yAxisThickness={0}
                 xAxisThickness={0}
+                hideRules={true}
+                maxValue={Math.max(...graph.data.map(item => item.value)) * 1.2}
               />
             )}
             {graph.type === 'line' && (
               <LineChart
                 data={graph.data}
-                height={300}
-                width={300}
-                minHeight={1}
+                height={200}
+                width={350}
+                hideRules={true}
                 spacing={50}
                 noOfSections={5}
                 yAxisThickness={0}
                 xAxisThickness={0}
                 isAnimated
-                animationDuration={7000}
+                animationDuration={700}
+                maxValue={Math.max(...graph.data.map(item => item.value)) * 1.2}
               />
             )}
           </View>
@@ -315,6 +466,7 @@ const Profile = ({ route, isBusinessProfile = false }) => {
             }
             style={styles.gridImage}
             resizeMode="cover"
+            defaultSource={require('../../../assets/del.png')}
           />
         )}
       </TouchableOpacity>
@@ -327,24 +479,26 @@ const Profile = ({ route, isBusinessProfile = false }) => {
     </View>
   );
 
-  const renderVenturesContent = () => (
-    <View style={styles.venturesContainer}>
-      <Card
-        title="Featured Achievement"
-        style={{ width: '90%', marginBottom: 20 }}
+  const renderStoriesTab = () => (
+    <View style={{ width: '100%' }}>
+      {sections.map((section, index) => {
+        switch (section.type) {
+          case 'story':
+            return <StorySection key={index} title={section.title} stories={section.stories} />;
+          case 'image':
+            return <ImageSection key={index} title={section.title} imageUri={section.imageUri} />;
+          case 'text':
+            return <TextSection key={index} title={section.title} content={section.content} />;
+          default:
+            return null;
+        }
+      })}
+      <TouchableOpacity
+        style={styles.addStorySectionButton}
+        onPress={handleAddSection}
       >
-        <View style={styles.cardContent}>
-          <Text style={styles.cardHeader}>Top Venture Milestone</Text>
-          <Text style={styles.cardParagraph}>
-            This is a significant milestone in our venture journey, showcasing our success and dedication to innovation and growth in the entrepreneurial space.
-          </Text>
-          <Image
-            source={require('../../../assets/ok.png')}
-            style={styles.certificateImage}
-            resizeMode="contain"
-          />
-        </View>
-      </Card>
+        <Text style={styles.addStorySectionText}>+ Add New Section</Text>
+      </TouchableOpacity>
     </View>
   );
 
@@ -355,6 +509,18 @@ const Profile = ({ route, isBusinessProfile = false }) => {
       </View>
     );
   }
+
+  const handleProfileButtonPress = () => {
+    if (route.params?.isOtherUser) {
+      // If viewing another user's profile, do nothing or navigate elsewhere (e.g., back or to a different page)
+      console.log("Viewing another user's profile, no edit option available.");
+      // Optionally, you could navigate back or to a different page:
+      // navigation.goBack();
+    } else {
+      // If viewing own profile, navigate to EditProfilePage
+      navigation.navigate('EditProfilePage', { userData });
+    }
+  };
 
   return (
     <View style={styles.contentContainer}>
@@ -390,6 +556,7 @@ const Profile = ({ route, isBusinessProfile = false }) => {
                   }
                   style={styles.profileImage}
                   resizeMode="cover"
+                  defaultSource={require('../../../assets/del.png')}
                   onError={(error) => console.log("Image load error:", error.nativeEvent.error)}
                 />
               </View>
@@ -411,21 +578,22 @@ const Profile = ({ route, isBusinessProfile = false }) => {
             </Text>
           </View>
           <View style={styles.buttonContainer}>
-            {!route.params?.isOtherUser && (
-              <TouchableOpacity
-                style={styles.masterOutlineButton}
-                onPress={() => navigation.navigate('EditProfilePage', { userData })}
-              >
-                <Text style={styles.button}>Edit Profile</Text>
-              </TouchableOpacity>
-            )}
-            <View style={styles.storiesWrapper}>
-              <Stories
-                stories={myStories}
-                onStoryPress={handleStoryPress}
-                title="Milestones and others"
-              />
-            </View>
+            <TouchableOpacity
+              style={styles.masterOutlineButton}
+              onPress={handleProfileButtonPress}
+            >
+              <Text style={styles.button}>
+                {route.params?.isOtherUser ? "Profile" : "Edit Profile"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          <View>
+            <Stories
+              stories={myStories}
+              onStoryPress={handleStoryPress}
+              onAddStory={() => console.log("Add story pressed")}
+              title="Milestones and others"
+            />
           </View>
         </View>
 
@@ -435,47 +603,234 @@ const Profile = ({ route, isBusinessProfile = false }) => {
           {renderTab("bucks", "The Posts")}
         </View>
 
-        {activeTab === 'stories' && (
-          <View>
-            <View style={styles.storiesWrapper}>
-              <Stories stories={myStories} onStoryPress={handleStoryPress} title="Startups" />
-            </View>
-            <View style={styles.storiesWrapper}>
-              <Stories stories={myStories} onStoryPress={handleStoryPress} title="Investments" />
-            </View>
-            {renderVenturesContent()}
-          </View>
-        )}
+        {activeTab === 'stories' && renderStoriesTab()}
         {activeTab === 'startups' && renderTry()}
         {activeTab === 'bucks' && renderGrid()}
       </ScrollView>
-      <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Home')}>
-          <Image source={require('../../../assets/film.png')} style={styles.navIcon} />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('CreatePost')}>
-          <Image source={require('../../../assets/plus3.png')} style={styles.navIcon} />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Reel')}>
-          <Image source={require('../../../assets/bell.png')} style={styles.navIcon} />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Settings')}>
-          <Image source={require('../../../assets/settings.png')} style={styles.navIcon} />
-        </TouchableOpacity>
-        <View style={styles.navIndicator} />
+
+      {/* Modal with KeyboardAvoidingView */}
+      <Modal
+        visible={isSectionModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setSectionModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Add New Section</Text>
+
+            {!sectionType ? (
+              <View style={styles.modalOptions}>
+                <TouchableOpacity
+                  style={styles.modalButton}
+                  onPress={() => setSectionType('story')}
+                >
+                  <Text style={styles.modalButtonText}>Story Section</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.modalButton}
+                  onPress={() => setSectionType('image')}
+                >
+                  <Text style={styles.modalButtonText}>Image Section</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.modalButton}
+                  onPress={() => setSectionType('text')}
+                >
+                  <Text style={styles.modalButtonText}>Text Section</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.cancelButton]}
+                  onPress={() => setSectionModalVisible(false)}
+                >
+                  <Text style={styles.modalButtonText}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <ScrollView
+                style={{ width: '100%' }}
+                contentContainerStyle={{ paddingBottom: 20 }}
+                onScroll={(event) => {
+                  const { contentOffset } = event.nativeEvent;
+                  // If user swipes down (positive y offset), dismiss keyboard
+                  if (contentOffset.y < 0) {
+                    Keyboard.dismiss();
+                  }
+                }}
+                scrollEventThrottle={16} // Adjusts how often scroll events fire (16ms is smooth)
+              >
+                <View style={styles.modalForm}>
+                  <TextInput
+                    style={styles.modalInput}
+                    placeholder="Section Title"
+                    value={sectionTitle}
+                    onChangeText={setSectionTitle}
+                  />
+                  {sectionType === 'text' && (
+                    <TextInput
+                      style={[styles.modalInput, styles.modalTextArea]}
+                      placeholder="Section Content"
+                      value={sectionContent}
+                      onChangeText={setSectionContent}
+                      multiline
+                      numberOfLines={4}
+                    />
+                  )}
+                  <View style={styles.modalFormButtons}>
+                    <TouchableOpacity
+                      style={styles.modalSubmitButton}
+                      onPress={handleSectionSubmit}
+                    >
+                      <Text style={styles.modalButtonText}>Add Section</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.modalButton, styles.cancelButton]}
+                      onPress={() => setSectionModalVisible(false)}
+                    >
+                      <Text style={styles.modalButtonText}>Cancel</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Bottomnav with absolute positioning */}
+      <View style={styles.bottomNavContainer}>
+        <Bottomnav />
       </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  sectionContainer: {
+    width: '100%',
+    alignSelf: 'stretch',
+    paddingVertical: 5,
+    backgroundColor: '#fff',
+  },
+  sectionHeader: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    marginVertical: 2,
+    textAlign: 'left',
+    paddingHorizontal: 15,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#ccc',
+    width: Dimensions.get('window').width,
+    minWidth: 1,
+    marginVertical: 5,
+  },
+  sectionImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 8,
+    resizeMode: 'cover',
+    marginVertical: 2,
+  },
+  sectionContent: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
+    marginVertical: 2,
+    textAlign: 'left',
+    paddingHorizontal: 15,
+    flexWrap: 'wrap',
+    width: '100%',
+    maxWidth: Dimensions.get('window').width - 30,
+  },
+  placeholderText: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'left',
+    marginVertical: 2,
+    paddingHorizontal: 15,
+    flex: 1,
+    width: '100%',
+  },
+  storiesContainer: {
+    paddingVertical: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 15,
+  },
+  storyItem: {
+    alignItems: 'center',
+    width: 72,
+    marginHorizontal: 6,
+    paddingVertical: 4,
+  },
+  storyRing: {},
+  activeStoryRing: {
+    borderWidth: 2.5,
+    borderColor: '#007bff',
+  },
+  storyImageContainer: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    overflow: 'hidden',
+    backgroundColor: '#f0f0f0',
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  storyImage: {
+    width: '100%',
+    height: '100%',
+  },
+  addStoryText: {
+    fontSize: 24,
+    color: '#666',
+    fontWeight: '600',
+  },
+  storyUsername: {
+    marginTop: 6,
+    fontSize: 12,
+    textAlign: 'center',
+    color: '#666',
+    fontFamily: "AvenirNextCyr",
+    fontWeight: '500',
+  },
+  unreadIndicator: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#007bff',
+    borderWidth: 1,
+    borderColor: '#fff',
+  },
+  addStorySectionButton: {
+    backgroundColor: '#007bff',
+    padding: 15,
+    borderRadius: 10,
+    marginVertical: 20,
+    alignItems: 'center',
+    width: '90%',
+    alignSelf: 'center',
+  },
+  addStorySectionText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
   addGraphButton: {
     backgroundColor: '#007bff',
     padding: 15,
     borderRadius: 10,
-    marginTop: 20,
+    marginVertical: 20,
     alignItems: 'center',
     width: '90%',
+    alignSelf: 'center',
   },
   addGraphButtonText: {
     color: 'white',
@@ -486,10 +841,20 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 20,
-    paddingBottom: 20,
-    padding: 20,
+    paddingVertical: 20,
     width: '100%',
+  },
+  cardStyle: {
+    width: '90%',
+    height: 300,
+    marginBottom: 20,
+    backgroundColor: 'white',
+    borderRadius: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   graphTitle: {
     fontSize: 18,
@@ -501,10 +866,11 @@ const styles = StyleSheet.create({
     borderBottomColor: '#eee',
   },
   graphContainer: {
-    padding: 20,
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    height: 350,
+    padding: 10,
+    width: 350,
   },
   videoContainer: {
     position: 'relative',
@@ -530,8 +896,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'flex-start',
     gap: 2,
-    paddingTop: 20,
-    paddingBottom: 20,
+    paddingVertical: 20,
     width: '100%',
   },
   gridItem: {
@@ -543,24 +908,17 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 4,
   },
-  profileContainer: {
-    flexGrow: 1,
-    backgroundColor: "#fff",
-    marginTop: 30,
-  },
   container: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
   contentContainer: {
-    marginTop: 20,
     flex: 1,
     alignItems: "center",
     paddingHorizontal: 0,
     width: '100%',
     position: 'relative',
-    height: '100%',
   },
   profileImage: {
     width: "100%",
@@ -573,7 +931,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 0,
     gap: 14,
-    marginTop: 30,
+    marginTop: 55,
   },
   profileSection: {
     flexDirection: 'row',
@@ -670,6 +1028,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     justifyContent: "center",
     alignItems: "center",
+    marginBottom: 20,
   },
   tab1: {
     flex: 1,
@@ -715,88 +1074,85 @@ const styles = StyleSheet.create({
   backButtonText: {
     fontSize: 32,
     color: "#000",
+    paddingTop: 20,
   },
   scrollViewContent: {
-    paddingBottom: 100,
+    paddingBottom: 80,
     width: '100%',
     alignItems: 'center',
   },
-  bottomNav: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    paddingVertical: Platform.OS === 'ios' ? 12 : 10,
-    paddingBottom: Platform.OS === 'ios' ? 30 : 12,
-    paddingHorizontal: 20,
-    borderTopWidth: 0.5,
-    borderTopColor: '#E0E0E0',
-    backgroundColor: '#FFFFFF',
-    height: Platform.OS === 'ios' ? 80 : 60,
+  bottomNavContainer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
     zIndex: 10,
   },
-  navItem: {
-    alignItems: 'center',
+  modalOverlay: {
+    flex: 1,
     justifyContent: 'center',
-    width: 50,
-    height: 50,
-  },
-  navIcon: {
-    width: 22,
-    height: 22,
-    marginBottom: Platform.OS === 'ios' ? 3 : 0,
-  },
-  navIndicator: {
-    position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 25 : 8,
-    width: '40%',
-    height: 4,
-    backgroundColor: '#CCCCCC',
-    borderRadius: 2,
-    alignSelf: 'center',
-  },
-  storiesWrapper: {
-    width: '95%',
-    marginTop: 10,
-    padding: 10,
-    alignSelf: 'center',
-  },
-  venturesContainer: {
-    width: '100%',
     alignItems: 'center',
-    marginTop: 20,
-    padding: 10,
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
-  cardContent: {
-    padding: 15,
-    gap: 0,
+  modalContainer: {
+    width: '80%',
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 20,
+    alignItems: 'center',
+    maxHeight: Dimensions.get('window').height * 0.7,
   },
-  cardHeader: {
+  modalTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#333',
-    fontFamily: "AvenirNextCyr",
-  },
-  cardParagraph: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: '#666',
-    fontFamily: "AvenirNextCyr",
-  },
-  certificateImage: {
-    width: '100%',
-    height: 400,
-    borderRadius: 8,
-  },
-  cardStyle: {
-    width: '90%',
-    minHeight: 400,
     marginBottom: 20,
-    backgroundColor: 'white',
-    borderRadius: 15,
+  },
+  modalOptions: {
+    width: '100%',
+    gap: 10,
+  },
+  modalButton: {
+    backgroundColor: '#007bff',
+    padding: 10,
+    borderRadius: 5,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#666',
+  },
+  modalButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalForm: {
+    width: '100%',
+    gap: 15,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 5,
+    padding: 10,
+    fontSize: 16,
+    width: '100%',
+  },
+  modalTextArea: {
+    height: 100,
+    textAlignVertical: 'top',
+  },
+  modalFormButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  modalSubmitButton: {
+    backgroundColor: '#007bff',
+    padding: 10,
+    borderRadius: 5,
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 5,
   },
 });
 

@@ -14,6 +14,9 @@ import {
   Animated,
   ScrollView,
   BackHandler,
+  SafeAreaView,
+  KeyboardAvoidingView,
+  StatusBar,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import axios from 'axios';
@@ -23,7 +26,7 @@ import { NGROK_URL } from '@env';
 import { Video } from 'expo-av';
 import { debounce } from 'lodash';
 import Modal from 'react-native-modal';
-
+import BottamNav from '../components/BottamNav';
 const { width } = Dimensions.get('window');
 
 const formatTimestamp = (timestamp) => {
@@ -46,10 +49,10 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
   const [isLoading, setIsLoading] = useState(true);
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(item.likes || 0);
-  const [comments, setComments] = useState([]); // State to store comments
-  const [newComment, setNewComment] = useState(''); // State for new comment input
-  const [isCommentModalVisible, setIsCommentModalVisible] = useState(false); // State for comment modal
-  const [isCommentsLoading, setIsCommentsLoading] = useState(false); // State for loading comments
+  const [comments, setComments] = useState([]);
+  const [newComment, setNewComment] = useState('');
+  const [isCommentModalVisible, setIsCommentModalVisible] = useState(false);
+  const [isCommentsLoading, setIsCommentsLoading] = useState(false);
   const animatedScale = new Animated.Value(1);
   const [isVideo, setIsVideo] = useState(false);
   const videoRef = React.useRef(null);
@@ -113,13 +116,12 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
     console.log('isCommentModalVisible changed:', isCommentModalVisible);
   }, [isCommentModalVisible]);
 
-  // Handle hardware back press on Android
   useEffect(() => {
     if (isCommentModalVisible) {
       const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
         console.log('Hardware back press detected, closing modal');
         setIsCommentModalVisible(false);
-        return true; // Prevent default back navigation
+        return true;
       });
       return () => backHandler.remove();
     }
@@ -248,7 +250,7 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
       console.log('✅ Comment posted successfully - Response:', response.data);
       if (response.data) {
         await fetchComments();
-        setNewComment(''); // Clear input
+        setNewComment('');
         console.log('📋 Refreshed comments state from server');
         console.log('🧹 Cleared newComment input');
       }
@@ -377,14 +379,14 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
       <Modal
         isVisible={isCommentModalVisible}
         onBackdropPress={toggleCommentModal}
-        onSwipeComplete={toggleCommentModal} // Added to allow swipe to dismiss
-        swipeDirection="down" // Enable swipe down to close
-        backdropOpacity={0.5} // Make backdrop visible and interactive
-        backdropColor="#000" // Ensure backdrop is dark
+        onSwipeComplete={toggleCommentModal}
+        swipeDirection="down"
+        backdropOpacity={0.5}
+        backdropColor="#000"
         style={styles.commentModal}
         animationIn="slideInUp"
         animationOut="slideOutDown"
-        useNativeDriver={true} // Improve performance
+        useNativeDriver={true}
       >
         <View style={styles.commentModalContent}>
           <View style={styles.commentModalHeader}>
@@ -433,6 +435,7 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
     </Animated.View>
   );
 });
+
 export default function HomeScreen() {
   const [users, setUsers] = useState([]);
   const [myPosts, setMyPosts] = useState([]);
@@ -509,7 +512,7 @@ export default function HomeScreen() {
           content: post.content,
           created_at: post.created_at,
           likes: post.like_count || 0,
-          comments: post.comment_count || 0, // Use comment_count from backend
+          comments: post.comment_count || 0,
           caption: post.content
         }));
         const sortedPosts = mappedPosts
@@ -629,7 +632,7 @@ export default function HomeScreen() {
   };
 
   const handleSearchBlur = () => {
-    setTimeout(() => setIsSearchActive(false), 200); // Delay to allow click on results
+    setTimeout(() => setIsSearchActive(false), 200);
   };
 
   const handleSearchChange = (text) => {
@@ -662,8 +665,7 @@ export default function HomeScreen() {
   );
 
   return (
-    <View style={styles.container}>
-      <View style={styles.statusBarBackground} />
+    <SafeAreaView style={styles.container}>
       <View style={styles.topBar}>
         <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
           <Image
@@ -675,6 +677,7 @@ export default function HomeScreen() {
             style={styles.profilePic}
           />
         </TouchableOpacity>
+
         <View style={styles.searchContainer}>
           <TextInput
             style={styles.searchBar}
@@ -695,52 +698,43 @@ export default function HomeScreen() {
             />
           )}
         </View>
-        <TouchableOpacity onPress={() => navigation.navigate('Chat')}>
-          <Image source={require('../assets/Arrow.png')} style={styles.chatIcon} />
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setFieldsModalVisible(true)}>
-          <Image source={require('../assets/film.png')} style={styles.filterIcon} />
-        </TouchableOpacity>
+
+        <View style={styles.iconsContainer}>
+          <TouchableOpacity onPress={() => navigation.navigate('Chat')}>
+            <Image source={require('../assets/Arrow.png')} style={styles.chatIcon} />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.iconSpacing} onPress={() => setFieldsModalVisible(true)}>
+            <Image source={require('../assets/film.png')} style={styles.filterIcon} />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      <FlatList
-        data={combinedData}
-        extraData={combinedData}
-        renderItem={({ item, index }) => (
-          <PostCard
-            item={item}
-            index={index}
-            toggleExpand={toggleExpand}
-            expandedItems={expandedItems}
-            isVisible={viewableItems.includes(index)}
-            navigation={navigation}
-          />
-        )}
-        keyExtractor={keyExtractor}
-        onEndReached={() => setCurrentPage(prev => prev + 1)}
-        onEndReachedThreshold={0.5}
-        ListFooterComponent={renderFooter}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.listContentContainer}
-        onViewableItemsChanged={onViewableItemsChanged}
-        viewabilityConfig={viewabilityConfig}
-      />
-
-      <View style={[styles.bottomNav, { borderTopColor: '#E9ECEF' }]}>
-        <TouchableOpacity onPress={() => navigation.navigate('Home')}>
-          <Image source={require('../assets/film.png')} style={[styles.navIcon]} />
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => navigation.navigate('CreatePost')}>
-          <Image source={require('../assets/plus3.png')} style={[styles.navIcon]} />
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => navigation.navigate('Reel')}>
-          <Image source={require('../assets/bell.png')} style={[styles.navIcon]} />
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
-          <Image source={require('../assets/settings.png')} style={[styles.navIcon]} />
-        </TouchableOpacity>
-      </View>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <FlatList
+          data={combinedData}
+          extraData={combinedData}
+          renderItem={({ item, index }) => (
+            <PostCard
+              item={item}
+              index={index}
+              toggleExpand={toggleExpand}
+              expandedItems={expandedItems}
+              isVisible={viewableItems.includes(index)}
+              navigation={navigation}
+            />
+          )}
+          keyExtractor={keyExtractor}
+          onEndReached={() => setCurrentPage(prev => prev + 1)}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={renderFooter}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.listContentContainer}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
+        />
+      </KeyboardAvoidingView>
 
       <Modal
         isVisible={isFieldsModalVisible}
@@ -771,18 +765,16 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
       </Modal>
-    </View>
+
+      <BottamNav/>
+    </SafeAreaView>
   );
 }
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8F9FA',
-    marginTop: Platform.OS === 'ios' ? 45 : 25,
-  },
-  statusBarBackground: {
-    height: Platform.OS === 'ios' ? 50 : 20,
-    backgroundColor: '#fff',
   },
   topBar: {
     flexDirection: 'row',
@@ -793,7 +785,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#E9ECEF',
-    marginTop: Platform.select({ ios: -55, android: null })
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight + 8 : 8,
+  },
+  iconsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  iconSpacing: {
+    marginLeft: 20,  // Add spacing between icons
   },
   profilePic: {
     width: 40,
@@ -806,7 +805,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 10,
   },
   searchBar: {
-    width: '100%',
+    width: '100%',  // Changed from 55% to 100%
     paddingHorizontal: 15,
     backgroundColor: '#eee',
     borderRadius: 20,
@@ -963,15 +962,7 @@ const styles = StyleSheet.create({
     color: '#868E96',
     marginTop: 4,
   },
-  bottomNav: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    paddingVertical: Platform.OS === 'ios' ? 12 : 8,
-    paddingBottom: Platform.OS === 'ios' ? 24 : 8,
-    borderTopWidth: 1,
-    height: Platform.OS === 'ios' ? 70 : 48,
-  },
+
   listContentContainer: {
     paddingBottom: 8,
   },
@@ -1056,7 +1047,6 @@ const styles = StyleSheet.create({
     color: '#007bff',
     fontWeight: '600',
   },
-  // Styles for comment modal
   commentModal: {
     justifyContent: 'flex-end',
     margin: 0,
@@ -1088,7 +1078,6 @@ const styles = StyleSheet.create({
   commentList: {
     flex: 1,
     marginBottom: 15,
-    // backgroundColor: 'rgba(0, 255, 0, 0.1)', // Keep for debugging
   },
   commentListContent: {
     paddingBottom: 10,
@@ -1098,7 +1087,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
     minHeight: 60,
-    // backgroundColor: 'rgba(255, 0, 0, 0.1)', // Keep for debugging
   },
   commentUsername: {
     fontSize: 14,

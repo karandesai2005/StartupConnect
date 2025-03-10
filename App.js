@@ -24,7 +24,10 @@ import Popup from './components/Popup';
 import CreatePostScreen from './components/CreatePostScreen';
 import PostViewScreen from './components/Profile/P_Profile/PostViewScreen';
 import SettingsScreen from './components/settings';
-
+import Events from './components/Events';
+import BottomNav from './components/BottamNav';
+import SelectTagsScreen from './components/Tagscreen';
+import EventDetail from './components/EventDetail';
 const Stack = createStackNavigator();
 
 const App = () => {
@@ -59,6 +62,10 @@ const App = () => {
             <Stack.Screen name="CreatePost" component={CreatePostScreen} />
             <Stack.Screen name="PostView" component={PostViewScreen} options={{ headerShown: false }} />
             <Stack.Screen name="Settings" component={SettingsScreen} />
+            <Stack.Screen name="Events" component={Events} />
+            <Stack.Screen name="BottomNav" component={BottomNav} />
+            <Stack.Screen name="SelectTags" component={SelectTagsScreen} />
+            <Stack.Screen name="EventDetails" component={EventDetail} options={{ title: 'Event Details' }} />
           </Stack.Navigator>
         </NavigationContainer>
       </UserRegistrationProvider>
