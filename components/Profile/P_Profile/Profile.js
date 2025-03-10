@@ -23,21 +23,9 @@ import DynamicGraphs from "./DynamicGraphs";
 import * as ImagePicker from 'expo-image-picker';
 import Bottomnav from '../../BottamNav';
 
-const myStories = [
-  { id: '3', username: 'no', imageUrl: '', hasStory: false, viewed: false },
-  { id: '4', username: 'Bob', imageUrl: '', hasStory: false, viewed: false },
-  { id: '5', username: 'Charlie', imageUrl: '', hasStory: false, viewed: false },
-  { id: '6', username: 'Dave', imageUrl: '', hasStory: false, viewed: false },
-  { id: '7', username: 'Eve', imageUrl: '', hasStory: false, viewed: false },
-];
-
-const handleStoryPress = (story) => {
-  console.log('Story clicked:', story);
-};
-
 const StoryItem = React.memo(({ story, onPress, isAddButton }) => {
-  const imageSource = story.imageUrl
-    ? { uri: story.imageUrl }
+  const imageSource = story.image_url
+    ? { uri: story.image_url }
     : require('../../../assets/del.png');
 
   return (
@@ -49,8 +37,8 @@ const StoryItem = React.memo(({ story, onPress, isAddButton }) => {
       <View style={[
         styles.storyRing,
         { borderColor: story.viewed ? '#8e8e8e' : '#007bff' },
-        story.hasStory && styles.activeStoryRing,
-        isAddButton
+        story.has_story && styles.activeStoryRing,
+        isAddButton && { borderWidth: 0 }
       ]}>
         <View style={styles.storyImageContainer}>
           {isAddButton ? (
@@ -63,7 +51,7 @@ const StoryItem = React.memo(({ story, onPress, isAddButton }) => {
               defaultSource={require('../../../assets/del.png')}
             />
           )}
-          {story.hasStory && !story.viewed && !isAddButton && (
+          {story.has_story && !story.viewed && !isAddButton && (
             <View style={styles.unreadIndicator} />
           )}
         </View>
@@ -76,7 +64,7 @@ const StoryItem = React.memo(({ story, onPress, isAddButton }) => {
 });
 
 const Stories = React.memo(({ stories, onStoryPress, onAddStory, title }) => {
-  const addStoryItem = { id: 'add', username: 'Add Story', hasStory: false, viewed: false };
+  const addStoryItem = { id: 'add', username: 'Add Story', has_story: false, viewed: false };
 
   return (
     <View style={styles.sectionContainer}>
@@ -87,9 +75,6 @@ const Stories = React.memo(({ stories, onStoryPress, onAddStory, title }) => {
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.storiesContainer}
-        decelerationRate="fast"
-        snapToAlignment="center"
-        alwaysBounceHorizontal={true}
       >
         <StoryItem
           story={addStoryItem}
@@ -98,7 +83,7 @@ const Stories = React.memo(({ stories, onStoryPress, onAddStory, title }) => {
         />
         {stories.map((story) => (
           <StoryItem
-            key={story.id}
+            key={story.story_id || story.id}
             story={story}
             onPress={() => onStoryPress?.(story)}
           />
@@ -108,15 +93,6 @@ const Stories = React.memo(({ stories, onStoryPress, onAddStory, title }) => {
     </View>
   );
 });
-
-const StorySection = ({ title, stories }) => (
-  <Stories
-    stories={stories}
-    onStoryPress={handleStoryPress}
-    onAddStory={() => console.log("Add story pressed")}
-    title={title}
-  />
-);
 
 const ImageSection = ({ title, imageUri }) => (
   <View style={styles.sectionContainer}>
@@ -158,13 +134,91 @@ const Profile = ({ route, isBusinessProfile = false }) => {
   const [isGraphModalVisible, setGraphModalVisible] = useState(false);
   const [userGraphs, setUserGraphs] = useState([]);
   const [sections, setSections] = useState([]);
+  const [stories, setStories] = useState([]);
   const [isSectionModalVisible, setSectionModalVisible] = useState(false);
   const [sectionType, setSectionType] = useState(null);
   const [sectionTitle, setSectionTitle] = useState('');
   const [sectionContent, setSectionContent] = useState('');
+  const [imageUri, setImageUri] = useState(null);
+
+  const fetchWithAuth = async (endpoint, method = 'GET', body = null) => {
+    const token = await AsyncStorage.getItem("token");
+    if (!token) {
+      navigation.navigate('Login');
+      return null;
+    }
+    try {
+      const response = await fetch(`${NGROK_URL}/api${endpoint}`, {
+        method,
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: body ? JSON.stringify(body) : null,
+      });
+      if (!response.ok) {
+        console.error(`Failed to fetch ${endpoint}: ${response.status}`);
+        return null;
+      }
+      return await response.json();
+    } catch (error) {
+      console.error(`Error fetching ${endpoint}:`, error);
+      return null;
+    }
+  };
+
+  const fetchStories = useCallback(async () => {
+    const data = await fetchWithAuth('/profile/stories');
+    if (data) setStories(data);
+  }, []);
+
+  const fetchSections = useCallback(async () => {
+    const data = await fetchWithAuth('/profile/sections');
+    if (data) setSections(data);
+  }, []);
+
+  const fetchGraphs = useCallback(async () => {
+    const data = await fetchWithAuth('/profile/graphs');
+    if (data) {
+      setUserGraphs(data.map(graph => ({
+        ...graph,
+        data: typeof graph.data === 'string' ? JSON.parse(graph.data) : graph.data
+      })));
+    }
+  }, []);
+
+  const handleAddStory = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') return;
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 1,
+    });
+
+    if (!result.canceled) {
+      const newStory = {
+        username: userData?.username || 'User',
+        image_url: result.assets[0].uri,
+        has_story: true,
+        viewed: false
+      };
+      const data = await fetchWithAuth('/profile/stories', 'POST', newStory);
+      if (data) setStories(prev => [...prev, { ...newStory, story_id: data.story_id }]);
+    }
+  };
 
   const handleAddGraph = (graphData) => {
-    setUserGraphs(prev => [...prev, graphData]);
+    fetchWithAuth('/profile/graphs', 'POST', graphData).then(data => {
+      if (data) {
+        setUserGraphs(prev => [...prev, { 
+          ...graphData, 
+          graph_id: data.graph_id,
+          data: typeof graphData.data === 'string' ? JSON.parse(graphData.data) : graphData.data 
+        }]);
+      }
+    });
   };
 
   const handleAddSection = () => {
@@ -172,43 +226,43 @@ const Profile = ({ route, isBusinessProfile = false }) => {
     setSectionType(null);
     setSectionTitle('');
     setSectionContent('');
+    setImageUri(null);
   };
 
   const handleSectionSubmit = async () => {
     if (!sectionTitle || !sectionType) return;
 
-    if (sectionType === 'story') {
-      setSections(prev => [...prev, { type: 'story', title: sectionTitle, stories: myStories }]);
-    } else if (sectionType === 'image') {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        console.log("Permission denied");
-        return;
-      }
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        quality: 1,
-      });
-      if (!result.canceled) {
-        setSections(prev => [...prev, {
-          type: 'image',
-          title: sectionTitle,
-          imageUri: result.assets[0].uri
-        }]);
-      }
+    let newSection = { type: sectionType, title: sectionTitle };
+
+    if (sectionType === 'image' && imageUri) {
+      newSection.image_uri = imageUri; // Note: You'll need to upload this to your server
     } else if (sectionType === 'text') {
-      setSections(prev => [...prev, { type: 'text', title: sectionTitle, content: sectionContent }]);
+      newSection.content = sectionContent;
     }
-    setSectionModalVisible(false);
-    setSectionType(null);
-    setSectionTitle('');
-    setSectionContent('');
+
+    const data = await fetchWithAuth('/profile/sections', 'POST', newSection);
+    if (data) {
+      setSections(prev => [...prev, { ...newSection, section_id: data.section_id }]);
+      setSectionModalVisible(false);
+      setSectionType(null);
+      setSectionTitle('');
+      setSectionContent('');
+      setImageUri(null);
+    }
   };
 
-  const screenWidth = Dimensions.get('window').width;
-  const spacing = 2;
-  const itemSize = (screenWidth - 32 - spacing * 2) / 3;
+  const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') return;
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 1,
+    });
+
+    if (!result.canceled) setImageUri(result.assets[0].uri);
+  };
 
   useEffect(() => {
     if (route.params?.updatedUser) {
@@ -258,8 +312,6 @@ const Profile = ({ route, isBusinessProfile = false }) => {
           .filter(post => post.image_url && !post.image_url.includes('undefined'))
           .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
         setUserPosts(validPosts);
-      } else {
-        console.error(`Failed to fetch posts: ${response.status}`);
       }
     } catch (error) {
       console.error("Posts fetch error:", error);
@@ -268,6 +320,7 @@ const Profile = ({ route, isBusinessProfile = false }) => {
 
   const fetchUserData = useCallback(async () => {
     try {
+      setIsLoading(true);
       const token = await AsyncStorage.getItem("token");
       if (!token) {
         navigation.navigate('Login');
@@ -277,7 +330,6 @@ const Profile = ({ route, isBusinessProfile = false }) => {
 
       let response;
       if (isOtherUser && username) {
-        // Fetch another user's profile
         response = await fetch(`${NGROK_URL}/api/auth/users/${username}`, {
           method: "GET",
           headers: {
@@ -288,7 +340,6 @@ const Profile = ({ route, isBusinessProfile = false }) => {
           },
         });
       } else {
-        // Fetch current user's profile
         response = await fetch(`${NGROK_URL}/api/auth/profile?timestamp=${Date.now()}`, {
           method: "GET",
           headers: {
@@ -305,10 +356,12 @@ const Profile = ({ route, isBusinessProfile = false }) => {
         setUserData(data);
         setLastUpdate(Date.now());
         await AsyncStorage.setItem('userData', JSON.stringify(data));
-        // Fetch posts for the user (current or other)
-        await fetchUserPosts(isOtherUser ? username : null);
-      } else {
-        console.error(`Failed to fetch profile: ${response.status}`);
+        await Promise.all([
+          fetchUserPosts(isOtherUser ? username : null),
+          fetchStories(),
+          fetchSections(),
+          fetchGraphs()
+        ]);
       }
     } catch (error) {
       console.error("Profile fetch error:", error);
@@ -316,7 +369,7 @@ const Profile = ({ route, isBusinessProfile = false }) => {
       setIsLoading(false);
       setRefreshing(false);
     }
-  }, [navigation, route.params]);
+  }, [fetchStories, fetchSections, fetchGraphs, fetchUserPosts]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -327,21 +380,9 @@ const Profile = ({ route, isBusinessProfile = false }) => {
   useFocusEffect(
     useCallback(() => {
       const shouldFetch = !userData || (Date.now() - lastUpdate > 5000);
-      if (shouldFetch) {
-        setIsLoading(true);
-        fetchUserData();
-      }
-      return () => { };
+      if (shouldFetch) fetchUserData();
     }, [fetchUserData, userData, lastUpdate])
   );
-
-  const avatarStyle = {
-    height: "100%",
-    width: "100%",
-    backgroundColor: "#f0f8ff",
-    borderRadius: isBusinessProfile ? 20 : 48,
-    overflow: "hidden",
-  };
 
   const renderTab = (tabName, label) => (
     <TouchableOpacity
@@ -354,10 +395,38 @@ const Profile = ({ route, isBusinessProfile = false }) => {
     </TouchableOpacity>
   );
 
+  const renderStoriesTab = () => (
+    <View style={{ width: '100%' }}>
+      {sections.map((section) => {
+        switch (section.type) {
+          case 'story':
+            return (
+              <Stories 
+                key={section.section_id} 
+                title={section.title} 
+                stories={stories} 
+                onAddStory={handleAddStory}
+                onStoryPress={(story) => console.log('Story pressed:', story)}
+              />
+            );
+          case 'image':
+            return <ImageSection key={section.section_id} title={section.title} imageUri={section.image_uri} />;
+          case 'text':
+            return <TextSection key={section.section_id} title={section.title} content={section.content} />;
+          default:
+            return null;
+        }
+      })}
+      <TouchableOpacity style={styles.addStorySectionButton} onPress={handleAddSection}>
+        <Text style={styles.addStorySectionText}>+ Add New Section</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   const renderTry = () => (
     <View style={styles.try}>
-      {userGraphs.map((graph, index) => (
-        <View key={index} style={styles.cardStyle}>
+      {userGraphs.map((graph) => (
+        <View key={graph.graph_id} style={styles.cardStyle}>
           <Text style={styles.graphTitle}>{graph.title}</Text>
           <View style={styles.graphContainer}>
             {graph.type === 'pie' && (
@@ -374,7 +443,6 @@ const Profile = ({ route, isBusinessProfile = false }) => {
                 showText
                 textColor="black"
                 textSize={14}
-                textBackground={{ color: 'white', opacity: 0.7 }}
                 showValuesAsLabels={true}
                 showGradient
                 centerLabelComponent={() => (
@@ -419,10 +487,7 @@ const Profile = ({ route, isBusinessProfile = false }) => {
           </View>
         </View>
       ))}
-      <TouchableOpacity
-        style={styles.addGraphButton}
-        onPress={() => setGraphModalVisible(true)}
-      >
+      <TouchableOpacity style={styles.addGraphButton} onPress={() => setGraphModalVisible(true)}>
         <Text style={styles.addGraphButtonText}>+ Add New Graph</Text>
       </TouchableOpacity>
       <DynamicGraphs
@@ -438,7 +503,7 @@ const Profile = ({ route, isBusinessProfile = false }) => {
     return (
       <TouchableOpacity
         key={index}
-        style={[styles.gridItem, { width: itemSize, height: itemSize, marginBottom: 2 }]}
+        style={[styles.gridItem, { width: (Dimensions.get('window').width - 34) / 3, height: (Dimensions.get('window').width - 34) / 3, marginBottom: 2 }]}
         onPress={() => navigation.navigate('PostView', { posts: userPosts, initialIndex: index })}
       >
         {isVideo ? (
@@ -460,9 +525,7 @@ const Profile = ({ route, isBusinessProfile = false }) => {
             source={
               post?.image_url
                 ? { uri: post.image_url }
-                : post?.media_url
-                  ? { uri: post.media_url }
-                  : require('../../../assets/del.png')
+                : require('../../../assets/del.png')
             }
             style={styles.gridImage}
             resizeMode="cover"
@@ -479,29 +542,6 @@ const Profile = ({ route, isBusinessProfile = false }) => {
     </View>
   );
 
-  const renderStoriesTab = () => (
-    <View style={{ width: '100%' }}>
-      {sections.map((section, index) => {
-        switch (section.type) {
-          case 'story':
-            return <StorySection key={index} title={section.title} stories={section.stories} />;
-          case 'image':
-            return <ImageSection key={index} title={section.title} imageUri={section.imageUri} />;
-          case 'text':
-            return <TextSection key={index} title={section.title} content={section.content} />;
-          default:
-            return null;
-        }
-      })}
-      <TouchableOpacity
-        style={styles.addStorySectionButton}
-        onPress={handleAddSection}
-      >
-        <Text style={styles.addStorySectionText}>+ Add New Section</Text>
-      </TouchableOpacity>
-    </View>
-  );
-
   if (isLoading) {
     return (
       <View style={styles.container}>
@@ -512,12 +552,8 @@ const Profile = ({ route, isBusinessProfile = false }) => {
 
   const handleProfileButtonPress = () => {
     if (route.params?.isOtherUser) {
-      // If viewing another user's profile, do nothing or navigate elsewhere (e.g., back or to a different page)
       console.log("Viewing another user's profile, no edit option available.");
-      // Optionally, you could navigate back or to a different page:
-      // navigation.goBack();
     } else {
-      // If viewing own profile, navigate to EditProfilePage
       navigation.navigate('EditProfilePage', { userData });
     }
   };
@@ -526,13 +562,7 @@ const Profile = ({ route, isBusinessProfile = false }) => {
     <View style={styles.contentContainer}>
       <ScrollView
         contentContainerStyle={styles.scrollViewContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            tintColor="#000000"
-          />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
       >
         <TouchableOpacity onPress={() => navigation.goBack('Home')} style={styles.backButton}>
           <Text style={styles.backButtonText}>←</Text>
@@ -547,7 +577,13 @@ const Profile = ({ route, isBusinessProfile = false }) => {
               </View>
             </View>
             <View style={styles.avatarMultiVariants}>
-              <View style={avatarStyle}>
+              <View style={{
+                width: 96,
+                height: 96,
+                backgroundColor: "#f0f8ff",
+                borderRadius: isBusinessProfile ? 20 : 48,
+                overflow: "hidden",
+              }}>
                 <Image
                   source={
                     userData?.profile_picture
@@ -557,7 +593,6 @@ const Profile = ({ route, isBusinessProfile = false }) => {
                   style={styles.profileImage}
                   resizeMode="cover"
                   defaultSource={require('../../../assets/del.png')}
-                  onError={(error) => console.log("Image load error:", error.nativeEvent.error)}
                 />
               </View>
             </View>
@@ -587,14 +622,12 @@ const Profile = ({ route, isBusinessProfile = false }) => {
               </Text>
             </TouchableOpacity>
           </View>
-          <View>
-            <Stories
-              stories={myStories}
-              onStoryPress={handleStoryPress}
-              onAddStory={() => console.log("Add story pressed")}
-              title="Milestones and others"
-            />
-          </View>
+          <Stories
+            stories={stories}
+            onStoryPress={(story) => console.log('Story pressed:', story)}
+            onAddStory={handleAddStory}
+            title="Milestones and others"
+          />
         </View>
 
         <View style={styles.tab}>
@@ -608,57 +641,27 @@ const Profile = ({ route, isBusinessProfile = false }) => {
         {activeTab === 'bucks' && renderGrid()}
       </ScrollView>
 
-      {/* Modal with KeyboardAvoidingView */}
-      <Modal
-        visible={isSectionModalVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setSectionModalVisible(false)}
-      >
+      <Modal visible={isSectionModalVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
             <Text style={styles.modalTitle}>Add New Section</Text>
-
             {!sectionType ? (
               <View style={styles.modalOptions}>
-                <TouchableOpacity
-                  style={styles.modalButton}
-                  onPress={() => setSectionType('story')}
-                >
+                <TouchableOpacity style={styles.modalButton} onPress={() => setSectionType('story')}>
                   <Text style={styles.modalButtonText}>Story Section</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.modalButton}
-                  onPress={() => setSectionType('image')}
-                >
+                <TouchableOpacity style={styles.modalButton} onPress={() => setSectionType('image')}>
                   <Text style={styles.modalButtonText}>Image Section</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.modalButton}
-                  onPress={() => setSectionType('text')}
-                >
+                <TouchableOpacity style={styles.modalButton} onPress={() => setSectionType('text')}>
                   <Text style={styles.modalButtonText}>Text Section</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.modalButton, styles.cancelButton]}
-                  onPress={() => setSectionModalVisible(false)}
-                >
+                <TouchableOpacity style={[styles.modalButton, styles.cancelButton]} onPress={() => setSectionModalVisible(false)}>
                   <Text style={styles.modalButtonText}>Cancel</Text>
                 </TouchableOpacity>
               </View>
             ) : (
-              <ScrollView
-                style={{ width: '100%' }}
-                contentContainerStyle={{ paddingBottom: 20 }}
-                onScroll={(event) => {
-                  const { contentOffset } = event.nativeEvent;
-                  // If user swipes down (positive y offset), dismiss keyboard
-                  if (contentOffset.y < 0) {
-                    Keyboard.dismiss();
-                  }
-                }}
-                scrollEventThrottle={16} // Adjusts how often scroll events fire (16ms is smooth)
-              >
+              <ScrollView style={{ width: '100%' }} contentContainerStyle={{ paddingBottom: 20 }}>
                 <View style={styles.modalForm}>
                   <TextInput
                     style={styles.modalInput}
@@ -673,20 +676,18 @@ const Profile = ({ route, isBusinessProfile = false }) => {
                       value={sectionContent}
                       onChangeText={setSectionContent}
                       multiline
-                      numberOfLines={4}
                     />
                   )}
+                  {sectionType === 'image' && (
+                    <TouchableOpacity style={styles.modalButton} onPress={pickImage}>
+                      <Text style={styles.modalButtonText}>{imageUri ? 'Image Selected' : 'Pick Image'}</Text>
+                    </TouchableOpacity>
+                  )}
                   <View style={styles.modalFormButtons}>
-                    <TouchableOpacity
-                      style={styles.modalSubmitButton}
-                      onPress={handleSectionSubmit}
-                    >
+                    <TouchableOpacity style={styles.modalSubmitButton} onPress={handleSectionSubmit}>
                       <Text style={styles.modalButtonText}>Add Section</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.modalButton, styles.cancelButton]}
-                      onPress={() => setSectionModalVisible(false)}
-                    >
+                    <TouchableOpacity style={[styles.modalButton, styles.cancelButton]} onPress={() => setSectionModalVisible(false)}>
                       <Text style={styles.modalButtonText}>Cancel</Text>
                     </TouchableOpacity>
                   </View>
@@ -697,7 +698,6 @@ const Profile = ({ route, isBusinessProfile = false }) => {
         </View>
       </Modal>
 
-      {/* Bottomnav with absolute positioning */}
       <View style={styles.bottomNavContainer}>
         <Bottomnav />
       </View>
@@ -724,7 +724,6 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: '#ccc',
     width: Dimensions.get('window').width,
-    minWidth: 1,
     marginVertical: 5,
   },
   sectionImage: {
@@ -766,7 +765,10 @@ const styles = StyleSheet.create({
     marginHorizontal: 6,
     paddingVertical: 4,
   },
-  storyRing: {},
+  storyRing: {
+    borderWidth: 2,
+    borderRadius: 37,
+  },
   activeStoryRing: {
     borderWidth: 2.5,
     borderColor: '#007bff',
