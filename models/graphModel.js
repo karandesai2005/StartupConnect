@@ -1,10 +1,10 @@
 const sql = require('mssql');
-const poolPromise = require('../config/db');
+const { connectDB } = require('../config/db'); // Changed to use connectDB
 
 const Graph = {
   async create(userId, type, title, data) {
     try {
-      const pool = await poolPromise;
+      const pool = await connectDB(); // Use connectDB to get the pool
       const request = pool.request();
       const result = await request
         .input('userId', sql.Int, userId)
@@ -22,7 +22,7 @@ const Graph = {
 
   async findByUserId(userId) {
     try {
-      const pool = await poolPromise;
+      const pool = await connectDB(); // Use connectDB to get the pool
       const request = pool.request();
       const result = await request
         .input('userId', sql.Int, userId)

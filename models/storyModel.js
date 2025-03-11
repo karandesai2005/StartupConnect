@@ -1,10 +1,10 @@
-const sql = require('mssql'); // Use mssql package for SQL Server
-const poolPromise = require('../config/db'); // Adjust path to your SQL Server pool config
+const sql = require('mssql');
+const { connectDB } = require('../config/db'); // Changed to use connectDB
 
 const Story = {
   async create(userId, username, imageUrl, hasStory = 0, viewed = 0) {
     try {
-      const pool = await poolPromise;
+      const pool = await connectDB(); // Use connectDB to get the pool
       const request = pool.request();
       const result = await request
         .input('userId', sql.Int, userId)
@@ -23,7 +23,7 @@ const Story = {
 
   async findByUserId(userId) {
     try {
-      const pool = await poolPromise;
+      const pool = await connectDB(); // Use connectDB to get the pool
       const request = pool.request();
       const result = await request
         .input('userId', sql.Int, userId)
