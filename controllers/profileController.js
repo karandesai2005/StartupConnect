@@ -1,60 +1,142 @@
+require('dotenv').config();
 const Story = require('../models/storyModel');
 const Section = require('../models/sectionModel');
 const Graph = require('../models/graphModel');
 
-exports.getStories = async (req, res) => {
-  try {
-    const stories = await Story.findByUserId(req.user.userId);
-    res.json(stories);
-  } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
+const profileController = {
+  getStories: async (req, res) => {
+    try {
+      console.log('=== Fetching Stories ===');
+      const userId = req.user?.userId || req.user?.id; // Flexible user ID access like postController
+      console.log('User:', req.user);
+
+      if (!userId) {
+        return res.status(400).json({ error: 'User ID is required.' });
+      }
+
+      console.log('Fetching stories for userId:', userId);
+      const stories = await Story.findByUserId(userId);
+      console.log('Stories fetched:', stories.length);
+      res.json(stories);
+    } catch (error) {
+      console.error('Error in getStories:', error);
+      res.status(500).json({ error: 'Server error', details: error.message });
+    }
+  },
+
+  addStory: async (req, res) => {
+    try {
+      console.log('=== Add Story Debug ===');
+      console.log('User:', req.user, '| Body:', req.body);
+
+      const userId = req.user?.userId || req.user?.id;
+      const { username, image_url, has_story = 0, viewed = 0 } = req.body;
+
+      if (!userId) {
+        return res.status(400).json({ error: 'User ID is required.' });
+      }
+
+      console.log('Creating story:', { userId, username, image_url, has_story, viewed });
+      const storyId = await Story.create(userId, username, image_url, has_story, viewed);
+      console.log('Story created with ID:', storyId);
+      res.status(201).json({ story_id: storyId });
+    } catch (error) {
+      console.error('Error in addStory:', error);
+      res.status(500).json({ error: 'Server error', details: error.message });
+    }
+  },
+
+  getSections: async (req, res) => {
+    try {
+      console.log('=== Fetching Sections ===');
+      const userId = req.user?.userId || req.user?.id;
+      console.log('User:', req.user);
+
+      if (!userId) {
+        return res.status(400).json({ error: 'User ID is required.' });
+      }
+
+      console.log('Fetching sections for userId:', userId);
+      const sections = await Section.findByUserId(userId);
+      console.log('Sections fetched:', sections.length);
+      res.json(sections);
+    } catch (error) {
+      console.error('Error in getSections:', error);
+      res.status(500).json({ error: 'Server error', details: error.message });
+    }
+  },
+
+  addSection: async (req, res) => {
+    try {
+      console.log('=== Add Section Debug ===');
+      console.log('User:', req.user, '| Body:', req.body);
+
+      const userId = req.user?.userId || req.user?.id;
+      const { type, title, content, image_uri } = req.body;
+
+      if (!userId) {
+        return res.status(400).json({ error: 'User ID is required.' });
+      }
+
+      if (!type || !title) {
+        return res.status(400).json({ error: 'Type and title are required.' });
+      }
+
+      console.log('Creating section:', { userId, type, title, content, image_uri });
+      const sectionId = await Section.create(userId, type, title, content, image_uri);
+      console.log('Section created with ID:', sectionId);
+      res.status(201).json({ section_id: sectionId });
+    } catch (error) {
+      console.error('Error in addSection:', error);
+      res.status(500).json({ error: 'Server error', details: error.message });
+    }
+  },
+
+  getGraphs: async (req, res) => {
+    try {
+      console.log('=== Fetching Graphs ===');
+      const userId = req.user?.userId || req.user?.id;
+      console.log('User:', req.user);
+
+      if (!userId) {
+        return res.status(400).json({ error: 'User ID is required.' });
+      }
+
+      console.log('Fetching graphs for userId:', userId);
+      const graphs = await Graph.findByUserId(userId);
+      console.log('Graphs fetched:', graphs.length);
+      res.json(graphs);
+    } catch (error) {
+      console.error('Error in getGraphs:', error);
+      res.status(500).json({ error: 'Server error', details: error.message });
+    }
+  },
+
+  addGraph: async (req, res) => {
+    try {
+      console.log('=== Add Graph Debug ===');
+      console.log('User:', req.user, '| Body:', req.body);
+
+      const userId = req.user?.userId || req.user?.id;
+      const { type, title, data } = req.body;
+
+      if (!userId) {
+        return res.status(400).json({ error: 'User ID is required.' });
+      }
+
+      if (!type || !title || !data) {
+        return res.status(400).json({ error: 'Type, title, and data are required.' });
+      }
+
+      console.log('Creating graph:', { userId, type, title, data });
+      const graphId = await Graph.create(userId, type, title, data);
+      console.log('Graph created with ID:', graphId);
+      res.status(201).json({ graph_id: graphId });
+    } catch (error) {
+      console.error('Error in addGraph:', error);
+      res.status(500).json({ error: 'Server error', details: error.message });
+    }
+  },
 };
 
-exports.addStory = async (req, res) => {
-  const { username, image_url, has_story, viewed } = req.body;
-  try {
-    const storyId = await Story.create(req.user.userId, username, image_url, has_story, viewed);
-    res.status(201).json({ story_id: storyId });
-  } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-};
-
-exports.getSections = async (req, res) => {
-  try {
-    const sections = await Section.findByUserId(req.user.userId);
-    res.json(sections);
-  } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-};
-
-exports.addSection = async (req, res) => {
-  const { type, title, content, image_uri } = req.body;
-  try {
-    const sectionId = await Section.create(req.user.userId, type, title, content, image_uri);
-    res.status(201).json({ section_id: sectionId });
-  } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-};
-
-exports.getGraphs = async (req, res) => {
-  try {
-    const graphs = await Graph.findByUserId(req.user.userId);
-    res.json(graphs);
-  } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-};
-
-exports.addGraph = async (req, res) => {
-  const { type, title, data } = req.body;
-  try {
-    const graphId = await Graph.create(req.user.userId, type, title, data);
-    res.status(201).json({ graph_id: graphId });
-  } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-};
+module.exports = profileController;
