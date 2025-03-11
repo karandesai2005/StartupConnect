@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const profileController = require('../controllers/profileController');
-const authMiddleware = require('../middleware/authenticateJWT'); // Adjust mpath to your auth middleware
+const authMiddleware = require('../middleware/authenticateJWT');
 
 router.get('/stories', authMiddleware, profileController.getStories);
-router.post('/stories', authMiddleware, profileController.addStory);
+router.post('/stories', authMiddleware, profileController.addStory); // Multer is handled in addStory
 
 router.get('/sections', authMiddleware, profileController.getSections);
 router.post('/sections', authMiddleware, profileController.addSection);
