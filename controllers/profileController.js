@@ -2,7 +2,7 @@ require('dotenv').config();
 const Story = require('../models/storyModel');
 const Section = require('../models/sectionModel');
 const Graph = require('../models/graphModel');
-const { uploadAndConvertPostMedia } = require('../config/multerConfig'); // Import specific utility
+const { uploadAndConvertPostMedia } = require('../config/multerConfig');
 const path = require('path');
 
 const profileController = {
@@ -27,14 +27,13 @@ const profileController = {
   },
 
   addStory: [
-    uploadAndConvertPostMedia, // Use the post media upload utility with video conversion
+    uploadAndConvertPostMedia,
     async (req, res) => {
       try {
         console.log('=== Add Story Debug ===');
         console.log('User:', req.user, '| Body:', req.body, '| File:', req.file);
 
         const userId = req.user?.userId || req.user?.id;
-        const { caption } = req.body;
         const username = req.user.username; // Assuming username is in the token payload
 
         if (!userId) {
@@ -45,18 +44,17 @@ const profileController = {
           return res.status(400).json({ error: 'Media file is required.' });
         }
 
-        const imageUrl = `/uploads/posts/${req.file.filename}`; // Adjust path based on postStorage
+        const imageUrl = `/uploads/posts/${req.file.filename}`;
         const has_story = 1;
         const viewed = 0;
 
-        console.log('Creating story:', { userId, username, imageUrl, has_story, viewed, caption });
-        const storyId = await Story.create(userId, username, imageUrl, has_story, viewed, caption);
+        console.log('Creating story:', { userId, username, imageUrl, has_story, viewed });
+        const storyId = await Story.create(userId, username, imageUrl, has_story, viewed);
         console.log('Story created with ID:', storyId);
 
         res.status(201).json({
           story_id: storyId,
           image_url: imageUrl,
-          caption: caption || '',
         });
       } catch (error) {
         console.error('Error in addStory:', error);
@@ -76,7 +74,7 @@ const profileController = {
       }
 
       console.log('Fetching sections for userId:', userId);
-      const sections = await Section.findByUserId(userId); // Fixed: Use Section model, not Story
+      const sections = await Section.findByUserId(userId);
       console.log('Sections fetched:', sections.length);
       res.json(sections);
     } catch (error) {
