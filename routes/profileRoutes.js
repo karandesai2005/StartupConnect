@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const profileController = require('../controllers/profileController');
-const authMiddleware = require('../middleware/auth'); // Adjust path to your auth middleware
+const authMiddleware = require('../middleware/authenticateJWT'); // Adjust mpath to your auth middleware
 
 router.get('/stories', authMiddleware, profileController.getStories);
 router.post('/stories', authMiddleware, profileController.addStory);
