@@ -3,12 +3,12 @@ import { View, Text, StyleSheet } from 'react-native';
 
 const SplashScreen = ({ navigation }) => {
   useEffect(() => {
-    // Navigate to Login after 3 seconds
+    // Navigate to Main (tab navigator with Home as default) after 3 seconds
     const timer = setTimeout(() => {
-      navigation.replace('Login');
+      navigation.replace('Main');
     }, 3000);
     return () => clearTimeout(timer);
-  }, []);
+  }, [navigation]);
 
   return (
     <View style={styles.container}>
@@ -32,4 +32,3 @@ const styles = StyleSheet.create({
 });
 
 export default SplashScreen;
-

@@ -1,7 +1,6 @@
 import React from 'react';
 import { StyleSheet, View, Text, Image, TouchableOpacity, FlatList, Dimensions, Platform } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import Bottomnav from './BottamNav';
 
 // Sample event data (fixed duplicate IDs)
 const eventsData = [
@@ -30,7 +29,7 @@ const EventItem = ({ event, onPress, isLast }) => {
       <TouchableOpacity
         style={[
           styles.eventItem,
-          Platform.OS === 'android' && styles.eventItemAndroid, // Apply Android-specific styling
+          Platform.OS === 'android' && styles.eventItemAndroid,
         ]}
         onPress={onPress}
         activeOpacity={0.7}
@@ -39,7 +38,7 @@ const EventItem = ({ event, onPress, isLast }) => {
           source={event.imageUrl}
           style={[
             styles.eventIcon,
-            Platform.OS === 'android' && styles.eventIconAndroid, // Smaller icon on Android
+            Platform.OS === 'android' && styles.eventIconAndroid,
           ]}
           resizeMode="cover"
         />
@@ -47,7 +46,7 @@ const EventItem = ({ event, onPress, isLast }) => {
           <Text
             style={[
               styles.eventTitle,
-              Platform.OS === 'android' && styles.eventTitleAndroid, // Smaller title on Android
+              Platform.OS === 'android' && styles.eventTitleAndroid,
             ]}
             numberOfLines={1}
           >
@@ -56,7 +55,7 @@ const EventItem = ({ event, onPress, isLast }) => {
           <Text
             style={[
               styles.eventDescription,
-              Platform.OS === 'android' && styles.eventDescriptionAndroid, // Smaller description on Android
+              Platform.OS === 'android' && styles.eventDescriptionAndroid,
             ]}
             numberOfLines={2}
           >
@@ -74,7 +73,7 @@ const Events = () => {
   const navigation = useNavigation();
 
   const handleEventPress = (event) => {
-    navigation.navigate('EventDetails', { event }); // Navigate to EventDetails with event data
+    navigation.navigate('EventDetails', { event });
   };
 
   const renderItem = ({ item, index }) => (
@@ -97,7 +96,6 @@ const Events = () => {
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
       />
-      <Bottomnav />
     </View>
   );
 };
@@ -106,19 +104,19 @@ const { width } = Dimensions.get('window');
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff', // White background like LinkedIn
+    backgroundColor: '#fff',
   },
   header: {
     paddingVertical: 15,
     paddingHorizontal: 20,
-    paddingTop: 60, // Space for status bar
+    paddingTop: 60,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0', // Subtle gray line
+    borderBottomColor: '#e0e0e0',
   },
   headerTitle: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#1a1a1a', // Darker gray for professionalism
+    color: '#1a1a1a',
     fontFamily: 'AvenirNextCyr',
   },
   listContainer: {
@@ -135,18 +133,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 5,
   },
   eventItemAndroid: {
-    paddingVertical: 10, // Reduced from 15 to make it more compact on Android
+    paddingVertical: 10,
   },
   eventIcon: {
     width: 60,
     height: 60,
-    borderRadius: 8, // Slightly rounded edges
-    backgroundColor: '#f0f0f0', // Fallback color
+    borderRadius: 8,
+    backgroundColor: '#f0f0f0',
   },
   eventIconAndroid: {
-    width: 48, // Reduced from 60
-    height: 48, // Reduced from 60
-    borderRadius: 6, // Slightly smaller radius to match
+    width: 48,
+    height: 48,
+    borderRadius: 6,
   },
   eventDetails: {
     flex: 1,
@@ -155,27 +153,27 @@ const styles = StyleSheet.create({
   eventTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1a1a1a', // Darker text for readability
+    color: '#1a1a1a',
     fontFamily: 'AvenirNextCyr',
   },
   eventTitleAndroid: {
-    fontSize: 14, // Reduced from 16
+    fontSize: 14,
   },
   eventDescription: {
     fontSize: 14,
-    color: '#666', // Muted gray like LinkedIn
+    color: '#666',
     fontFamily: 'AvenirNextCyr',
     marginTop: 4,
     lineHeight: 18,
   },
   eventDescriptionAndroid: {
-    fontSize: 12, // Reduced from 14
-    lineHeight: 16, // Adjusted for compactness
-    marginTop: 2, // Reduced from 4
+    fontSize: 12,
+    lineHeight: 16,
+    marginTop: 2,
   },
   divider: {
     height: 1,
-    backgroundColor: '#e0e0e0', // Light gray divider like LinkedIn
+    backgroundColor: '#e0e0e0',
     marginHorizontal: 10,
   },
 });

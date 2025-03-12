@@ -26,7 +26,6 @@ import { NGROK_URL } from '@env';
 import { Video } from 'expo-av';
 import { debounce } from 'lodash';
 import Modal from 'react-native-modal';
-import BottamNav from '../components/BottamNav';
 const { width } = Dimensions.get('window');
 
 const formatTimestamp = (timestamp) => {
@@ -665,7 +664,7 @@ export default function HomeScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <View style={styles.topBar}>
         <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
           <Image
@@ -705,7 +704,7 @@ export default function HomeScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.iconSpacing} onPress={() => setFieldsModalVisible(true)}>
-            <Image source={require('../assets/film.png')} style={styles.filterIcon} />
+            <Image source={require('../assets/options.png')} style={styles.filterIcon} />
           </TouchableOpacity>
         </View>
       </View>
@@ -766,18 +765,18 @@ export default function HomeScreen() {
         </View>
       </Modal>
 
-      <BottamNav/>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#FFFFFF',
   },
   topBar: {
     flexDirection: 'row',
+    marginTop: Platform.OS === 'ios' ? 37: 0,
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
@@ -940,8 +939,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   navIcon: {
-    width: 22,
-    height: 22,
+    width: 20,
+    height: 20,
     marginBottom: Platform.OS === 'ios' ? 3 : 0,
   },
   captionContainer: {
@@ -1110,6 +1109,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#eee',
     paddingTop: 10,
+    paddingBottom: 30,
   },
   commentInput: {
     flex: 1,

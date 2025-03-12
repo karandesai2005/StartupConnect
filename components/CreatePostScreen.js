@@ -22,7 +22,6 @@ import { NGROK_URL } from '@env';
 import { useNavigation } from '@react-navigation/native';
 import * as FileSystem from 'expo-file-system';
 import { Ionicons, Feather } from '@expo/vector-icons';
-import BottomNav from './BottamNav';
 
 const getFileUri = async (uri) => {
   if (Platform.OS === 'android' && uri.startsWith('content://')) {
@@ -144,8 +143,7 @@ export default function CreatePostScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" />
+    <View style={styles.safeArea}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.keyboardAvoid}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.cancelButton}>
@@ -204,7 +202,7 @@ export default function CreatePostScreen() {
               <View style={styles.emptyStateContainer}>
                 <TouchableOpacity onPress={pickMedia} style={styles.mediaPickerEmpty}>
                   <View style={styles.mediaPickerContent}>
-                    <Feather name="image" size={60} color="#0095f6" />
+                    <Feather name="image" size={60} color='#1f219c' />
                     <Text style={styles.mediaPickerText}>Select from Gallery</Text>
                   </View>
                 </TouchableOpacity>
@@ -213,13 +211,12 @@ export default function CreatePostScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-      <BottomNav />
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#fff' },
+  safeArea: { flex: 1, backgroundColor: '#fff', paddingTop: 50 },
   keyboardAvoid: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, height: 44, borderBottomWidth: 0.5, borderBottomColor: '#dbdbdb' },
   cancelButton: { padding: 8 },
@@ -236,7 +233,7 @@ const styles = StyleSheet.create({
   changeMediaButton: { position: 'absolute', bottom: 16, right: 16, backgroundColor: 'rgba(0,0,0,0.6)', width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
   mediaPickerEmpty: { width: '100%', aspectRatio: 1, maxWidth: 300, backgroundColor: '#fafafa', borderRadius: 12, overflow: 'hidden', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#dbdbdb', borderStyle: 'dashed' },
   mediaPickerContent: { justifyContent: 'center', alignItems: 'center', padding: 20 },
-  mediaPickerText: { fontSize: 18, fontWeight: '500', color: '#0095f6', marginTop: 12 },
+  mediaPickerText: { fontSize: 18, fontWeight: '500', color: '#1f219c', marginTop: 12 },
   captionSection: { padding: 16 },
   userInfoContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   profilePic: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#efefef', marginRight: 10 },

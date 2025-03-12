@@ -21,7 +21,6 @@ import { BarChart, PieChart, LineChart } from 'react-native-gifted-charts';
 import { Video } from 'expo-av';
 import DynamicGraphs from "./DynamicGraphs";
 import * as ImagePicker from 'expo-image-picker';
-import Bottomnav from '../../BottamNav';
 
 const StoryItem = React.memo(({ story, onPress, isAddButton }) => {
   const imageSource = story.image_url
@@ -731,9 +730,7 @@ const pickImage = async () => {
         </View>
       </Modal>
 
-      <View style={styles.bottomNavContainer}>
-        <Bottomnav />
-      </View>
+      
     </View>
   );
 };
@@ -1116,13 +1113,7 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
   },
-  bottomNavContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    zIndex: 10,
-  },
+
   modalOverlay: {
     flex: 1,
     justifyContent: 'center',
