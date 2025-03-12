@@ -35,6 +35,7 @@ const profileController = {
 
         const userId = req.user?.userId || req.user?.id;
         const username = req.user.username; // Assuming username is in the token payload
+        const section = req.body.section || 'default'; // Get section from request body, default to 'default'
 
         if (!userId) {
           return res.status(400).json({ error: 'User ID is required.' });
@@ -48,13 +49,14 @@ const profileController = {
         const has_story = 1;
         const viewed = 0;
 
-        console.log('Creating story:', { userId, username, imageUrl, has_story, viewed });
-        const storyId = await Story.create(userId, username, imageUrl, has_story, viewed);
+        console.log('Creating story:', { userId, username, imageUrl, has_story, viewed, section });
+        const storyId = await Story.create(userId, username, imageUrl, has_story, viewed, section);
         console.log('Story created with ID:', storyId);
 
         res.status(201).json({
           story_id: storyId,
           image_url: imageUrl,
+          section: section, // Include section in response
         });
       } catch (error) {
         console.error('Error in addStory:', error);
