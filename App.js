@@ -3,7 +3,6 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { UserRegistrationProvider } from './context/UserRegistrationContext';
 import { ThemeProvider } from './components/ThemeContext'; // Adjust the path based on your file structure
-
 // Import components
 import SplashScreen from './components/SplashScreen';
 import LoginScreen from './components/LoginScreen';
@@ -27,7 +26,7 @@ import SettingsScreen from './components/settings';
 import Events from './components/Events';
 import BottomNav from './components/BottamNav';
 import AddStory from './components/Profile/P_Profile/AddStory';
-// import SelectTagsScreen from './components/Tagscreen';
+import SelectTagsScreen from './components/Tagscreen';
 // import EventDetail from './components/EventDetail';
 const Stack = createStackNavigator();
 
@@ -67,7 +66,7 @@ const App = () => {
             <Stack.Screen name="BottomNav" component={BottomNav} />
             <Stack.Screen name="AddStory" component={AddStory} />
 
-            {/* <Stack.Screen name="SelectTags" component={SelectTagsScreen} /> */}
+            <Stack.Screen name="SelectTags" component={SelectTagsScreen} />
             {/* <Stack.Screen name="EventDetails" component={EventDetail} options={{ title: 'Event Details' }} /> */}
           </Stack.Navigator>
         </NavigationContainer>

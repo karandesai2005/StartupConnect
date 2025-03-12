@@ -13,7 +13,6 @@ const debugMiddleware = (req, res, next) => {
   next();
 };
 
-
 router.post('/posts',
   debugMiddleware,
   authenticateJWT,

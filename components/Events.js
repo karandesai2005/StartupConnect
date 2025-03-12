@@ -74,14 +74,14 @@ const Events = () => {
   const navigation = useNavigation();
 
   const handleEventPress = (event) => {
-    navigation.navigate('Profile'); // Assuming Profile is a placeholder; replace with 'EventDetail' if intended
+    navigation.navigate('EventDetails', { event }); // Navigate to EventDetails with event data
   };
 
   const renderItem = ({ item, index }) => (
     <EventItem
       event={item}
       onPress={() => handleEventPress(item)}
-      isLast={index === eventsData.length - 1} // No divider for the last item
+      isLast={index === eventsData.length - 1}
     />
   );
 
