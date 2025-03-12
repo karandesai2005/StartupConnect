@@ -12,20 +12,21 @@ import {
   Modal,
   TextInput,
   Dimensions,
-  Keyboard
 } from "react-native";
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { NGROK_URL } from '@env';
-import { BarChart, PieChart, LineChart } from 'react-native-gifted-charts';
-import { Video } from 'expo-av';
+import { NGROK_URL } from "@env";
+import { BarChart, PieChart, LineChart } from "react-native-gifted-charts";
+import { Video } from "expo-av";
 import DynamicGraphs from "./DynamicGraphs";
-import * as ImagePicker from 'expo-image-picker';
+import * as ImagePicker from "expo-image-picker";
 
 const StoryItem = React.memo(({ story, onPress, isAddButton }) => {
-  const imageSource = story.image_url
+  const imageSource = isAddButton
+    ? require("../../../assets/del.png")
+    : story.image_url
     ? { uri: story.image_url }
-    : require('../../../assets/del.png');
+    : require("../../../assets/del.png");
 
   return (
     <TouchableOpacity
@@ -33,12 +34,14 @@ const StoryItem = React.memo(({ story, onPress, isAddButton }) => {
       style={styles.storyItem}
       activeOpacity={0.7}
     >
-      <View style={[
-        styles.storyRing,
-        { borderColor: story.viewed ? '#8e8e8e' : '#007bff' },
-        story.has_story && styles.activeStoryRing,
-        isAddButton && { borderWidth: 0 }
-      ]}>
+      <View
+        style={[
+          styles.storyRing,
+          { borderColor: story.viewed ? "#8e8e8e" : "#007bff" },
+          story.has_story && styles.activeStoryRing,
+          isAddButton && { borderWidth: 0 },
+        ]}
+      >
         <View style={styles.storyImageContainer}>
           {isAddButton ? (
             <Text style={styles.addStoryText}>+</Text>
@@ -47,7 +50,7 @@ const StoryItem = React.memo(({ story, onPress, isAddButton }) => {
               source={imageSource}
               style={styles.storyImage}
               resizeMode="cover"
-              defaultSource={require('../../../assets/del.png')}
+              defaultSource={require("../../../assets/del.png")}
             />
           )}
           {story.has_story && !story.viewed && !isAddButton && (
@@ -56,14 +59,22 @@ const StoryItem = React.memo(({ story, onPress, isAddButton }) => {
         </View>
       </View>
       <Text style={styles.storyUsername} numberOfLines={1}>
-        {isAddButton ? 'Add Story' : story.username}
+        {isAddButton ? "Add Story" : story.username}
       </Text>
     </TouchableOpacity>
   );
 });
 
 const Stories = React.memo(({ stories, onStoryPress, onAddStory, title }) => {
-  const addStoryItem = { id: 'add', username: 'Add Story', has_story: false, viewed: false };
+  const addStoryItem = { id: "add", username: "Add Story", has_story: false, viewed: false };
+
+  // Filter stories based on the section derived from the title
+  const filteredStories = stories.filter((story) => {
+    if (title === "Milestones and others") return story.section === "milestones";
+    if (title === "The Ventures" || title === "The Startup")
+      return story.section === "ventures";
+    return true; // Default case (if no match, show all for now)
+  });
 
   return (
     <View style={styles.sectionContainer}>
@@ -80,11 +91,11 @@ const Stories = React.memo(({ stories, onStoryPress, onAddStory, title }) => {
           onPress={onAddStory}
           isAddButton={true}
         />
-        {stories.map((story) => (
+        {filteredStories.map((story, index) => (
           <StoryItem
-            key={story.story_id || story.id}
+            key={story.story_id}
             story={story}
-            onPress={() => onStoryPress?.(story)}
+            onPress={() => onStoryPress(story, index)}
           />
         ))}
       </ScrollView>
@@ -103,7 +114,7 @@ const ImageSection = ({ title, imageUri }) => (
         source={{ uri: imageUri }}
         style={styles.sectionImage}
         resizeMode="cover"
-        defaultSource={require('../../../assets/del.png')}
+        defaultSource={require("../../../assets/del.png")}
       />
     ) : (
       <Text style={styles.placeholderText}>No image uploaded</Text>
@@ -128,7 +139,7 @@ const Profile = ({ route, isBusinessProfile = false }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(0);
-  const [activeTab, setActiveTab] = useState('stories');
+  const [activeTab, setActiveTab] = useState("stories");
   const [userPosts, setUserPosts] = useState([]);
   const [isGraphModalVisible, setGraphModalVisible] = useState(false);
   const [userGraphs, setUserGraphs] = useState([]);
@@ -136,38 +147,38 @@ const Profile = ({ route, isBusinessProfile = false }) => {
   const [stories, setStories] = useState([]);
   const [isSectionModalVisible, setSectionModalVisible] = useState(false);
   const [sectionType, setSectionType] = useState(null);
-  const [sectionTitle, setSectionTitle] = useState('');
-  const [sectionContent, setSectionContent] = useState('');
+  const [sectionTitle, setSectionTitle] = useState("");
+  const [sectionContent, setSectionContent] = useState("");
   const [imageUri, setImageUri] = useState(null);
+  const [isAddStoryModalVisible, setIsAddStoryModalVisible] = useState(false);
+  const [selectedSection, setSelectedSection] = useState(null);
 
-  const fetchWithAuth = async (endpoint, method = 'GET', body = null) => {
+  const fetchWithAuth = async (endpoint, method = "GET", body = null) => {
     const token = await AsyncStorage.getItem("token");
     if (!token) {
-      navigation.navigate('Login');
+      navigation.navigate("Login");
       return null;
     }
     try {
-      // Make sure NGROK_URL doesn't end with a slash and endpoint starts with one
-      const baseUrl = NGROK_URL.endsWith('/') ? NGROK_URL.slice(0, -1) : NGROK_URL;
-      const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-      
+      const baseUrl = NGROK_URL.endsWith("/") ? NGROK_URL.slice(0, -1) : NGROK_URL;
+      const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
       const url = `${baseUrl}/api/profile${cleanEndpoint}`;
-      console.log(`Fetching: ${url}`); // Debug log
-      
+      console.log(`Fetching: ${url}`);
+
       const response = await fetch(url, {
         method,
         headers: {
-          "Authorization": `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
         body: body ? JSON.stringify(body) : null,
       });
-      
+
       if (!response.ok) {
         console.error(`Failed to fetch ${endpoint}: ${response.status}`);
         return null;
       }
-      
+
       return await response.json();
     } catch (error) {
       console.error(`Error fetching ${endpoint}:`, error);
@@ -177,185 +188,215 @@ const Profile = ({ route, isBusinessProfile = false }) => {
 
   useEffect(() => {
     if (route.params?.updatedUser) {
-      setUserData(prevData => ({
+      setUserData((prevData) => ({
         ...prevData,
         ...route.params.updatedUser,
         profile_picture: route.params.updatedUser.profile_picture,
-        bio: route.params.updatedUser.bio
+        bio: route.params.updatedUser.bio,
       }));
       setLastUpdate(Date.now());
       if (route.params.forceRefresh) fetchUserData();
     }
   }, [route.params?.updatedUser]);
 
-  const fetchUserPosts = useCallback(async (username) => {
-    try {
-      const token = await AsyncStorage.getItem("token");
-      if (!token) {
-        navigation.navigate('Login');
-        return;
+  const fetchUserPosts = useCallback(
+    async (username) => {
+      try {
+        const token = await AsyncStorage.getItem("token");
+        if (!token) {
+          navigation.navigate("Login");
+          return;
+        }
+        const endpoint = username
+          ? `${NGROK_URL}/api/posts/user/${username}`
+          : `${NGROK_URL}/api/posts/myposts`;
+        const response = await fetch(endpoint, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          const mappedPosts = data.map((post) => ({
+            _id: post.post_id,
+            username: post.username,
+            profile_picture: post.profile_picture,
+            image_url: post.media_url,
+            content: post.content,
+            created_at: post.created_at,
+            likes: post.like_count || 0,
+            comments: 0,
+            caption: post.content,
+            media_type:
+              post.media_type || (post.media_url?.includes(".mp4") ? "video" : "image"),
+          }));
+          const validPosts = mappedPosts
+            .filter((post) => post.image_url && !post.image_url.includes("undefined"))
+            .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+          setUserPosts(validPosts);
+        }
+      } catch (error) {
+        console.error("Posts fetch error:", error);
       }
-      const endpoint = username
-        ? `${NGROK_URL}/api/posts/user/${username}`
-        : `${NGROK_URL}/api/posts/myposts`;
-      const response = await fetch(endpoint, {
-        method: "GET",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
-      if (response.ok) {
-        const data = await response.json();
-        const mappedPosts = data.map(post => ({
-          _id: post.post_id,
-          username: post.username,
-          profile_picture: post.profile_picture,
-          image_url: post.media_url,
-          content: post.content,
-          created_at: post.created_at,
-          likes: post.like_count || 0,
-          comments: 0,
-          caption: post.content,
-          media_type: post.media_type || (post.media_url?.includes('.mp4') ? 'video' : 'image')
+    },
+    [navigation]
+  );
+
+  const fetchStories = useCallback(async () => {
+    try {
+      const storiesData = await fetchWithAuth("/stories");
+      console.log("Fetched stories:", storiesData);
+      if (storiesData) {
+        const validStories = storiesData.map((story) => ({
+          story_id: story.story_id,
+          image_url: story.image_url.startsWith("http")
+            ? story.image_url
+            : `${NGROK_URL}${story.image_url}`,
+          has_story: story.has_story === 1 || true,
+          viewed: story.viewed === 1 ? true : false,
+          username: story.username || userData?.username || "User",
+          profile_picture: userData?.profile_picture || null,
+          section: story.section || "default", // Include section field
         }));
-        const validPosts = mappedPosts
-          .filter(post => post.image_url && !post.image_url.includes('undefined'))
-          .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-        setUserPosts(validPosts);
+        setStories(validStories);
       }
     } catch (error) {
-      console.error("Posts fetch error:", error);
+      console.error("Stories fetch error:", error);
     }
-  }, [navigation]);
+  }, [fetchWithAuth, userData]);
 
-  // Add these functions inside your Profile component before the fetchUserData function
-
-const fetchStories = useCallback(async () => {
-  try {
-    const storiesData = await fetchWithAuth('/stories');
-    if (storiesData) {
-      const validStories = storiesData.filter(story => 
-        story && (story.story_id || story.id)
-      );
-      setStories(validStories);
+  const fetchSections = useCallback(async () => {
+    try {
+      const sectionsData = await fetchWithAuth("/sections");
+      if (sectionsData) {
+        setSections(sectionsData);
+      }
+    } catch (error) {
+      console.error("Sections fetch error:", error);
     }
-  } catch (error) {
-    console.error("Stories fetch error:", error);
-  }
-}, [fetchWithAuth]);
+  }, [fetchWithAuth]);
 
-const fetchSections = useCallback(async () => {
-  try {
-    const sectionsData = await fetchWithAuth('/sections');
-    if (sectionsData) {
-      setSections(sectionsData);
+  const fetchGraphs = useCallback(async () => {
+    try {
+      const graphsData = await fetchWithAuth("/graphs");
+      if (graphsData) {
+        setUserGraphs(graphsData);
+      }
+    } catch (error) {
+      console.error("Graphs fetch error:", error);
     }
-  } catch (error) {
-    console.error("Sections fetch error:", error);
-  }
-}, [fetchWithAuth]);
+  }, [fetchWithAuth]);
 
-const fetchGraphs = useCallback(async () => {
-  try {
-    const graphsData = await fetchWithAuth('/graphs');
-    if (graphsData) {
-      setUserGraphs(graphsData);
-    }
-  } catch (error) {
-    console.error("Graphs fetch error:", error);
-  }
-}, [fetchWithAuth]);
+  const handleAddStory = () => {
+    setSelectedSection(null); // Reset section
+    setIsAddStoryModalVisible(true); // Show section selection modal
+  };
 
-// Add these handler functions for creating new content
-const handleAddStory = async () => {
-  navigation.navigate('AddStory', { onStoryAdded: fetchStories });
-};
-
-const handleAddSection = () => {
-  setSectionType(null);
-  setSectionTitle('');
-  setSectionContent('');
-  setImageUri(null);
-  setSectionModalVisible(true);
-};
-
-const handleSectionSubmit = async () => {
-  if (!sectionTitle) {
-    alert('Please provide a section title');
-    return;
-  }
-
-  // Validate section content based on type
-  if (sectionType === 'text' && !sectionContent) {
-    alert('Please provide section content');
-    return;
-  }
-
-  if (sectionType === 'image' && !imageUri) {
-    alert('Please select an image');
-    return;
-  }
-
-  try {
-    const sectionData = {
-      type: sectionType,
-      title: sectionTitle,
-      content: sectionType === 'text' ? sectionContent : null,
-      image_uri: sectionType === 'image' ? imageUri : null
-    };
-
-    const response = await fetchWithAuth('/sections', 'POST', sectionData);
-    if (response) {
-      await fetchSections();
-      setSectionModalVisible(false);
-      setSectionType(null);
-      setSectionTitle('');
-      setSectionContent('');
-      setImageUri(null);
-    }
-  } catch (error) {
-    console.error("Error creating section:", error);
-    alert('Failed to create section');
-  }
-};
-
-const handleAddGraph = async (graphData) => {
-  try {
-    const response = await fetchWithAuth('/graphs', 'POST', graphData);
-    if (response) {
-      await fetchGraphs();
-      setGraphModalVisible(false);
-    }
-  } catch (error) {
-    console.error("Error creating graph:", error);
-    alert('Failed to create graph');
-  }
-};
-
-const pickImage = async () => {
-  try {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.8,
+  const handleConfirmAddStory = async (section) => {
+    setIsAddStoryModalVisible(false);
+    navigation.navigate("AddStory", {
+      onStoryAdded: (newStory) => {
+        const fullImageUrl = newStory.image_url.startsWith("http")
+          ? newStory.image_url
+          : `${NGROK_URL}${newStory.image_url}`;
+        setStories((prev) => [
+          ...prev,
+          {
+            story_id: newStory.story_id,
+            image_url: fullImageUrl,
+            has_story: true,
+            viewed: false,
+            username: userData?.username || "User",
+            profile_picture: userData?.profile_picture || null,
+            section: section, // Assign the selected section
+          },
+        ]);
+        fetchStories(); // Refresh from server
+      },
+      section: section, // Pass the selected section to AddStory
     });
+  };
 
-    if (!result.canceled) {
-      setImageUri(result.assets[0].uri);
+  const handleAddSection = () => {
+    setSectionType(null);
+    setSectionTitle("");
+    setSectionContent("");
+    setImageUri(null);
+    setSectionModalVisible(true);
+  };
+
+  const handleSectionSubmit = async () => {
+    if (!sectionTitle) {
+      alert("Please provide a section title");
+      return;
     }
-  } catch (error) {
-    console.error("Error picking image:", error);
-  }
-};
+    if (sectionType === "text" && !sectionContent) {
+      alert("Please provide section content");
+      return;
+    }
+    if (sectionType === "image" && !imageUri) {
+      alert("Please select an image");
+      return;
+    }
+    try {
+      const sectionData = {
+        type: sectionType,
+        title: sectionTitle,
+        content: sectionType === "text" ? sectionContent : null,
+        image_uri: sectionType === "image" ? imageUri : null,
+      };
+      const response = await fetchWithAuth("/sections", "POST", sectionData);
+      if (response) {
+        await fetchSections();
+        setSectionModalVisible(false);
+        setSectionType(null);
+        setSectionTitle("");
+        setSectionContent("");
+        setImageUri(null);
+      }
+    } catch (error) {
+      console.error("Error creating section:", error);
+      alert("Failed to create section");
+    }
+  };
+
+  const handleAddGraph = async (graphData) => {
+    try {
+      const response = await fetchWithAuth("/graphs", "POST", graphData);
+      if (response) {
+        await fetchGraphs();
+        setGraphModalVisible(false);
+      }
+    } catch (error) {
+      console.error("Error creating graph:", error);
+      alert("Failed to create graph");
+    }
+  };
+
+  const pickImage = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+      if (!result.canceled) {
+        setImageUri(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error("Error picking image:", error);
+    }
+  };
 
   const fetchUserData = useCallback(async () => {
     try {
       setIsLoading(true);
       const token = await AsyncStorage.getItem("token");
       if (!token) {
-        navigation.navigate('Login');
+        navigation.navigate("Login");
         return;
       }
       const { username, isOtherUser } = route.params || {};
@@ -365,34 +406,37 @@ const pickImage = async () => {
         response = await fetch(`${NGROK_URL}/api/auth/users/${username}`, {
           method: "GET",
           headers: {
-            "Authorization": `Bearer ${token}`,
+            Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
             "Cache-Control": "no-cache",
-            "Pragma": "no-cache",
+            Pragma: "no-cache",
           },
         });
       } else {
-        response = await fetch(`${NGROK_URL}/api/auth/profile?timestamp=${Date.now()}`, {
-          method: "GET",
-          headers: {
-            "Authorization": `Bearer ${token}`,
-            "Content-Type": "application/json",
-            "Cache-Control": "no-cache",
-            "Pragma": "no-cache",
-          },
-        });
+        response = await fetch(
+          `${NGROK_URL}/api/auth/profile?timestamp=${Date.now()}`,
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+              "Cache-Control": "no-cache",
+              Pragma: "no-cache",
+            },
+          }
+        );
       }
 
       if (response.ok) {
         const data = await response.json();
         setUserData(data);
         setLastUpdate(Date.now());
-        await AsyncStorage.setItem('userData', JSON.stringify(data));
+        await AsyncStorage.setItem("userData", JSON.stringify(data));
         await Promise.all([
           fetchUserPosts(isOtherUser ? username : null),
           fetchStories(),
           fetchSections(),
-          fetchGraphs()
+          fetchGraphs(),
         ]);
       }
     } catch (error) {
@@ -411,7 +455,7 @@ const pickImage = async () => {
 
   useFocusEffect(
     useCallback(() => {
-      const shouldFetch = !userData || (Date.now() - lastUpdate > 5000);
+      const shouldFetch = !userData || Date.now() - lastUpdate > 5000;
       if (shouldFetch) fetchUserData();
     }, [fetchUserData, userData, lastUpdate])
   );
@@ -428,28 +472,50 @@ const pickImage = async () => {
   );
 
   const renderStoriesTab = () => (
-    <View style={{ width: '100%' }}>
+    <View style={{ width: "100%" }}>
       {sections.map((section) => {
         switch (section.type) {
-          case 'story':
+          case "story":
             return (
-              <Stories 
-                key={section.section_id} 
-                title={section.title} 
-                stories={stories} 
+              <Stories
+                key={section.section_id}
+                title={section.title}
+                stories={stories}
                 onAddStory={handleAddStory}
-                onStoryPress={(story) => console.log('Story pressed:', story)}
+                onStoryPress={(story, index) =>
+                  navigation.navigate("ViewStory", {
+                    stories: stories.filter((s) =>
+                      s.section === (section.title === "Milestones and others" ? "milestones" : "ventures")
+                    ),
+                    initialIndex: index,
+                  })
+                }
               />
             );
-          case 'image':
-            return <ImageSection key={section.section_id} title={section.title} imageUri={section.image_uri} />;
-          case 'text':
-            return <TextSection key={section.section_id} title={section.title} content={section.content} />;
+          case "image":
+            return (
+              <ImageSection
+                key={section.section_id}
+                title={section.title}
+                imageUri={section.image_uri}
+              />
+            );
+          case "text":
+            return (
+              <TextSection
+                key={section.section_id}
+                title={section.title}
+                content={section.content}
+              />
+            );
           default:
             return null;
         }
       })}
-      <TouchableOpacity style={styles.addStorySectionButton} onPress={handleAddSection}>
+      <TouchableOpacity
+        style={styles.addStorySectionButton}
+        onPress={handleAddSection}
+      >
         <Text style={styles.addStorySectionText}>+ Add New Section</Text>
       </TouchableOpacity>
     </View>
@@ -461,13 +527,25 @@ const pickImage = async () => {
         <View key={graph.graph_id} style={styles.cardStyle}>
           <Text style={styles.graphTitle}>{graph.title}</Text>
           <View style={styles.graphContainer}>
-            {graph.type === 'pie' && (
+            {graph.type === "pie" && (
               <PieChart
                 data={graph.data.map((item, i) => ({
                   ...item,
-                  color: ['#007bff', '#004999', '#002d5f', '#000000', '#696969'][i % 5],
-                  gradientCenterColor: ['#007bff', '#004999', '#002d5f', '#000000', '#696969'][(i + 1) % 5],
-                  focused: true
+                  color: [
+                    "#007bff",
+                    "#004999",
+                    "#002d5f",
+                    "#000000",
+                    "#696969",
+                  ][i % 5],
+                  gradientCenterColor: [
+                    "#007bff",
+                    "#004999",
+                    "#002d5f",
+                    "#000000",
+                    "#696969",
+                  ][(i + 1) % 5],
+                  focused: true,
                 }))}
                 donut
                 innerRadius={40}
@@ -478,13 +556,13 @@ const pickImage = async () => {
                 showValuesAsLabels={true}
                 showGradient
                 centerLabelComponent={() => (
-                  <Text style={{ fontSize: 16, color: '#333' }}>
+                  <Text style={{ fontSize: 16, color: "#333" }}>
                     Total: {graph.data.reduce((sum, item) => sum + item.value, 0)}
                   </Text>
                 )}
               />
             )}
-            {graph.type === 'bar' && (
+            {graph.type === "bar" && (
               <BarChart
                 data={graph.data}
                 isAnimated
@@ -498,10 +576,10 @@ const pickImage = async () => {
                 yAxisThickness={0}
                 xAxisThickness={0}
                 hideRules={true}
-                maxValue={Math.max(...graph.data.map(item => item.value)) * 1.2}
+                maxValue={Math.max(...graph.data.map((item) => item.value)) * 1.2}
               />
             )}
-            {graph.type === 'line' && (
+            {graph.type === "line" && (
               <LineChart
                 data={graph.data}
                 height={200}
@@ -513,13 +591,16 @@ const pickImage = async () => {
                 xAxisThickness={0}
                 isAnimated
                 animationDuration={700}
-                maxValue={Math.max(...graph.data.map(item => item.value)) * 1.2}
+                maxValue={Math.max(...graph.data.map((item) => item.value)) * 1.2}
               />
             )}
           </View>
         </View>
       ))}
-      <TouchableOpacity style={styles.addGraphButton} onPress={() => setGraphModalVisible(true)}>
+      <TouchableOpacity
+        style={styles.addGraphButton}
+        onPress={() => setGraphModalVisible(true)}
+      >
         <Text style={styles.addGraphButtonText}>+ Add New Graph</Text>
       </TouchableOpacity>
       <DynamicGraphs
@@ -531,12 +612,21 @@ const pickImage = async () => {
   );
 
   const renderGridItem = (post, index) => {
-    const isVideo = post.media_type === 'video' || post.image_url?.includes('.mp4');
+    const isVideo = post.media_type === "video" || post.image_url?.includes(".mp4");
     return (
       <TouchableOpacity
         key={index}
-        style={[styles.gridItem, { width: (Dimensions.get('window').width - 34) / 3, height: (Dimensions.get('window').width - 34) / 3, marginBottom: 2 }]}
-        onPress={() => navigation.navigate('PostView', { posts: userPosts, initialIndex: index })}
+        style={[
+          styles.gridItem,
+          {
+            width: (Dimensions.get("window").width - 34) / 3,
+            height: (Dimensions.get("window").width - 34) / 3,
+            marginBottom: 2,
+          },
+        ]}
+        onPress={() =>
+          navigation.navigate("PostView", { posts: userPosts, initialIndex: index })
+        }
       >
         {isVideo ? (
           <View style={styles.videoContainer}>
@@ -557,11 +647,11 @@ const pickImage = async () => {
             source={
               post?.image_url
                 ? { uri: post.image_url }
-                : require('../../../assets/del.png')
+                : require("../../../assets/del.png")
             }
             style={styles.gridImage}
             resizeMode="cover"
-            defaultSource={require('../../../assets/del.png')}
+            defaultSource={require("../../../assets/del.png")}
           />
         )}
       </TouchableOpacity>
@@ -586,7 +676,7 @@ const pickImage = async () => {
     if (route.params?.isOtherUser) {
       console.log("Viewing another user's profile, no edit option available.");
     } else {
-      navigation.navigate('EditProfilePage', { userData });
+      navigation.navigate("EditProfilePage", { userData });
     }
   };
 
@@ -594,9 +684,14 @@ const pickImage = async () => {
     <View style={styles.contentContainer}>
       <ScrollView
         contentContainerStyle={styles.scrollViewContent}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+        }
       >
-        <TouchableOpacity onPress={() => navigation.goBack('Home')} style={styles.backButton}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack("Home")}
+          style={styles.backButton}
+        >
           <Text style={styles.backButtonText}>←</Text>
         </TouchableOpacity>
 
@@ -609,22 +704,24 @@ const pickImage = async () => {
               </View>
             </View>
             <View style={styles.avatarMultiVariants}>
-              <View style={{
-                width: 96,
-                height: 96,
-                backgroundColor: "#f0f8ff",
-                borderRadius: isBusinessProfile ? 20 : 48,
-                overflow: "hidden",
-              }}>
+              <View
+                style={{
+                  width: 96,
+                  height: 96,
+                  backgroundColor: "#f0f8ff",
+                  borderRadius: isBusinessProfile ? 20 : 48,
+                  overflow: "hidden",
+                }}
+              >
                 <Image
                   source={
                     userData?.profile_picture
                       ? { uri: `${userData.profile_picture}?timestamp=${lastUpdate}` }
-                      : require('../../../assets/del.png')
+                      : require("../../../assets/del.png")
                   }
                   style={styles.profileImage}
                   resizeMode="cover"
-                  defaultSource={require('../../../assets/del.png')}
+                  defaultSource={require("../../../assets/del.png")}
                 />
               </View>
             </View>
@@ -637,11 +734,16 @@ const pickImage = async () => {
           </View>
           <View style={styles.text}>
             <View style={styles.id}>
-              <Text style={styles.userName}>{userData?.username || "Chir.a.g"}</Text>
+              <Text style={styles.userName}>
+                {userData?.username || "Chir.a.g"}
+              </Text>
               <Text style={styles.checkCircleIcon}>✓</Text>
             </View>
-            <Text style={[styles.about, { textAlign: 'center', paddingHorizontal: 10 }]}>
-              {userData?.bio || "CEO of PITCH. Entrepreneur investor and many more"}
+            <Text
+              style={[styles.about, { textAlign: "center", paddingHorizontal: 10 }]}
+            >
+              {userData?.bio ||
+                "CEO of PITCH. Entrepreneur investor and many more"}
             </Text>
           </View>
           <View style={styles.buttonContainer}>
@@ -656,21 +758,30 @@ const pickImage = async () => {
           </View>
           <Stories
             stories={stories}
-            onStoryPress={(story) => console.log('Story pressed:', story)}
+            onStoryPress={(story, index) => {
+              console.log("Navigating to ViewStory with story:", story);
+              navigation.navigate("ViewStory", {
+                stories: stories.filter((s) => s.section === "milestones"),
+                initialIndex: index,
+              });
+            }}
             onAddStory={handleAddStory}
             title="Milestones and others"
           />
         </View>
 
         <View style={styles.tab}>
-          {renderTab("stories", isBusinessProfile ? "The Startup" : "The Ventures")}
+          {renderTab(
+            "stories",
+            isBusinessProfile ? "The Startup" : "The Ventures"
+          )}
           {renderTab("startups", "The Analytics")}
           {renderTab("bucks", "The Posts")}
         </View>
 
-        {activeTab === 'stories' && renderStoriesTab()}
-        {activeTab === 'startups' && renderTry()}
-        {activeTab === 'bucks' && renderGrid()}
+        {activeTab === "stories" && renderStoriesTab()}
+        {activeTab === "startups" && renderTry()}
+        {activeTab === "bucks" && renderGrid()}
       </ScrollView>
 
       <Modal visible={isSectionModalVisible} transparent animationType="slide">
@@ -679,21 +790,36 @@ const pickImage = async () => {
             <Text style={styles.modalTitle}>Add New Section</Text>
             {!sectionType ? (
               <View style={styles.modalOptions}>
-                <TouchableOpacity style={styles.modalButton} onPress={() => setSectionType('story')}>
+                <TouchableOpacity
+                  style={styles.modalButton}
+                  onPress={() => setSectionType("story")}
+                >
                   <Text style={styles.modalButtonText}>Story Section</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.modalButton} onPress={() => setSectionType('image')}>
+                <TouchableOpacity
+                  style={styles.modalButton}
+                  onPress={() => setSectionType("image")}
+                >
                   <Text style={styles.modalButtonText}>Image Section</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.modalButton} onPress={() => setSectionType('text')}>
+                <TouchableOpacity
+                  style={styles.modalButton}
+                  onPress={() => setSectionType("text")}
+                >
                   <Text style={styles.modalButtonText}>Text Section</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.modalButton, styles.cancelButton]} onPress={() => setSectionModalVisible(false)}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.cancelButton]}
+                  onPress={() => setSectionModalVisible(false)}
+                >
                   <Text style={styles.modalButtonText}>Cancel</Text>
                 </TouchableOpacity>
               </View>
             ) : (
-              <ScrollView style={{ width: '100%' }} contentContainerStyle={{ paddingBottom: 20 }}>
+              <ScrollView
+                style={{ width: "100%" }}
+                contentContainerStyle={{ paddingBottom: 20 }}
+              >
                 <View style={styles.modalForm}>
                   <TextInput
                     style={styles.modalInput}
@@ -701,7 +827,7 @@ const pickImage = async () => {
                     value={sectionTitle}
                     onChangeText={setSectionTitle}
                   />
-                  {sectionType === 'text' && (
+                  {sectionType === "text" && (
                     <TextInput
                       style={[styles.modalInput, styles.modalTextArea]}
                       placeholder="Section Content"
@@ -710,16 +836,27 @@ const pickImage = async () => {
                       multiline
                     />
                   )}
-                  {sectionType === 'image' && (
-                    <TouchableOpacity style={styles.modalButton} onPress={pickImage}>
-                      <Text style={styles.modalButtonText}>{imageUri ? 'Image Selected' : 'Pick Image'}</Text>
+                  {sectionType === "image" && (
+                    <TouchableOpacity
+                      style={styles.modalButton}
+                      onPress={pickImage}
+                    >
+                      <Text style={styles.modalButtonText}>
+                        {imageUri ? "Image Selected" : "Pick Image"}
+                      </Text>
                     </TouchableOpacity>
                   )}
                   <View style={styles.modalFormButtons}>
-                    <TouchableOpacity style={styles.modalSubmitButton} onPress={handleSectionSubmit}>
+                    <TouchableOpacity
+                      style={styles.modalSubmitButton}
+                      onPress={handleSectionSubmit}
+                    >
                       <Text style={styles.modalButtonText}>Add Section</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={[styles.modalButton, styles.cancelButton]} onPress={() => setSectionModalVisible(false)}>
+                    <TouchableOpacity
+                      style={[styles.modalButton, styles.cancelButton]}
+                      onPress={() => setSectionModalVisible(false)}
+                    >
                       <Text style={styles.modalButtonText}>Cancel</Text>
                     </TouchableOpacity>
                   </View>
@@ -730,67 +867,103 @@ const pickImage = async () => {
         </View>
       </Modal>
 
-      
+      <Modal
+        visible={isAddStoryModalVisible}
+        transparent
+        animationType="slide"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Select Section for Story</Text>
+            <View style={styles.modalOptions}>
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={() => {
+                  setSelectedSection("milestones");
+                  handleConfirmAddStory("milestones");
+                }}
+              >
+                <Text style={styles.modalButtonText}>Milestones and others</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={() => {
+                  setSelectedSection("ventures");
+                  handleConfirmAddStory("ventures");
+                }}
+              >
+                <Text style={styles.modalButtonText}>The Ventures</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setIsAddStoryModalVisible(false)}
+              >
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   sectionContainer: {
-    width: '100%',
-    alignSelf: 'stretch',
+    width: "100%",
+    alignSelf: "stretch",
     paddingVertical: 5,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
   },
   sectionHeader: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: "600",
+    color: "#333",
     marginVertical: 2,
-    textAlign: 'left',
+    textAlign: "left",
     paddingHorizontal: 15,
   },
   divider: {
     height: 1,
-    backgroundColor: '#ccc',
-    width: Dimensions.get('window').width,
+    backgroundColor: "#ccc",
+    width: Dimensions.get("window").width,
     marginVertical: 5,
   },
   sectionImage: {
-    width: '100%',
+    width: "100%",
     height: 200,
     borderRadius: 8,
-    resizeMode: 'cover',
+    resizeMode: "cover",
     marginVertical: 2,
   },
   sectionContent: {
     fontSize: 14,
-    color: '#666',
+    color: "#666",
     lineHeight: 20,
     marginVertical: 2,
-    textAlign: 'left',
+    textAlign: "left",
     paddingHorizontal: 15,
-    flexWrap: 'wrap',
-    width: '100%',
-    maxWidth: Dimensions.get('window').width - 30,
+    flexWrap: "wrap",
+    width: "100%",
+    maxWidth: Dimensions.get("window").width - 30,
   },
   placeholderText: {
     fontSize: 14,
-    color: '#999',
-    textAlign: 'left',
+    color: "#999",
+    textAlign: "left",
     marginVertical: 2,
     paddingHorizontal: 15,
     flex: 1,
-    width: '100%',
+    width: "100%",
   },
   storiesContainer: {
     paddingVertical: 2,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 15,
   },
   storyItem: {
-    alignItems: 'center',
+    alignItems: "center",
     width: 72,
     marginHorizontal: 6,
     paddingVertical: 4,
@@ -801,88 +974,88 @@ const styles = StyleSheet.create({
   },
   activeStoryRing: {
     borderWidth: 2.5,
-    borderColor: '#007bff',
+    borderColor: "#007bff",
   },
   storyImageContainer: {
     width: 70,
     height: 70,
     borderRadius: 35,
-    overflow: 'hidden',
-    backgroundColor: '#f0f0f0',
-    position: 'relative',
-    justifyContent: 'center',
-    alignItems: 'center',
+    overflow: "hidden",
+    backgroundColor: "#f0f0f0",
+    position: "relative",
+    justifyContent: "center",
+    alignItems: "center",
   },
   storyImage: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
   addStoryText: {
     fontSize: 24,
-    color: '#666',
-    fontWeight: '600',
+    color: "#666",
+    fontWeight: "600",
   },
   storyUsername: {
     marginTop: 6,
     fontSize: 12,
-    textAlign: 'center',
-    color: '#666',
+    textAlign: "center",
+    color: "#666",
     fontFamily: "AvenirNextCyr",
-    fontWeight: '500',
+    fontWeight: "500",
   },
   unreadIndicator: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 2,
     right: 2,
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#007bff',
+    backgroundColor: "#007bff",
     borderWidth: 1,
-    borderColor: '#fff',
+    borderColor: "#fff",
   },
   addStorySectionButton: {
-    backgroundColor: '#007bff',
+    backgroundColor: "#007bff",
     padding: 15,
     borderRadius: 10,
     marginVertical: 20,
-    alignItems: 'center',
-    width: '90%',
-    alignSelf: 'center',
+    alignItems: "center",
+    width: "90%",
+    alignSelf: "center",
   },
   addStorySectionText: {
-    color: 'white',
+    color: "white",
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   addGraphButton: {
-    backgroundColor: '#007bff',
+    backgroundColor: "#007bff",
     padding: 15,
     borderRadius: 10,
     marginVertical: 20,
-    alignItems: 'center',
-    width: '90%',
-    alignSelf: 'center',
+    alignItems: "center",
+    width: "90%",
+    alignSelf: "center",
   },
   addGraphButtonText: {
-    color: 'white',
+    color: "white",
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   try: {
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 20,
-    width: '100%',
+    width: "100%",
   },
   cardStyle: {
-    width: '90%',
+    width: "90%",
     height: 300,
     marginBottom: 20,
-    backgroundColor: 'white',
+    backgroundColor: "white",
     borderRadius: 15,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -890,67 +1063,67 @@ const styles = StyleSheet.create({
   },
   graphTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    textAlign: 'center',
+    fontWeight: "600",
+    color: "#333",
+    textAlign: "center",
     padding: 15,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: "#eee",
   },
   graphContainer: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     padding: 10,
     width: 350,
   },
   videoContainer: {
-    position: 'relative',
-    width: '100%',
-    height: '100%',
+    position: "relative",
+    width: "100%",
+    height: "100%",
   },
   playIconContainer: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.3)",
   },
   playIcon: {
-    color: 'white',
+    color: "white",
     fontSize: 24,
   },
   gridContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'flex-start',
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "flex-start",
     gap: 2,
     paddingVertical: 20,
-    width: '100%',
+    width: "100%",
   },
   gridItem: {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: "#f0f0f0",
     marginBottom: 2,
   },
   gridImage: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
     borderRadius: 4,
   },
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   contentContainer: {
     flex: 1,
     alignItems: "center",
     paddingHorizontal: 0,
-    width: '100%',
-    position: 'relative',
+    width: "100%",
+    position: "relative",
   },
   profileImage: {
     width: "100%",
@@ -966,10 +1139,10 @@ const styles = StyleSheet.create({
     marginTop: 55,
   },
   profileSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    width: "100%",
     paddingHorizontal: 40,
     paddingTop: 20,
   },
@@ -979,21 +1152,21 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
   },
   statsContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   statsItem: {
-    alignItems: 'center',
+    alignItems: "center",
   },
   statsNumber: {
     fontSize: 18,
-    fontWeight: '700',
-    color: '#000',
+    fontWeight: "700",
+    color: "#000",
     fontFamily: "AvenirNextCyr",
   },
   statsLabel: {
     fontSize: 14,
-    color: '#666',
+    color: "#666",
     fontFamily: "AvenirNextCyr",
   },
   text: {
@@ -1057,7 +1230,7 @@ const styles = StyleSheet.create({
     padding: 4,
     gap: 8,
     marginTop: 10,
-    alignSelf: 'center',
+    alignSelf: "center",
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 20,
@@ -1110,73 +1283,72 @@ const styles = StyleSheet.create({
   },
   scrollViewContent: {
     paddingBottom: 80,
-    width: '100%',
-    alignItems: 'center',
+    width: "100%",
+    alignItems: "center",
   },
-
   modalOverlay: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.5)",
   },
   modalContainer: {
-    width: '80%',
-    backgroundColor: 'white',
+    width: "80%",
+    backgroundColor: "white",
     borderRadius: 10,
     padding: 20,
-    alignItems: 'center',
-    maxHeight: Dimensions.get('window').height * 0.7,
+    alignItems: "center",
+    maxHeight: Dimensions.get("window").height * 0.7,
   },
   modalTitle: {
     fontSize: 20,
-    fontWeight: '600',
+    fontWeight: "600",
     marginBottom: 20,
   },
   modalOptions: {
-    width: '100%',
+    width: "100%",
     gap: 10,
   },
   modalButton: {
-    backgroundColor: '#007bff',
+    backgroundColor: "#007bff",
     padding: 10,
     borderRadius: 5,
-    alignItems: 'center',
+    alignItems: "center",
   },
   cancelButton: {
-    backgroundColor: '#666',
+    backgroundColor: "#666",
   },
   modalButtonText: {
-    color: 'white',
+    color: "white",
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   modalForm: {
-    width: '100%',
+    width: "100%",
     gap: 15,
   },
   modalInput: {
     borderWidth: 1,
-    borderColor: '#ccc',
+    borderColor: "#ccc",
     borderRadius: 5,
     padding: 10,
     fontSize: 16,
-    width: '100%',
+    width: "100%",
   },
   modalTextArea: {
     height: 100,
-    textAlignVertical: 'top',
+    textAlignVertical: "top",
   },
   modalFormButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '100%',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
   },
   modalSubmitButton: {
-    backgroundColor: '#007bff',
+    backgroundColor: "#007bff",
     padding: 10,
     borderRadius: 5,
-    alignItems: 'center',
+    alignItems: "center",
     flex: 1,
     marginRight: 5,
   },

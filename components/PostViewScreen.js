@@ -110,7 +110,7 @@ const PostItem = memo(({
                         source={
                             item?.profile_picture
                                 ? { uri: item.profile_picture }
-                                : require('../../../assets/del.png')
+                                : require('../assets/del.png')
                         }
                         style={styles.avatar}
                     />
@@ -154,7 +154,7 @@ const PostItem = memo(({
                             {isPaused && (
                                 <View style={styles.playButtonOverlay}>
                                     <Image
-                                        source={require('../../../assets/play-button.png')}
+                                        source={require('../assets/play-button.png')}
                                         style={styles.playButton}
                                     />
                                 </View>
@@ -184,18 +184,18 @@ const PostItem = memo(({
             <View style={styles.actions}>
                 <TouchableOpacity style={styles.actionButton} onPress={handleLike}>
                     <Image
-                        source={require('../../../assets/icon-like.png')}
+                        source={require('../assets/icon-like.png')}
                         style={[styles.navIcon, isLiked && { tintColor: '#1f219c' }]}
                     />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.actionButton}>
-                    <Image source={require('../../../assets/comment6.png')} style={styles.navIcon} />
+                    <Image source={require('../assets/comment6.png')} style={styles.navIcon} />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.actionButton}>
-                    <Image source={require('../../../assets/share.png')} style={styles.navIcon} />
+                    <Image source={require('../assets/share.png')} style={styles.navIcon} />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.actionButton}>
-                    <Image source={require('../../../assets/save.png')} style={styles.navIcon} />
+                    <Image source={require('../assets/save.png')} style={styles.navIcon} />
                 </TouchableOpacity>
             </View>
 

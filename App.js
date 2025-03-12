@@ -19,12 +19,13 @@ import EditProfileB from './components/Profile/B_Profile/editProfile';
 import Field from './components/field';
 import Popup from './components/Popup';
 import CreatePostScreen from './components/CreatePostScreen';
-import PostViewScreen from './components/Profile/P_Profile/PostViewScreen';
+import PostViewScreen from './components/PostViewScreen';
 import Settings from './components/settings';
 import Events from './components/Events';
 import Bottomnav from './components/Bottomnav';
 import AddStory from './components/Profile/P_Profile/AddStory';
 import SelectTagsScreen from './components/Tagscreen';
+import ViewStory from './components/Profile/P_Profile/ViewStory';
 
 const Stack = createStackNavigator();
 
@@ -61,6 +62,7 @@ const App = () => {
             <Stack.Screen name="Events" component={Events} />
             <Stack.Screen name="AddStory" component={AddStory} />
             <Stack.Screen name="SelectTags" component={SelectTagsScreen} />
+            <Stack.Screen name="ViewStory" component={ViewStory} options={{ headerShown: false }} />
           </Stack.Navigator>
         </NavigationContainer>
       </UserRegistrationProvider>

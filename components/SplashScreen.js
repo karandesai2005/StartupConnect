@@ -5,7 +5,7 @@ const SplashScreen = ({ navigation }) => {
   useEffect(() => {
     // Navigate to Main (tab navigator with Home as default) after 3 seconds
     const timer = setTimeout(() => {
-      navigation.replace('Main');
+      navigation.replace('Login');
     }, 3000);
     return () => clearTimeout(timer);
   }, [navigation]);

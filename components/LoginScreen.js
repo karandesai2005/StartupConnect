@@ -84,7 +84,7 @@ const LoginScreen = () => {
         if (result.token) {
           console.log("Token received:", result.token);
           await AsyncStorage.setItem("token", result.token);
-          navigation.replace("Home");
+          navigation.replace("Main");
         } else {
           console.log("No token received.");
           setPopupMessage("Login failed: No token received.");

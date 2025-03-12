@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   SafeAreaView,
   StatusBar,
+  ScrollView,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -152,8 +153,7 @@ const AddStory = ({ onStoryAdded }) => {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" />
+    <View style={styles.safeArea}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.cancelButton}>
           <Ionicons name="close" size={24} color="#000" />
@@ -161,48 +161,70 @@ const AddStory = ({ onStoryAdded }) => {
         <Text style={styles.headerText}>Add New Story</Text>
         <TouchableOpacity onPress={pickAndUploadMedia} disabled={isUploading} style={styles.nextButton}>
           <Text style={[styles.nextButtonText, isUploading && styles.nextButtonDisabled]}>
-            {isUploading ? <ActivityIndicator size="small" color="#0095f6" /> : 'Choose & Share'}
+            {isUploading ? <ActivityIndicator size="small" color="#0095f6" /> : 'Next'}
           </Text>
         </TouchableOpacity>
       </View>
 
-      <View style={styles.container}>
-        {isUploading ? (
-          <View style={styles.uploadingContainer}>
-            <ActivityIndicator size="large" color="#0095f6" />
-            <Text style={styles.uploadingText}>Uploading your story...</Text>
-          </View>
-        ) : (
-          <View style={styles.emptyStateContainer}>
-            <TouchableOpacity onPress={pickAndUploadMedia} style={styles.mediaPickerEmpty}>
-              <View style={styles.mediaPickerContent}>
-                <Feather name="image" size={60} color="#0095f6" />
-                <Text style={styles.mediaPickerText}>Select from Gallery</Text>
-              </View>
-            </TouchableOpacity>
-            {error && <Text style={styles.errorText}>{error}</Text>}
-          </View>
-        )}
-      </View>
-    </SafeAreaView>
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
+        <View style={styles.container}>
+          {isUploading ? (
+            <View style={styles.uploadingContainer}>
+              <ActivityIndicator size="large" color="#0095f6" />
+              <Text style={styles.uploadingText}>Uploading your story...</Text>
+            </View>
+          ) : (
+            <View style={styles.emptyStateContainer}>
+              <TouchableOpacity onPress={pickAndUploadMedia} style={styles.mediaPickerEmpty}>
+                <View style={styles.mediaPickerContent}>
+                  <Feather name="image" size={60} color="#1f219c" />
+                  <Text style={styles.mediaPickerText}>Select from Gallery</Text>
+                </View>
+              </TouchableOpacity>
+              {error && <Text style={styles.errorText}>{error}</Text>}
+            </View>
+          )}
+        </View>
+      </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#fff' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, height: 44, borderBottomWidth: 0.5, borderBottomColor: '#dbdbdb' },
+  safeArea: { flex: 1, backgroundColor: '#fff', paddingTop: 50 },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    height: 44,
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#dbdbdb',
+  },
   cancelButton: { padding: 8 },
   headerText: { fontSize: 17, fontWeight: '600' },
   nextButton: { padding: 8 },
   nextButtonText: { fontSize: 17, fontWeight: '600', color: '#0095f6' },
   nextButtonDisabled: { color: '#0095f660' },
-  container: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
-  emptyStateContainer: { justifyContent: 'center', alignItems: 'center' },
-  uploadingContainer: { justifyContent: 'center', alignItems: 'center' },
-  uploadingText: { fontSize: 16, color: '#0095f6', marginTop: 10 },
-  mediaPickerEmpty: { width: '100%', aspectRatio: 1, maxWidth: 300, backgroundColor: '#fafafa', borderRadius: 12, overflow: 'hidden', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#dbdbdb', borderStyle: 'dashed' },
+  scrollContainer: { flexGrow: 1 },
+  container: { flex: 1 },
+  emptyStateContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  uploadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  uploadingText: { fontSize: 16, color: '#262626', marginTop: 8 },
+  mediaPickerEmpty: {
+    width: '100%',
+    aspectRatio: 1,
+    maxWidth: 300,
+    backgroundColor: '#fafafa',
+    borderRadius: 12,
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#dbdbdb',
+  },
   mediaPickerContent: { justifyContent: 'center', alignItems: 'center', padding: 20 },
-  mediaPickerText: { fontSize: 18, fontWeight: '500', color: '#0095f6', marginTop: 12 },
+  mediaPickerText: { fontSize: 18, fontWeight: '500', color: '#1f219c', marginTop: 12 },
   errorText: { fontSize: 14, color: 'red', marginTop: 8, textAlign: 'center' },
 });
 
