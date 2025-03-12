@@ -2,7 +2,7 @@ const sql = require('mssql');
 const { connectDB } = require('../config/db');
 
 const Story = {
-  async create(userId, username, imageUrl, hasStory = 0, viewed = 0) {
+  async create(userId, username, imageUrl, hasStory = 0, viewed = 0, section = 'default') {
     try {
       const pool = await connectDB();
       const request = pool.request();
@@ -12,9 +12,10 @@ const Story = {
         .input('imageUrl', sql.VarChar, imageUrl)
         .input('hasStory', sql.Bit, hasStory)
         .input('viewed', sql.Bit, viewed)
+        .input('section', sql.VarChar, section) // Add section parameter
         .query(
-          'INSERT INTO dbo.stories (user_id, username, image_url, has_story, viewed) ' +
-          'VALUES (@userId, @username, @imageUrl, @hasStory, @viewed); ' +
+          'INSERT INTO dbo.stories (user_id, username, image_url, has_story, viewed, section) ' +
+          'VALUES (@userId, @username, @imageUrl, @hasStory, @viewed, @section); ' +
           'SELECT SCOPE_IDENTITY() AS story_id'
         );
       return result.recordset[0].story_id;
