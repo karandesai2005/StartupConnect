@@ -2,6 +2,81 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const { getUserByEmail, createUser } = require("../models/userModel");
 const { queryDB } = require("../config/db");
+const nodemailer = require('nodemailer');
+const submitFeedback = async (req, res) => {
+  try {
+    const { feedback } = req.body;
+    const userId = req.user.userId; // Get user ID from authenticated token
+
+    if (!feedback || !feedback.trim()) {
+      return res.status(400).json({ message: "Feedback is required." });
+    }
+
+    // Fetch user details to include in the email
+    const userQuery = `
+      SELECT username, email 
+      FROM users 
+      WHERE user_id = @param1
+    `;
+    const userResult = await queryDB(userQuery, [userId]);
+
+    if (userResult.length === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const { username, email } = userResult[0];
+
+    // Store feedback in the database (optional)
+    const feedbackQuery = `
+      INSERT INTO feedback (user_id, feedback_text, created_at)
+      VALUES (@param1, @param2, GETDATE())
+      RETURNING feedback_id
+    `;
+    const feedbackResult = await queryDB(feedbackQuery, [userId, feedback]);
+    const feedbackId = feedbackResult[0].feedback_id;
+
+    // Configure Nodemailer transporter
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
+    // Email options
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: process.env.EMAIL_USER, // Send to your Gmail
+      subject: `New Feedback from ${username} (ID: ${userId})`,
+      text: `
+        Feedback ID: ${feedbackId}
+        User: ${username} (${email})
+        Feedback: ${feedback}
+        Submitted on: ${new Date().toLocaleString()}
+      `,
+      // Optional: HTML version for better formatting
+      html: `
+        <h3>New Feedback</h3>
+        <p><strong>Feedback ID:</strong> ${feedbackId}</p>
+        <p><strong>User:</strong> ${username} (${email})</p>
+        <p><strong>Feedback:</strong> ${feedback.replace(/\n/g, '<br>')}</p>
+        <p><strong>Submitted on:</strong> ${new Date().toLocaleString()}</p>
+      `,
+    };
+
+    // Send email
+    await transporter.sendMail(mailOptions);
+    console.log('Feedback email sent successfully');
+
+    res.status(200).json({ message: "Feedback submitted and email sent successfully", feedbackId });
+  } catch (err) {
+    console.error("Error submitting feedback or sending email:", err);
+    res.status(500).json({ message: "Internal server error", error: err.message });
+  }
+};
+
+// Updated exports
 
 // Register user
 const register = async (req, res) => {
@@ -530,8 +605,8 @@ const searchUsers = async (req, res) => {
 module.exports = {
   register,
   login,
-  logout, // Added logout endpoint
-  deleteAccount, // Updated deleteAccount endpoint
+  logout,
+  deleteAccount,
   validateUsername,
   saveUserDetails,
   getUserProfile,
@@ -539,5 +614,6 @@ module.exports = {
   getUserProfileByUsername,
   getUserPostsByUsername,
   searchUsers,
-  checkTokenBlacklist // Middleware for token blacklist checking
+  checkTokenBlacklist,
+  submitFeedback, // Add the new feedback endpoint
 };
