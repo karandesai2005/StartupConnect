@@ -26,6 +26,7 @@ import Bottomnav from './components/Bottomnav';
 import AddStory from './components/Profile/P_Profile/AddStory';
 import SelectTagsScreen from './components/Tagscreen';
 import ViewStory from './components/Profile/P_Profile/ViewStory';
+import EventDetails from './components/EventDetail';
 
 const Stack = createStackNavigator();
 
@@ -63,6 +64,7 @@ const App = () => {
             <Stack.Screen name="AddStory" component={AddStory} />
             <Stack.Screen name="SelectTags" component={SelectTagsScreen} />
             <Stack.Screen name="ViewStory" component={ViewStory} options={{ headerShown: false }} />
+            <Stack.Screen name = "EventDetails" component={EventDetails}/>
           </Stack.Navigator>
         </NavigationContainer>
       </UserRegistrationProvider>

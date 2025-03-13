@@ -6,17 +6,19 @@ import {
   Image,
   TouchableOpacity,
   ScrollView,
-  SafeAreaView,
-  StatusBar,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import BottomNav from './BottamNav';
 import { Ionicons } from '@expo/vector-icons';
 
 const EventDetailsScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
-  const { event } = route.params; // Event data passed from Events screen
+  // Safely access the event object with default values
+  const event = route.params?.event || {
+    title: 'Event Title',
+    description: 'Event Description',
+    imageUrl: null,
+  };
 
   const handleParticipate = () => {
     // Navigate to CreatePostScreen when Participate is clicked
@@ -24,25 +26,28 @@ const EventDetailsScreen = () => {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" />
+    <View style={styles.safeArea}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#000" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Event Details</Text>
-        <View style={styles.headerSpacer} /> {/* Spacer for alignment */}
+        <View style={styles.headerSpacer} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <Image source={event.imageUrl} style={styles.eventImage} resizeMode="cover" />
+        {event.imageUrl ? (
+          <Image source={event.imageUrl} style={styles.eventImage} resizeMode="cover" />
+        ) : (
+          <View style={[styles.eventImage, styles.placeholderImage]} />
+        )}
+        
         <View style={styles.detailsContainer}>
-          <Text style={styles.eventTitle}>{event.title}</Text>
-          <Text style={styles.eventDescription}>{event.description}</Text>
-          
-          {/* Additional event details could be added here */}
+          <Text style={styles.eventTitle}>{event.title || 'Event Title'}</Text>
+          <Text style={styles.eventDescription}>{event.description || 'No description available'}</Text>
+
           <View style={styles.additionalDetails}>
-            <Text style={styles.detailText}>Date: March 25, 2025</Text> {/* Example, replace with real data */}
+            <Text style={styles.detailText}>Date: March 25, 2025</Text>
             <Text style={styles.detailText}>Location: Tech Hub, Silicon Valley</Text>
             <Text style={styles.detailText}>Time: 9:00 AM - 5:00 PM</Text>
           </View>
@@ -52,8 +57,7 @@ const EventDetailsScreen = () => {
           </TouchableOpacity>
         </View>
       </ScrollView>
-      <BottomNav />
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -70,6 +74,7 @@ const styles = StyleSheet.create({
     height: 44,
     borderBottomWidth: 0.5,
     borderBottomColor: '#dbdbdb',
+    marginTop: 29,
   },
   backButton: {
     padding: 8,
@@ -80,7 +85,7 @@ const styles = StyleSheet.create({
     color: '#1a1a1a',
   },
   headerSpacer: {
-    width: 40, // Balances the layout with back button
+    width: 40,
   },
   scrollContainer: {
     flexGrow: 1,
@@ -89,7 +94,9 @@ const styles = StyleSheet.create({
   eventImage: {
     width: '100%',
     height: 250,
-    backgroundColor: '#f0f0f0', // Fallback color
+  },
+  placeholderImage: {
+    backgroundColor: '#f0f0f0',
   },
   detailsContainer: {
     padding: 20,

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react'; // Added useEffect
 import {
   View,
   Text,
@@ -31,6 +31,7 @@ const entrepreneurTechTags = [
   'VentureCapital',
   'Productivity',
   'SoftwareDev',
+  'PITCH2025', // Added PITCH2025 to the list
 ];
 
 export default function SelectTagsScreen() {
@@ -38,7 +39,14 @@ export default function SelectTagsScreen() {
   const [loading, setLoading] = useState(false);
   const navigation = useNavigation();
   const route = useRoute();
-  const { media, mediaType, caption } = route.params;
+  const { media, mediaType, caption, fromEvent = false } = route.params;
+
+  // Pre-select PITCH2025 if coming from event
+  useEffect(() => {
+    if (fromEvent && !selectedTags.includes('PITCH2025')) {
+      setSelectedTags(['PITCH2025']);
+    }
+  }, [fromEvent]); // Runs when fromEvent changes (initial render)
 
   const toggleTag = (tag) => {
     if (selectedTags.includes(tag)) {
@@ -54,37 +62,54 @@ export default function SelectTagsScreen() {
       const token = await AsyncStorage.getItem('token');
       if (!token) throw new Error('No authentication token found');
 
-      const formData = new FormData();
-      formData.append('caption', caption);
-      formData.append('tags', JSON.stringify(selectedTags));
+      console.log('Starting upload with token:', token.substring(0, 10) + '...');
+      console.log('Selected tags:', selectedTags);
+      console.log('Content:', caption);
+      console.log('Media type:', mediaType);
+      console.log('Media URI:', media);
 
-      // Handle media file
-      const fileUri = media;
-      const fileInfo = await fetch(fileUri);
-      const blob = await fileInfo.blob();
-      
+      if (!media) throw new Error('Media is required');
+
+      const formData = new FormData();
+      formData.append('content', caption || '');
+      formData.append('tags', JSON.stringify(selectedTags));
       formData.append('media', {
-        uri: fileUri,
+        uri: media,
         type: mediaType === 'video' ? 'video/mp4' : 'image/jpeg',
-        name: `media.${mediaType === 'video' ? 'mp4' : 'jpg'}`,
+        name: `${Date.now()}.${mediaType === 'video' ? 'mp4' : 'jpg'}`,
       });
 
-      const response = await fetch(`${NGROK_URL}/api/posts`, {
+      const url = `${NGROK_URL}/api/posts`;
+      console.log(`Uploading to: ${url}`);
+
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data',
+          'Accept': 'application/json',
         },
         body: formData,
       });
 
+      console.log('Response status:', response.status);
+
+      let responseData;
+      try {
+        responseData = await response.json();
+        console.log('Response data:', responseData);
+      } catch (jsonError) {
+        console.error('Failed to parse response as JSON:', jsonError);
+        const responseText = await response.text();
+        console.log('Raw response:', responseText);
+        throw new Error(`Server returned ${response.status}: ${responseText}`);
+      }
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to upload post');
+        throw new Error(responseData.message || `Failed to upload post (Status: ${response.status})`);
       }
 
       Alert.alert('Success', 'Post uploaded successfully!');
-      navigation.navigate('Home'); // Or wherever you want to redirect after posting
+      navigation.navigate('Main');
     } catch (error) {
       console.error('Error uploading post:', error);
       Alert.alert('Upload Failed', error.message);
@@ -94,8 +119,7 @@ export default function SelectTagsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" />
+    <View style={styles.safeArea}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#000" />
@@ -137,7 +161,7 @@ export default function SelectTagsScreen() {
           ))}
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -151,6 +175,7 @@ const styles = StyleSheet.create({
     height: 44,
     borderBottomWidth: 0.5,
     borderBottomColor: '#dbdbdb',
+    marginTop: 29,
   },
   backButton: { padding: 8 },
   headerText: { fontSize: 17, fontWeight: '600' },

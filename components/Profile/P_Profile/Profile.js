@@ -25,8 +25,8 @@ const StoryItem = React.memo(({ story, onPress, isAddButton }) => {
   const imageSource = isAddButton
     ? require("../../../assets/del.png")
     : story.image_url
-    ? { uri: story.image_url }
-    : require("../../../assets/del.png");
+      ? { uri: story.image_url }
+      : require("../../../assets/del.png");
 
   return (
     <TouchableOpacity
@@ -68,13 +68,16 @@ const StoryItem = React.memo(({ story, onPress, isAddButton }) => {
 const Stories = React.memo(({ stories, onStoryPress, onAddStory, title }) => {
   const addStoryItem = { id: "add", username: "Add Story", has_story: false, viewed: false };
 
-  // Filter stories based on the section derived from the title
-  const filteredStories = stories.filter((story) => {
-    if (title === "Milestones and others") return story.section === "milestones";
-    if (title === "The Ventures" || title === "The Startup")
-      return story.section === "ventures";
-    return true; // Default case (if no match, show all for now)
-  });
+  // Determine the section identifier based on the title
+  const sectionId = title === "Milestones and others"
+    ? "milestones"
+    : title === "The Ventures" || title === "The Startup"
+      ? "ventures"
+      : title.toLowerCase().replace(/ /g, "_");
+
+  // Filter stories based on the section identifier
+  const filteredStories = stories.filter((story) => story.section === sectionId);
+  console.log(`Filtered stories for ${title} (section: ${sectionId}):`, filteredStories);
 
   return (
     <View style={styles.sectionContainer}>
@@ -88,7 +91,7 @@ const Stories = React.memo(({ stories, onStoryPress, onAddStory, title }) => {
       >
         <StoryItem
           story={addStoryItem}
-          onPress={onAddStory}
+          onPress={() => onAddStory(sectionId)} // Pass the sectionId directly
           isAddButton={true}
         />
         {filteredStories.map((story, index) => (
@@ -150,8 +153,6 @@ const Profile = ({ route, isBusinessProfile = false }) => {
   const [sectionTitle, setSectionTitle] = useState("");
   const [sectionContent, setSectionContent] = useState("");
   const [imageUri, setImageUri] = useState(null);
-  const [isAddStoryModalVisible, setIsAddStoryModalVisible] = useState(false);
-  const [selectedSection, setSelectedSection] = useState(null);
 
   const fetchWithAuth = async (endpoint, method = "GET", body = null) => {
     const token = await AsyncStorage.getItem("token");
@@ -258,7 +259,7 @@ const Profile = ({ route, isBusinessProfile = false }) => {
           viewed: story.viewed === 1 ? true : false,
           username: story.username || userData?.username || "User",
           profile_picture: userData?.profile_picture || null,
-          section: story.section || "default", // Include section field
+          section: story.section || "milestones", // Default to "milestones" if section is null
         }));
         setStories(validStories);
       }
@@ -289,13 +290,7 @@ const Profile = ({ route, isBusinessProfile = false }) => {
     }
   }, [fetchWithAuth]);
 
-  const handleAddStory = () => {
-    setSelectedSection(null); // Reset section
-    setIsAddStoryModalVisible(true); // Show section selection modal
-  };
-
-  const handleConfirmAddStory = async (section) => {
-    setIsAddStoryModalVisible(false);
+  const handleAddStory = (sectionId) => {
     navigation.navigate("AddStory", {
       onStoryAdded: (newStory) => {
         const fullImageUrl = newStory.image_url.startsWith("http")
@@ -310,12 +305,12 @@ const Profile = ({ route, isBusinessProfile = false }) => {
             viewed: false,
             username: userData?.username || "User",
             profile_picture: userData?.profile_picture || null,
-            section: section, // Assign the selected section
+            section: newStory.section || sectionId, // Use the returned section or fallback to sectionId
           },
         ]);
         fetchStories(); // Refresh from server
       },
-      section: section, // Pass the selected section to AddStory
+      section: sectionId, // Pass the sectionId to AddStory
     });
   };
 
@@ -473,6 +468,20 @@ const Profile = ({ route, isBusinessProfile = false }) => {
 
   const renderStoriesTab = () => (
     <View style={{ width: "100%" }}>
+      {/* Always render "Milestones and others" as a default story section */}
+      <Stories
+        key="milestones"
+        title="Milestones and others"
+        stories={stories}
+        onAddStory={handleAddStory}
+        onStoryPress={(story, index) =>
+          navigation.navigate("ViewStory", {
+            stories: stories.filter((s) => s.section === "milestones"),
+            initialIndex: index,
+          })
+        }
+      />
+      {/* Render dynamic sections from the backend */}
       {sections.map((section) => {
         switch (section.type) {
           case "story":
@@ -485,7 +494,13 @@ const Profile = ({ route, isBusinessProfile = false }) => {
                 onStoryPress={(story, index) =>
                   navigation.navigate("ViewStory", {
                     stories: stories.filter((s) =>
-                      s.section === (section.title === "Milestones and others" ? "milestones" : "ventures")
+                      s.section ===
+                      (section.title === "Milestones and others"
+                        ? "milestones"
+                        : section.title === "The Ventures" ||
+                          section.title === "The Startup"
+                        ? "ventures"
+                        : section.title.toLowerCase().replace(/ /g, "_"))
                     ),
                     initialIndex: index,
                   })
@@ -756,18 +771,6 @@ const Profile = ({ route, isBusinessProfile = false }) => {
               </Text>
             </TouchableOpacity>
           </View>
-          <Stories
-            stories={stories}
-            onStoryPress={(story, index) => {
-              console.log("Navigating to ViewStory with story:", story);
-              navigation.navigate("ViewStory", {
-                stories: stories.filter((s) => s.section === "milestones"),
-                initialIndex: index,
-              });
-            }}
-            onAddStory={handleAddStory}
-            title="Milestones and others"
-          />
         </View>
 
         <View style={styles.tab}>
@@ -863,44 +866,6 @@ const Profile = ({ route, isBusinessProfile = false }) => {
                 </View>
               </ScrollView>
             )}
-          </View>
-        </View>
-      </Modal>
-
-      <Modal
-        visible={isAddStoryModalVisible}
-        transparent
-        animationType="slide"
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>Select Section for Story</Text>
-            <View style={styles.modalOptions}>
-              <TouchableOpacity
-                style={styles.modalButton}
-                onPress={() => {
-                  setSelectedSection("milestones");
-                  handleConfirmAddStory("milestones");
-                }}
-              >
-                <Text style={styles.modalButtonText}>Milestones and others</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.modalButton}
-                onPress={() => {
-                  setSelectedSection("ventures");
-                  handleConfirmAddStory("ventures");
-                }}
-              >
-                <Text style={styles.modalButtonText}>The Ventures</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setIsAddStoryModalVisible(false)}
-              >
-                <Text style={styles.modalButtonText}>Cancel</Text>
-              </TouchableOpacity>
-            </View>
           </View>
         </View>
       </Modal>

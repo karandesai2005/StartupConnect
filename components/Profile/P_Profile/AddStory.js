@@ -8,6 +8,7 @@ import {
   SafeAreaView,
   StatusBar,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -15,7 +16,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { NGROK_URL } from '@env';
 import { Ionicons, Feather } from '@expo/vector-icons';
 
-const AddStory = ({ onStoryAdded }) => {
+const AddStory = ({ route, onStoryAdded }) => {
   const navigation = useNavigation();
   const [mediaUri, setMediaUri] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -23,6 +24,9 @@ const AddStory = ({ onStoryAdded }) => {
   const [username, setUsername] = useState('');
   const [profilePic, setProfilePic] = useState(null);
   const [isLoadingUsername, setIsLoadingUsername] = useState(true);
+
+  // Extract section from route.params (default to "default" if not provided)
+  const { section = "default" } = route.params || {};
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -123,8 +127,10 @@ const AddStory = ({ onStoryAdded }) => {
         type: fileType,
         name: `story.${fileType.split('/')[1]}`,
       });
+      formData.append('section', section); // Add the section parameter
 
       console.log('Uploading to:', `${NGROK_URL}/api/profile/stories`);
+      console.log('With section:', section); // Debug log
       const response = await fetch(`${NGROK_URL}/api/profile/stories`, {
         method: 'POST',
         headers: {
@@ -142,7 +148,10 @@ const AddStory = ({ onStoryAdded }) => {
       const result = await response.json();
       console.log('Story uploaded successfully:', result);
 
-      if (onStoryAdded) await onStoryAdded();
+      // Call onStoryAdded with the new story data
+      if (onStoryAdded) {
+        onStoryAdded(result); // Pass the full response data
+      }
       navigation.goBack();
     } catch (err) {
       console.error('Error uploading story:', err);
@@ -153,7 +162,7 @@ const AddStory = ({ onStoryAdded }) => {
   };
 
   return (
-    <View style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.cancelButton}>
           <Ionicons name="close" size={24} color="#000" />
@@ -186,12 +195,12 @@ const AddStory = ({ onStoryAdded }) => {
           )}
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#fff', paddingTop: 50 },
+  safeArea: { flex: 1, backgroundColor: '#fff', paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',

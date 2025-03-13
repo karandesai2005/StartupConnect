@@ -38,29 +38,24 @@ export default function CreatePostScreen() {
   const [caption, setCaption] = useState('');
   const [loading, setLoading] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
-  const [username, setUsername] = useState('');
+  const [username, setUsername] = useState('User'); // Default fallback
   const [profilePic, setProfilePic] = useState(null);
   const [isLoadingUsername, setIsLoadingUsername] = useState(true);
   const navigation = useNavigation();
 
   useEffect(() => {
-    const keyboardDidShowListener = Keyboard.addListener(
-      'keyboardDidShow',
-      () => setKeyboardVisible(true)
-    );
-    const keyboardDidHideListener = Keyboard.addListener(
-      'keyboardDidHide',
-      () => setKeyboardVisible(false)
-    );
+    const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
+    const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
 
     const fetchUserProfile = async () => {
       try {
         setIsLoadingUsername(true);
-        const cachedUsername = await AsyncStorage.getItem('username');
-        const cachedProfilePic = await AsyncStorage.getItem('profilePic');
-        if (cachedUsername) {
-          setUsername(cachedUsername);
-          if (cachedProfilePic) setProfilePic(cachedProfilePic);
+        // Check cached userData (shared with Profile.js)
+        const cachedUserData = await AsyncStorage.getItem('userData');
+        if (cachedUserData) {
+          const userData = JSON.parse(cachedUserData);
+          setUsername(userData.username || 'User');
+          setProfilePic(userData.profile_picture ? `${NGROK_URL}${userData.profile_picture}` : null);
           setIsLoadingUsername(false);
           return;
         }
@@ -68,9 +63,13 @@ export default function CreatePostScreen() {
         const token = await AsyncStorage.getItem('token');
         if (!token) throw new Error('No authentication token found');
 
-        const response = await fetch(`${NGROK_URL}/api/profile`, {
+        const response = await fetch(`${NGROK_URL}/api/auth/profile`, {
           method: 'GET',
-          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache', // Prevent stale data
+          },
         });
 
         if (!response.ok) throw new Error('Failed to fetch profile');
@@ -80,12 +79,13 @@ export default function CreatePostScreen() {
         if (profileData.profile_picture) {
           const profilePicUrl = `${NGROK_URL}${profileData.profile_picture}`;
           setProfilePic(profilePicUrl);
-          await AsyncStorage.setItem('profilePic', profilePicUrl);
         }
-        await AsyncStorage.setItem('username', profileData.username || 'User');
+        // Cache the full userData object like Profile.js
+        await AsyncStorage.setItem('userData', JSON.stringify(profileData));
       } catch (error) {
         console.error('Error fetching profile:', error);
-        setUsername('User');
+        setUsername('User'); // Fallback
+        setProfilePic(null);
       } finally {
         setIsLoadingUsername(false);
       }
@@ -177,7 +177,7 @@ export default function CreatePostScreen() {
                     ) : profilePic ? (
                       <Image source={{ uri: profilePic }} style={styles.profilePic} />
                     ) : (
-                      <View style={styles.profilePic} />
+                      <View style={[styles.profilePic, { backgroundColor: '#efefef' }]} />
                     )}
                     {isLoadingUsername ? (
                       <ActivityIndicator size="small" color="#0095f6" />
