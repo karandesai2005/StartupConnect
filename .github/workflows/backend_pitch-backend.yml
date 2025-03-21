@@ -28,13 +28,18 @@ jobs:
 
       - name: Zip artifact for deployment
         run: |
-          zip -r release.zip app.js config/ controllers/ middleware/ models/ routes/ server.js testdb.js test-connection.js uploads/ package.json package-lock.json
+          zip -r release.zip app.js config/ controllers/ middleware/ models/ routes/ server.js package.json -x "uploads/*" "package-lock.json" "testdb.js" "test-connection.js"
+
+      - name: Check artifact size
+        run: |
+          ls -lh release.zip
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
         with:
           name: node-app
           path: release.zip
+          retention-days: 7  # Retain artifact for only 7 days
 
   deploy:
     runs-on: ubuntu-latest
@@ -56,7 +61,7 @@ jobs:
         run: unzip release.zip
       
       - name: Login to Azure
-        uses: azure/login@v2
+        uses: actions/azure/login@v2
         with:
           client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_62F6E6D4CB9E4E1D8C20521539CB3351 }}
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_19A9DD0473794F56A6F4128E86C2E570 }}
