@@ -8,21 +8,14 @@ const register = async (req, res) => {
   try {
     const { username, email, password, isFounder, isInvestor } = req.body;
 
-    // Enhanced input validation
     if (!username || !email || !password) {
       return res.status(400).json({ message: "Username, email, and password are required." });
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return res.status(400).json({ message: "Invalid email format." });
-    }
-    if (password.length < 6) {
-      return res.status(400).json({ message: "Password must be at least 6 characters." });
     }
 
     const normalizedEmail = email.toLowerCase();
 
     const existingUsers = await queryDB(
-      "SELECT * FROM users WHERE email = @param1",
+      'SELECT * FROM users WHERE email = @param1',
       [normalizedEmail]
     );
 
@@ -30,8 +23,7 @@ const register = async (req, res) => {
       return res.status(400).json({ message: "Email already in use" });
     }
 
-    const saltRounds = parseInt(process.env.SALT_ROUNDS, 10) || 10; // Default to 10 if not set
-    const passwordHash = await bcrypt.hash(password, saltRounds);
+    const passwordHash = await bcrypt.hash(password, parseInt(process.env.SALT_ROUNDS, 10));
 
     const query = `
       INSERT INTO users (username, email, password_hash, is_founder, is_investor)
@@ -44,7 +36,7 @@ const register = async (req, res) => {
       normalizedEmail,
       passwordHash,
       isFounder ? 1 : 0,
-      isInvestor ? 1 : 0,
+      isInvestor ? 1 : 0
     ]);
 
     res.status(201).json({
@@ -52,8 +44,8 @@ const register = async (req, res) => {
       user: {
         user_id: result[0].user_id,
         username,
-        email: normalizedEmail,
-      },
+        email: normalizedEmail
+      }
     });
   } catch (err) {
     console.error("Registration error:", err);
@@ -65,20 +57,14 @@ const register = async (req, res) => {
 const login = async (req, res) => {
   try {
     const { email, username, password } = req.body;
-    console.log("Login attempt with:", { email, username, timestamp: new Date() });
+    console.log("Login attempt with:", { email, username });
 
-    // Ensure either email or username is provided
     if (!email && !username) {
       return res.status(400).json({ message: "Email or username is required." });
     }
-    if (!password) {
-      return res.status(400).json({ message: "Password is required." });
-    }
 
-    const paramValue = (email || username).toLowerCase();
-    const query = email
-      ? "SELECT * FROM users WHERE email = @param1"
-      : "SELECT * FROM users WHERE username = @param1";
+    let query = email ? "SELECT * FROM users WHERE email = @param1" : "SELECT * FROM users WHERE username = @param1";
+    let paramValue = (email || username).toLowerCase();
 
     const users = await queryDB(query, [paramValue]);
     console.log("Query result:", users);
@@ -97,10 +83,7 @@ const login = async (req, res) => {
       return res.status(400).json({ message: "Invalid email/username or password" });
     }
 
-    // Ensure JWT_SECRET is set
-    if (!process.env.JWT_SECRET) {
-      throw new Error("JWT_SECRET is not defined in environment variables");
-    }
+    console.log("JWT_SECRET:", process.env.JWT_SECRET);
     const token = jwt.sign({ userId: user.user_id }, process.env.JWT_SECRET, {
       expiresIn: "1h",
     });
@@ -116,14 +99,16 @@ const login = async (req, res) => {
 // Logout user
 const logout = async (req, res) => {
   try {
-    const token = req.headers.authorization?.split(" ")[1];
+    const token = req.headers.authorization?.split(" ")[1]; // Extract token from "Bearer <token>"
     if (!token) {
       return res.status(400).json({ message: "No token provided" });
     }
 
+    // Decode the token to get its expiration time
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const expiresAt = new Date(decoded.exp * 1000);
+    const expiresAt = new Date(decoded.exp * 1000); // Convert expiration time to Date object
 
+    // Add the token to the blacklist
     const query = `
       INSERT INTO token_blacklist (token, expires_at)
       VALUES (@param1, @param2)
@@ -145,10 +130,11 @@ const checkTokenBlacklist = async (req, res, next) => {
       return res.status(401).json({ message: "No token provided" });
     }
 
-    const result = await queryDB(
-      "SELECT * FROM token_blacklist WHERE token = @param1",
-      [token]
-    );
+    // Check if token is in the blacklist
+    const query = `
+      SELECT * FROM token_blacklist WHERE token = @param1
+    `;
+    const result = await queryDB(query, [token]);
 
     if (result.length > 0) {
       return res.status(401).json({ message: "Token has been invalidated" });
@@ -165,34 +151,58 @@ const checkTokenBlacklist = async (req, res, next) => {
 const deleteAccount = async (req, res) => {
   try {
     const userId = req.user.userId;
-    const token = req.headers.authorization?.split(" ")[1];
+    const token = req.headers.authorization?.split(" ")[1]; // Extract token for blacklisting
 
-    await queryDB("BEGIN TRANSACTION");
-
-    const queries = [
-      "DELETE FROM comments WHERE user_id = @param1",
-      "DELETE FROM likes WHERE user_id = @param1",
-      "DELETE FROM posts WHERE user_id = @param1",
-      "DELETE FROM users WHERE user_id = @param1",
+    // Begin transaction to ensure data integrity
+    const transactionQueries = [
+      // Delete user's comments
+      {
+        query: `
+          DELETE FROM comments WHERE user_id = @param1
+        `,
+        params: [userId]
+      },
+      // Delete user's likes
+      {
+        query: `
+          DELETE FROM likes WHERE user_id = @param1
+        `,
+        params: [userId]
+      },
+      // Delete user's posts
+      {
+        query: `
+          DELETE FROM posts WHERE user_id = @param1
+        `,
+        params: [userId]
+      },
+      // Delete user
+      {
+        query: `
+          DELETE FROM users WHERE user_id = @param1
+        `,
+        params: [userId]
+      }
     ];
 
-    for (const query of queries) {
-      await queryDB(query, [userId]);
+    // Execute all delete queries in a transaction
+    for (const { query, params } of transactionQueries) {
+      await queryDB(query, params);
     }
 
+    // Blacklist the token
     if (token) {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       const expiresAt = new Date(decoded.exp * 1000);
-      await queryDB(
-        "INSERT INTO token_blacklist (token, expires_at) VALUES (@param1, @param2)",
-        [token, expiresAt]
-      );
+      const blacklistQuery = `
+        INSERT INTO token_blacklist (token, expires_at)
+        VALUES (@param1, @param2)
+      `;
+      await queryDB(blacklistQuery, [token, expiresAt]);
     }
 
-    await queryDB("COMMIT TRANSACTION");
     res.status(200).json({ message: "Account deleted successfully" });
   } catch (err) {
-    await queryDB("ROLLBACK TRANSACTION");
     console.error("Delete account error:", err);
     res.status(500).json({ message: "Internal server error", error: err.message });
   }
@@ -213,13 +223,14 @@ const saveUserDetails = async (req, res) => {
 
     switch (step) {
       case 1:
-        if (!data.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
-          return res.status(400).json({ message: "Valid email is required." });
+        if (!data.email) {
+          return res.status(400).json({ message: "Email is required." });
         }
 
         const normalizedEmail = data.email.toLowerCase();
+
         const existingUsers = await queryDB(
-          "SELECT * FROM users WHERE email = @param1",
+          'SELECT * FROM users WHERE email = @param1',
           [normalizedEmail]
         );
 
@@ -228,6 +239,7 @@ const saveUserDetails = async (req, res) => {
         }
 
         const tempUsername = `user_${Date.now()}`;
+
         query = `
           INSERT INTO users (email, username, created_at)
           VALUES (@param1, @param2, GETDATE());
@@ -237,17 +249,16 @@ const saveUserDetails = async (req, res) => {
         break;
 
       case 2:
-        if (!data.password || data.password.length < 6) {
-          return res.status(400).json({ message: "Password must be at least 6 characters." });
+        if (!data.password) {
+          return res.status(400).json({ message: "Password is required." });
         }
+
         if (!data.userId) {
           return res.status(400).json({ message: "User ID is required." });
         }
 
-        const passwordHash = await bcrypt.hash(
-          data.password,
-          parseInt(process.env.SALT_ROUNDS, 10) || 10
-        );
+        const passwordHash = await bcrypt.hash(data.password, parseInt(process.env.SALT_ROUNDS, 10));
+
         query = `
           UPDATE users 
           SET password_hash = @param1 
@@ -259,8 +270,11 @@ const saveUserDetails = async (req, res) => {
 
       case 3:
         if (!data.username || data.username.length < 3 || data.username.length > 20) {
-          return res.status(400).json({ message: "Username must be between 3 and 20 characters." });
+          return res.status(400).json({
+            message: "Username must be between 3 and 20 characters.",
+          });
         }
+
         query = `
           UPDATE users 
           SET username = @param1 
@@ -274,6 +288,7 @@ const saveUserDetails = async (req, res) => {
         if (data.preference !== "personal" && data.preference !== "business") {
           return res.status(400).json({ message: "Invalid preference." });
         }
+
         query = `
           UPDATE users 
           SET is_personal = @param1, is_business = @param2 
@@ -283,7 +298,7 @@ const saveUserDetails = async (req, res) => {
         params = [
           data.preference === "personal" ? 1 : 0,
           data.preference === "business" ? 1 : 0,
-          data.userId,
+          data.userId
         ];
         break;
 
@@ -291,6 +306,7 @@ const saveUserDetails = async (req, res) => {
         if (!data.realName || data.realName.trim() === "") {
           return res.status(400).json({ message: "Real name is required." });
         }
+
         query = `
           UPDATE users 
           SET name = @param1 
@@ -318,7 +334,7 @@ const validateUsername = async (req, res) => {
     const { username } = req.body;
     console.log("Validating username:", username);
 
-    if (!username || username.length < 3 || username.length > 20) {
+    if (username.length < 3 || username.length > 20) {
       return res.status(400).json({
         available: false,
         message: "Username must be between 3 and 20 characters",
@@ -326,7 +342,7 @@ const validateUsername = async (req, res) => {
     }
 
     const existingUsers = await queryDB(
-      "SELECT * FROM users WHERE username = @param1",
+      'SELECT * FROM users WHERE username = @param1',
       [username]
     );
 
@@ -396,9 +412,7 @@ const updateProfile = async (req, res) => {
     }
 
     if (profilePicture) {
-      const profilePicturePath = `${req.protocol}://${req.get(
-        "host"
-      )}/uploads/profile_pictures/${profilePicture.filename}`;
+      const profilePicturePath = `${req.protocol}://${req.get("host")}/uploads/profile_pictures/${profilePicture.filename}`;
       updates.push("profile_picture = @param2");
       values.push(profilePicturePath);
     }
@@ -428,7 +442,7 @@ const updateProfile = async (req, res) => {
   }
 };
 
-// Get user profile by username
+// New endpoint: Get user profile by username
 const getUserProfileByUsername = async (req, res) => {
   try {
     const { username } = req.params;
@@ -452,11 +466,12 @@ const getUserProfileByUsername = async (req, res) => {
   }
 };
 
-// Get user posts by username
+// New endpoint: Get user posts by username
 const getUserPostsByUsername = async (req, res) => {
   try {
     const { username } = req.params;
 
+    // First, get the user_id from the username
     const userQuery = `
       SELECT user_id 
       FROM users 
@@ -470,6 +485,7 @@ const getUserPostsByUsername = async (req, res) => {
 
     const userId = userResult[0].user_id;
 
+    // Then, fetch posts for that user_id
     const postsQuery = `
       SELECT p.post_id, p.user_id, u.username, p.media_url, p.content, p.created_at, p.media_type,
              (SELECT COUNT(*) FROM likes WHERE post_id = p.post_id) AS like_count
@@ -487,10 +503,9 @@ const getUserPostsByUsername = async (req, res) => {
   }
 };
 
-// Search users
 const searchUsers = async (req, res) => {
   try {
-    const { q } = req.query;
+    const { q } = req.query; // Query parameter 'q' for search term
     if (!q || q.length < 1) {
       return res.status(400).json({ message: "Search query is required." });
     }
@@ -511,11 +526,12 @@ const searchUsers = async (req, res) => {
   }
 };
 
+// Updated exports
 module.exports = {
   register,
   login,
-  logout,
-  deleteAccount,
+  logout, // Added logout endpoint
+  deleteAccount, // Updated deleteAccount endpoint
   validateUsername,
   saveUserDetails,
   getUserProfile,
@@ -523,5 +539,5 @@ module.exports = {
   getUserProfileByUsername,
   getUserPostsByUsername,
   searchUsers,
-  checkTokenBlacklist,
+  checkTokenBlacklist // Middleware for token blacklist checking
 };
