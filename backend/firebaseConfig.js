@@ -1,10 +1,8 @@
-// Import Firebase SDK
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage"; // If using file uploads
 
-// Your Firebase config (replace with your actual keys)
 const firebaseConfig = {
   apiKey: "AIzaSyCl-_vYyEZMRwwB5ObRZc3_35tG2fUVa5M",
   authDomain: "pitch-chat-d79ff.firebaseapp.com",
