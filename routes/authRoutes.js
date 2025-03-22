@@ -10,13 +10,12 @@ const {
   updateProfile,
   getUserProfileByUsername,
   getUserPostsByUsername,
-  searchUsers,
-  submitFeedback, // Add the new function
+  searchUsers
 } = require("../controllers/authController");
 
 const {
   validateUsernameInput,
-  validateSaveUserDetailsInput,
+  validateSaveUserDetailsInput
 } = require("../middleware/validator");
 
 const authenticateJWT = require("../middleware/authenticateJWT");
@@ -38,6 +37,5 @@ router.put("/update-profile", authenticateJWT, uploadProfilePicture.single('prof
 router.get("/users/:username", authenticateJWT, getUserProfileByUsername);
 router.get("/posts/user/:username", authenticateJWT, getUserPostsByUsername);
 router.get("/search-users", authenticateJWT, searchUsers);
-router.post("/feedback", authenticateJWT, submitFeedback); // Add the new feedback route
 
 module.exports = router;
