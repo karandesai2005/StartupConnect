@@ -37,7 +37,7 @@ const StoryItem = React.memo(({ story, onPress, isAddButton }) => {
       <View
         style={[
           styles.storyRing,
-          { borderColor: story.viewed ? "#8e8e8e" : "#007bff" },
+          { borderColor: story.viewed ? "#8e8e8e" : "#1f219c" },
           story.has_story && styles.activeStoryRing,
           isAddButton && { borderWidth: 0 },
         ]}
@@ -682,7 +682,7 @@ const Profile = ({ route, isBusinessProfile = false }) => {
   if (isLoading) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator size="large" color="#007BFF" />
+        <ActivityIndicator size="large" color="#1f219c" />
       </View>
     );
   }
@@ -939,7 +939,7 @@ const styles = StyleSheet.create({
   },
   activeStoryRing: {
     borderWidth: 2.5,
-    borderColor: "#007bff",
+    borderColor: "#1f219c",
   },
   storyImageContainer: {
     width: 70,
@@ -975,12 +975,12 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#007bff",
+    backgroundColor: "#1f219c",
     borderWidth: 1,
     borderColor: "#fff",
   },
   addStorySectionButton: {
-    backgroundColor: "#007bff",
+    backgroundColor: "#1f219c",
     padding: 15,
     borderRadius: 10,
     marginVertical: 20,
@@ -994,7 +994,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   addGraphButton: {
-    backgroundColor: "#007bff",
+    backgroundColor: "#1f219c",
     padding: 15,
     borderRadius: 10,
     marginVertical: 20,
@@ -1203,7 +1203,7 @@ const styles = StyleSheet.create({
   tab1: {
     flex: 1,
     height: 30,
-    backgroundColor: "#007bff",
+    backgroundColor: "#1f219c",
     borderRadius: 18,
     paddingVertical: 4,
     paddingHorizontal: 8,
@@ -1275,7 +1275,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   modalButton: {
-    backgroundColor: "#007bff",
+    backgroundColor: "#1f219c",
     padding: 10,
     borderRadius: 5,
     alignItems: "center",
@@ -1310,7 +1310,7 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   modalSubmitButton: {
-    backgroundColor: "#007bff",
+    backgroundColor: "#1f219c",
     padding: 10,
     borderRadius: 5,
     alignItems: "center",
