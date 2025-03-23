@@ -218,7 +218,7 @@ const Profile = ({ route, isBusinessProfile = false }) => {
       const cachedPosts = await AsyncStorage.getItem("userPosts");
       if (cachedPosts) {
         const posts = JSON.parse(cachedPosts);
-        console.log("Loaded cached posts:", posts);
+        //console.log("Loaded cached posts:", posts);
         setUserPosts(posts);
       }
       const cachedStories = await AsyncStorage.getItem("stories");
@@ -266,15 +266,15 @@ const Profile = ({ route, isBusinessProfile = false }) => {
   const fetchUserPosts = async () => {
     const token = await AsyncStorage.getItem("token");
     if (!token) {
-      console.log("No token found, skipping fetchUserPosts");
+      //console.log("No token found, skipping fetchUserPosts");
       return;
     }
     const { username } = route.params || {};
     const endpoint = username
       ? `${NGROK_URL}/api/profile/posts/user/${username}`
       : `${NGROK_URL}/api/posts/myposts`;
-    console.log("Fetching posts from:", endpoint);
-    console.log("Using token:", token);
+    //console.log("Fetching posts from:", endpoint);
+    //console.log("Using token:", token);
     try {
       const response = await fetch(endpoint, {
         method: "GET",
@@ -283,10 +283,10 @@ const Profile = ({ route, isBusinessProfile = false }) => {
           "Content-Type": "application/json",
         },
       });
-      console.log("Response status:", response.status);
+      //console.log("Response status:", response.status);
       if (response.ok) {
         const data = await response.json();
-        console.log("Raw posts data:", data);
+        //console.log("Raw posts data:", data);
         const mappedPosts = data
           .map((post) => ({
             _id: post.post_id,
@@ -302,10 +302,10 @@ const Profile = ({ route, isBusinessProfile = false }) => {
           }))
           .filter((post) => post.image_url && !post.image_url.includes("undefined"))
           .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-        console.log("Mapped posts:", mappedPosts);
+        //console.log("Mapped posts:", mappedPosts);
         setUserPosts(mappedPosts);
         await AsyncStorage.setItem("userPosts", JSON.stringify(mappedPosts));
-        console.log("userPosts state updated with:", mappedPosts);
+        //console.log("userPosts state updated with:", mappedPosts);
       } else {
         console.error("Failed to fetch posts:", response.status, response.statusText);
         const errorText = await response.text();
@@ -362,7 +362,7 @@ const Profile = ({ route, isBusinessProfile = false }) => {
         fetchSections(),
         fetchGraphs(),
       ]);
-      console.log("Refresh completed, userPosts should be updated");
+      //console.log("Refresh completed, userPosts should be updated");
     } catch (error) {
       console.error("Refresh failed:", error);
       await loadCachedData();
@@ -382,7 +382,7 @@ const Profile = ({ route, isBusinessProfile = false }) => {
 
   useFocusEffect(
     useCallback(() => {
-      console.log("useFocusEffect triggered");
+      //console.log("useFocusEffect triggered");
       if (!userData) {
         refreshProfileData();
       } else if (Date.now() - lastUpdate > 60000) {
@@ -731,7 +731,7 @@ const Profile = ({ route, isBusinessProfile = false }) => {
   };
 
   const renderPostsTab = () => {
-    console.log("Rendering posts tab, userPosts:", userPosts);
+    //console.log("Rendering posts tab, userPosts:", userPosts);
     if (!userPosts || userPosts.length === 0) {
       return (
         <View style={styles.noPostsContainer}>
@@ -754,7 +754,7 @@ const Profile = ({ route, isBusinessProfile = false }) => {
 
   const handleProfileButtonPress = () => {
     if (route.params?.isOtherUser) {
-      console.log("Viewing another user's profile, no edit option.");
+      //console.log("Viewing another user's profile, no edit option.");
     } else {
       navigation.navigate("EditProfilePage", { userData });
     }
@@ -1196,15 +1196,28 @@ const styles = StyleSheet.create({
   addLinkSectionText: { color: "white", fontSize: 16, fontWeight: "600" },
   linkButton: { backgroundColor: "#1f219c", padding: 10, borderRadius: 5, alignItems: "center", marginHorizontal: 15, marginVertical: 5 },
   linkText: { color: "white", fontSize: 14, fontWeight: "600" },
-  addGraphButton: { backgroundColor: "#1f219c", padding: 15, borderRadius: 10, marginVertical: 20, alignItems: "center", width: "90%", alignSelf: "center" },
+  addGraphButton: { backgroundColor: "#1f219c", padding: 10, borderRadius: 10, marginVertical: 20, alignItems: "center", width: "90%", alignSelf: "center" },
   addGraphButtonText: { color: "white", fontSize: 16, fontWeight: "600" },
   try: { flexDirection: "column", alignItems: "center", paddingVertical: 20, width: "100%" },
   cardStyle: { width: "90%", height: 300, marginBottom: 20, backgroundColor: "white", borderRadius: 15, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 },
   graphTitle: { fontSize: 18, fontWeight: "600", color: "#333", textAlign: "center", padding: 15, borderBottomWidth: 1, borderBottomColor: "#eee" },
   graphContainer: { flex: 1, alignItems: "center", justifyContent: "center", padding: 10, width: 350 },
   videoContainer: { position: "relative", width: "100%", height: "100%" },
-  playIconContainer: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.3)" },
-  playIcon: { color: "white", fontSize: 24 },
+  playIconContainer: {
+    position: "absolute",
+    top: 5, // Move to the top
+    right: 5, // Move to the right
+    width: 24, // Smaller width
+    height: 24, // Smaller height
+    borderRadius: 12, // Circular shape (half of width/height)
+    backgroundColor: "rgba(0,0,0,0.5)", // Slightly darker semi-transparent background
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  playIcon: {
+    color: "white",
+    fontSize: 12, // Smaller font size
+  },
   gridContainer: { paddingVertical: 20, width: "100%" },
   gridItem: { width: (Dimensions.get("window").width - 34) / 3, height: (Dimensions.get("window").width - 34) / 3, backgroundColor: "#f0f0f0", marginBottom: 2 },
   gridImage: { width: "100%", height: "100%", borderRadius: 4 },
@@ -1224,8 +1237,8 @@ const styles = StyleSheet.create({
   about: { fontSize: 14, lineHeight: 20, fontWeight: "500", color: "#000", fontFamily: "AvenirNextCyr" },
   fundingAsk: { fontSize: 14, color: "#1f219c", fontWeight: "600", marginTop: 5 },
   checkCircleIcon: { marginLeft: 5, color: "green" },
-  buttonContainer: { width: "100%", flexDirection: "row", justifyContent: "center", gap: 10 },
-  masterOutlineButton: { borderRadius: 14, borderColor: "#ccc", borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: "#f9f9f9", alignItems: "center", justifyContent: "center" },
+  buttonContainer: { width: "100%", flexDirection: "column", justifyContent: "center", gap: 10 },
+  masterOutlineButton: { borderRadius: 14,width: 90, borderColor: "#ccc", borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: "#f9f9f9", alignItems: "center", justifyContent: "center" },
   button: { fontSize: 12, lineHeight: 18, color: "#666", fontFamily: "AvenirNextCyr-Bold", fontWeight: "600" },
   tab: { width: "90%", flexDirection: "row", backgroundColor: "#f3f3f3", borderRadius: 18, borderColor: "#ddd", borderWidth: 1, padding: 4, gap: 8, marginTop: 10, alignSelf: "center", marginBottom: 20 },
   tab1: { flex: 1, height: 30, backgroundColor: "#1f219c", borderRadius: 18, paddingVertical: 4, paddingHorizontal: 8, justifyContent: "center", alignItems: "center" },
