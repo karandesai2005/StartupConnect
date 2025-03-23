@@ -22,11 +22,6 @@ import { Video } from "expo-av";
 import DynamicGraphs from "./DynamicGraphs";
 import * as ImagePicker from "expo-image-picker";
 
-// Utility function to normalize image URLs
-const normalizeImageUrl = (imageUrl) =>
-  imageUrl.startsWith("http") ? imageUrl : `${NGROK_URL}${imageUrl}`;
-
-// Reusable StoryItem component
 const StoryItem = React.memo(({ story, onPress, isAddButton }) => {
   const imageSource = isAddButton
     ? require("../../../assets/del.png")
@@ -71,7 +66,6 @@ const StoryItem = React.memo(({ story, onPress, isAddButton }) => {
   );
 });
 
-// Reusable Stories component
 const Stories = React.memo(({ stories, onStoryPress, onAddStory, title, sectionId }) => {
   const addStoryItem = { id: "add", username: "Add Story", has_story: false, viewed: false };
   const filteredStories = stories.filter((story) => story.section === sectionId);
@@ -104,7 +98,6 @@ const Stories = React.memo(({ stories, onStoryPress, onAddStory, title, sectionI
   );
 });
 
-// Reusable ImageSection component
 const ImageSection = ({ title, imageUri }) => (
   <View style={styles.sectionContainer}>
     <View style={styles.divider} />
@@ -124,7 +117,6 @@ const ImageSection = ({ title, imageUri }) => (
   </View>
 );
 
-// Reusable TextSection component
 const TextSection = ({ title, content }) => (
   <View style={styles.sectionContainer}>
     <View style={styles.divider} />
@@ -135,7 +127,6 @@ const TextSection = ({ title, content }) => (
   </View>
 );
 
-// Reusable LinkSection component
 const LinkSection = ({ title, linkType, onPress }) => (
   <View style={styles.sectionContainer}>
     <View style={styles.divider} />
@@ -154,124 +145,6 @@ const LinkSection = ({ title, linkType, onPress }) => (
   </View>
 );
 
-// Reusable LinkOption component for LinkSectionModal
-const LinkOption = ({ linkType, label, onPress, sampleProfile }) => (
-  <TouchableOpacity style={styles.linkOptionContainer} onPress={() => onPress(linkType)}>
-    <StoryItem story={sampleProfile} onPress={() => onPress(linkType)} isAddButton={false} />
-    <Text style={styles.linkOptionText}>{label}</Text>
-  </TouchableOpacity>
-);
-
-// Reusable ProfileHeader component to avoid duplication
-const ProfileHeader = ({
-  userData,
-  lastUpdate,
-  navigation,
-  networkError,
-  refreshProfileData,
-  isFollowing,
-  isFollowLoading,
-  handleFollow,
-  handleUnfollow,
-  handleProfileButtonPress,
-  renderTab,
-  route,
-}) => (
-  <>
-    <TouchableOpacity onPress={() => navigation.goBack("Home")} style={styles.backButton}>
-      <Text style={styles.backButtonText}>←</Text>
-    </TouchableOpacity>
-
-    {networkError && (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>Network error. Showing cached data.</Text>
-        <TouchableOpacity onPress={refreshProfileData} style={styles.retryButton}>
-          <Text style={styles.retryButtonText}>Retry</Text>
-        </TouchableOpacity>
-      </View>
-    )}
-
-    <View style={styles.profile}>
-      <View style={styles.profileSection}>
-        <View style={styles.statsContainer}>
-          <Text style={styles.statsNumber}>{userData?.followers || "1.2K"}</Text>
-          <Text style={styles.statsLabel}>Followers</Text>
-        </View>
-        <View style={styles.avatarMultiVariants}>
-          <Image
-            source={
-              userData?.profile_picture
-                ? { uri: `${userData.profile_picture}?timestamp=${lastUpdate}` }
-                : require("../../../assets/del.png")
-            }
-            style={styles.profileImage}
-            resizeMode="cover"
-            defaultSource={require("../../../assets/del.png")}
-          />
-        </View>
-        <View style={styles.statsContainer}>
-          <Text style={styles.statsNumber}>{userData?.following || "856"}</Text>
-          <Text style={styles.statsLabel}>Following</Text>
-        </View>
-      </View>
-      <View style={styles.text}>
-        <View style={styles.id}>
-          <Text style={styles.userName}>{userData?.username || "Chir.a.g"}</Text>
-          {userData?.verified && <Text style={styles.checkCircleIcon}>✓</Text>}
-        </View>
-        <Text style={[styles.about, { textAlign: "center", paddingHorizontal: 10 }]}>
-          {userData?.bio || "CEO of PITCH. Entrepreneur, investor, and more."}
-        </Text>
-        {userData?.funding_ask && (
-          <Text style={styles.fundingAsk}>
-            Seeking {userData.funding_ask.amount} for {userData.funding_ask.equity}% equity
-          </Text>
-        )}
-      </View>
-      <View style={styles.buttonContainer}>
-        {route.params?.isOtherUser ? (
-          <TouchableOpacity
-            style={[
-              styles.masterOutlineButton,
-              isFollowing && { backgroundColor: "#1f219c" },
-              isFollowLoading && styles.disabledButton,
-            ]}
-            onPress={isFollowLoading ? null : (isFollowing ? handleUnfollow : handleFollow)}
-            disabled={isFollowLoading}
-          >
-            {isFollowLoading ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <Text style={[styles.button, isFollowing && { color: "white" }]}>
-                {isFollowing ? "Unfollow" : "Follow"}
-              </Text>
-            )}
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity style={styles.masterOutlineButton} onPress={handleProfileButtonPress}>
-            <Text style={styles.button}>Edit Profile</Text>
-          </TouchableOpacity>
-        )}
-        {route.params?.isOtherUser && userData?.role === "founder" && (
-          <TouchableOpacity
-            style={[styles.masterOutlineButton, { backgroundColor: "#1f219c" }]}
-            onPress={() => navigation.navigate("ConnectInvestor", { user: userData })}
-          >
-            <Text style={[styles.button, { color: "white" }]}>Connect</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-    </View>
-
-    <View style={styles.tab}>
-      {renderTab("stories", "Our Journey")}
-      {renderTab("startups", "Key Metrics")}
-      {renderTab("bucks", "Updates")}
-    </View>
-  </>
-);
-
-// Main Profile component
 const Profile = ({ route, isBusinessProfile = false }) => {
   const navigation = useNavigation();
   const [userData, setUserData] = useState(null);
@@ -293,7 +166,6 @@ const Profile = ({ route, isBusinessProfile = false }) => {
   const [imageUri, setImageUri] = useState(null);
   const [networkError, setNetworkError] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
-  const [isFollowLoading, setIsFollowLoading] = useState(false);
 
   const sectionMap = {
     "Our Journey": "milestones",
@@ -304,8 +176,7 @@ const Profile = ({ route, isBusinessProfile = false }) => {
     "Startup": "startup",
   };
 
-  // Centralized fetch function
-  const fetchWithAuth = async (endpoint, method = "GET", body = null, customHeaders = {}) => {
+  const fetchWithAuth = async (endpoint, method = "GET", body = null) => {
     const token = await AsyncStorage.getItem("token");
     if (!token) {
       navigation.navigate("Login");
@@ -314,13 +185,12 @@ const Profile = ({ route, isBusinessProfile = false }) => {
     try {
       const baseUrl = NGROK_URL.endsWith("/") ? NGROK_URL.slice(0, -1) : NGROK_URL;
       const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
-      const url = `${baseUrl}${cleanEndpoint}`;
+      const url = `${baseUrl}/api/profile${cleanEndpoint}`;
       const response = await fetch(url, {
         method,
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
-          ...customHeaders,
         },
         body: body ? JSON.stringify(body) : null,
       });
@@ -363,16 +233,26 @@ const Profile = ({ route, isBusinessProfile = false }) => {
   };
 
   const fetchUserData = async () => {
+    const token = await AsyncStorage.getItem("token");
+    if (!token) {
+      navigation.navigate("Login");
+      return;
+    }
     const { username, isOtherUser } = route.params || {};
     const endpoint = isOtherUser && username
-      ? `/api/profile/user/${username}?timestamp=${Date.now()}`
-      : `/api/auth/profile?timestamp=${Date.now()}`;
-    const customHeaders = {
-      "Cache-Control": "no-cache",
-      Pragma: "no-cache",
-    };
-    const data = await fetchWithAuth(endpoint, "GET", null, customHeaders);
-    if (data) {
+      ? `${NGROK_URL}/api/auth/users/${username}`
+      : `${NGROK_URL}/api/auth/profile?timestamp=${Date.now()}`;
+    const response = await fetch(endpoint, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
+      },
+    });
+    if (response.ok) {
+      const data = await response.json();
       setUserData(data);
       setIsFollowing(data.isFollowing || false);
       setLastUpdate(Date.now());
@@ -384,14 +264,29 @@ const Profile = ({ route, isBusinessProfile = false }) => {
   };
 
   const fetchUserPosts = async () => {
+    const token = await AsyncStorage.getItem("token");
+    if (!token) {
+      console.log("No token found, skipping fetchUserPosts");
+      return;
+    }
     const { username } = route.params || {};
     const endpoint = username
-      ? `/api/profile/posts/user/${username}`
-      : `/api/posts/myposts`;
-    console.log("Fetching posts from:", `${NGROK_URL}${endpoint}`);
+      ? `${NGROK_URL}/api/profile/posts/user/${username}`
+      : `${NGROK_URL}/api/posts/myposts`;
+    console.log("Fetching posts from:", endpoint);
+    console.log("Using token:", token);
     try {
-      const data = await fetchWithAuth(endpoint);
-      if (data) {
+      const response = await fetch(endpoint, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+      console.log("Response status:", response.status);
+      if (response.ok) {
+        const data = await response.json();
+        console.log("Raw posts data:", data);
         const mappedPosts = data
           .map((post) => ({
             _id: post.post_id,
@@ -411,6 +306,10 @@ const Profile = ({ route, isBusinessProfile = false }) => {
         setUserPosts(mappedPosts);
         await AsyncStorage.setItem("userPosts", JSON.stringify(mappedPosts));
         console.log("userPosts state updated with:", mappedPosts);
+      } else {
+        console.error("Failed to fetch posts:", response.status, response.statusText);
+        const errorText = await response.text();
+        console.error("Error response body:", errorText);
       }
     } catch (error) {
       console.error("Error in fetchUserPosts:", error.message);
@@ -422,7 +321,9 @@ const Profile = ({ route, isBusinessProfile = false }) => {
     if (storiesData) {
       const validStories = storiesData.map((story) => ({
         story_id: story.story_id,
-        image_url: normalizeImageUrl(story.image_url),
+        image_url: story.image_url.startsWith("http")
+          ? story.image_url
+          : `${NGROK_URL}${story.image_url}`,
         has_story: story.has_story === 1 || true,
         viewed: story.viewed === 1,
         username: story.username || userData?.username || "User",
@@ -496,7 +397,9 @@ const Profile = ({ route, isBusinessProfile = false }) => {
   const handleAddStory = (sectionId) => {
     navigation.navigate("AddStory", {
       onStoryAdded: (newStory) => {
-        const fullImageUrl = normalizeImageUrl(newStory.image_url);
+        const fullImageUrl = newStory.image_url.startsWith("http")
+          ? newStory.image_url
+          : `${NGROK_URL}${newStory.image_url}`;
         setStories((prev) => [
           ...prev,
           {
@@ -622,30 +525,42 @@ const Profile = ({ route, isBusinessProfile = false }) => {
     if (!result.canceled) setImageUri(result.assets[0].uri);
   };
 
-  const handleFollowAction = async (action) => {
-    const endpoint = `/api/profile/${action}`;
-    setIsFollowLoading(true);
+  const handleFollow = async () => {
+    const token = await AsyncStorage.getItem("token");
+    if (!token) {
+      navigation.navigate("Login");
+      return;
+    }
     try {
-      const response = await fetchWithAuth(endpoint, "POST", { username: userData.username });
-      if (response) {
-        setIsFollowing(action === "follow");
+      const response = await fetch(`${NGROK_URL}/api/profile/follow`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ username: userData.username }),
+      });
+      if (response.ok) {
+        setIsFollowing(true);
         setUserData((prev) => ({
           ...prev,
-          followers: (prev.followers || 0) + (action === "follow" ? 1 : -1),
+          followers: (prev.followers || 0) + 1,
         }));
       } else {
-        throw new Error(`Failed to ${action} user`);
+        throw new Error("Failed to follow user");
       }
     } catch (error) {
-      console.error(`${action} error:`, error);
-      alert(error.message || `Failed to ${action} user`);
-    } finally {
-      setIsFollowLoading(false);
+      console.error("Follow error:", error);
+      alert("Failed to follow user");
     }
   };
 
-  const handleFollow = () => handleFollowAction("follow");
-  const handleUnfollow = () => handleFollowAction("unfollow");
+  const handleStoryPress = (story, index) => {
+    navigation.navigate("ViewStory", {
+      stories: stories.filter((s) => s.section === "milestones"),
+      initialIndex: index,
+    });
+  };
 
   const renderTab = (tabName, label) => (
     <TouchableOpacity
@@ -660,18 +575,7 @@ const Profile = ({ route, isBusinessProfile = false }) => {
 
   const renderStoriesTab = () => (
     <View style={{ width: "100%" }}>
-      <Stories
-        title="Our Journey"
-        sectionId="milestones"
-        stories={stories}
-        onAddStory={handleAddStory}
-        onStoryPress={(story, index) =>
-          navigation.navigate("ViewStory", {
-            stories: stories.filter((s) => s.section === "milestones"),
-            initialIndex: index,
-          })
-        }
-      />
+      {/* Removed the "Our Journey" Stories section from here */}
       {sections.map((section) => {
         switch (section.type) {
           case "story":
@@ -707,12 +611,12 @@ const Profile = ({ route, isBusinessProfile = false }) => {
             return null;
         }
       })}
-      <TouchableOpacity style={[styles.actionButton, styles.addStorySectionButton]} onPress={handleAddSection}>
-        <Text style={styles.actionButtonText}>+ Add New Section</Text>
+      <TouchableOpacity style={styles.addStorySectionButton} onPress={handleAddSection}>
+        <Text style={styles.addStorySectionText}>+ Add New Section</Text>
       </TouchableOpacity>
       {userData?.role === "founder" && !route.params?.isOtherUser && (
-        <TouchableOpacity style={[styles.actionButton, styles.addLinkSectionButton]} onPress={handleAddLinkSection}>
-          <Text style={styles.actionButtonText}>+ Add Link Section</Text>
+        <TouchableOpacity style={styles.addLinkSectionButton} onPress={handleAddLinkSection}>
+          <Text style={styles.addLinkSectionText}>+ Add Link Section</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -782,8 +686,8 @@ const Profile = ({ route, isBusinessProfile = false }) => {
           </View>
         </View>
       ))}
-      <TouchableOpacity style={[styles.actionButton, styles.addGraphButton]} onPress={() => setGraphModalVisible(true)}>
-        <Text style={styles.actionButtonText}>+ Add New Graph</Text>
+      <TouchableOpacity style={styles.addGraphButton} onPress={() => setGraphModalVisible(true)}>
+        <Text style={styles.addGraphButtonText}>+ Add New Graph</Text>
       </TouchableOpacity>
       <DynamicGraphs
         visible={isGraphModalVisible}
@@ -878,12 +782,6 @@ const Profile = ({ route, isBusinessProfile = false }) => {
     );
   }
 
-  const linkOptions = [
-    { linkType: "team", label: "Team Profiles" },
-    { linkType: "startups", label: "Startup Profiles" },
-    { linkType: "singleStartup", label: "Single Startup Profile" },
-  ];
-
   return (
     <View style={styles.contentContainer}>
       {activeTab !== "bucks" ? (
@@ -891,39 +789,199 @@ const Profile = ({ route, isBusinessProfile = false }) => {
           contentContainerStyle={styles.scrollViewContent}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refreshProfileData} />}
         >
-          <ProfileHeader
-            userData={userData}
-            lastUpdate={lastUpdate}
-            navigation={navigation}
-            networkError={networkError}
-            refreshProfileData={refreshProfileData}
-            isFollowing={isFollowing}
-            isFollowLoading={isFollowLoading}
-            handleFollow={handleFollow}
-            handleUnfollow={handleUnfollow}
-            handleProfileButtonPress={handleProfileButtonPress}
-            renderTab={renderTab}
-            route={route}
+          <TouchableOpacity onPress={() => navigation.goBack("Home")} style={styles.backButton}>
+            <Text style={styles.backButtonText}>←</Text>
+          </TouchableOpacity>
+
+          {networkError && (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>Network error. Showing cached data.</Text>
+              <TouchableOpacity onPress={refreshProfileData} style={styles.retryButton}>
+                <Text style={styles.retryButtonText}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          <View style={styles.profile}>
+            <View style={styles.profileSection}>
+              <View style={styles.statsContainer}>
+                <Text style={styles.statsNumber}>{userData?.followers || "1.2K"}</Text>
+                <Text style={styles.statsLabel}>Followers</Text>
+              </View>
+              <View style={styles.avatarMultiVariants}>
+                <Image
+                  source={
+                    userData?.profile_picture
+                      ? { uri: `${userData.profile_picture}?timestamp=${lastUpdate}` }
+                      : require("../../../assets/del.png")
+                  }
+                  style={styles.profileImage}
+                  resizeMode="cover"
+                  defaultSource={require("../../../assets/del.png")}
+                />
+              </View>
+              <View style={styles.statsContainer}>
+                <Text style={styles.statsNumber}>{userData?.following || "856"}</Text>
+                <Text style={styles.statsLabel}>Following</Text>
+              </View>
+            </View>
+            <View style={styles.text}>
+              <View style={styles.id}>
+                <Text style={styles.userName}>{userData?.username || "Chir.a.g"}</Text>
+                {userData?.verified && <Text style={styles.checkCircleIcon}>✓</Text>}
+              </View>
+              <Text style={[styles.about, { textAlign: "center", paddingHorizontal: 10 }]}>
+                {userData?.bio || "CEO of PITCH. Entrepreneur, investor, and more."}
+              </Text>
+              {userData?.funding_ask && (
+                <Text style={styles.fundingAsk}>
+                  Seeking {userData.funding_ask.amount} for {userData.funding_ask.equity}% equity
+                </Text>
+              )}
+            </View>
+            <View style={styles.buttonContainer}>
+              {route.params?.isOtherUser ? (
+                <TouchableOpacity
+                  style={[
+                    styles.masterOutlineButton,
+                    isFollowing && { backgroundColor: "#1f219c" },
+                  ]}
+                  onPress={isFollowing ? null : handleFollow}
+                >
+                  <Text style={[styles.button, isFollowing && { color: "white" }]}>
+                    {isFollowing ? "Following" : "Follow"}
+                  </Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity style={styles.masterOutlineButton} onPress={handleProfileButtonPress}>
+                  <Text style={styles.button}>Edit Profile</Text>
+                </TouchableOpacity>
+              )}
+              {route.params?.isOtherUser && userData?.role === "founder" && (
+                <TouchableOpacity
+                  style={[styles.masterOutlineButton, { backgroundColor: "#1f219c" }]}
+                  onPress={() => navigation.navigate("ConnectInvestor", { user: userData })}
+                >
+                  <Text style={[styles.button, { color: "white" }]}>Connect</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+
+          {/* Moved "Our Journey" Stories section here, above the tabs */}
+          <Stories
+            title="Our Journey"
+            sectionId="milestones"
+            stories={stories}
+            onAddStory={handleAddStory}
+            onStoryPress={handleStoryPress}
           />
+
+          <View style={styles.tab}>
+            {renderTab("stories", "Our Journey")}
+            {renderTab("startups", "Key Metrics")}
+            {renderTab("bucks", "Updates")}
+          </View>
+
           {activeTab === "stories" && renderStoriesTab()}
           {activeTab === "startups" && renderAnalyticsTab()}
         </ScrollView>
       ) : (
         <View style={styles.fullScreenContainer}>
-          <ProfileHeader
-            userData={userData}
-            lastUpdate={lastUpdate}
-            navigation={navigation}
-            networkError={networkError}
-            refreshProfileData={refreshProfileData}
-            isFollowing={isFollowing}
-            isFollowLoading={isFollowLoading}
-            handleFollow={handleFollow}
-            handleUnfollow={handleUnfollow}
-            handleProfileButtonPress={handleProfileButtonPress}
-            renderTab={renderTab}
-            route={route}
+          <TouchableOpacity onPress={() => navigation.goBack("Home")} style={styles.backButton}>
+            <Text style={styles.backButtonText}>←</Text>
+          </TouchableOpacity>
+
+          {networkError && (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>Network error. Showing cached data.</Text>
+              <TouchableOpacity onPress={refreshProfileData} style={styles.retryButton}>
+                <Text style={styles.retryButtonText}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          <View style={styles.profile}>
+            <View style={styles.profileSection}>
+              <View style={styles.statsContainer}>
+                <Text style={styles.statsNumber}>{userData?.followers || "1.2K"}</Text>
+                <Text style={styles.statsLabel}>Followers</Text>
+              </View>
+              <View style={styles.avatarMultiVariants}>
+                <Image
+                  source={
+                    userData?.profile_picture
+                      ? { uri: `${userData.profile_picture}?timestamp=${lastUpdate}` }
+                      : require("../../../assets/del.png")
+                  }
+                  style={styles.profileImage}
+                  resizeMode="cover"
+                  defaultSource={require("../../../assets/del.png")}
+                />
+              </View>
+              <View style={styles.statsContainer}>
+                <Text style={styles.statsNumber}>{userData?.following || "856"}</Text>
+                <Text style={styles.statsLabel}>Following</Text>
+              </View>
+            </View>
+            <View style={styles.text}>
+              <View style={styles.id}>
+                <Text style={styles.userName}>{userData?.username || "Chir.a.g"}</Text>
+                {userData?.verified && <Text style={styles.checkCircleIcon}>✓</Text>}
+              </View>
+              <Text style={[styles.about, { textAlign: "center", paddingHorizontal: 10 }]}>
+                {userData?.bio || "CEO of PITCH. Entrepreneur, investor, and more."}
+              </Text>
+              {userData?.funding_ask && (
+                <Text style={styles.fundingAsk}>
+                  Seeking {userData.funding_ask.amount} for {userData.funding_ask.equity}% equity
+                </Text>
+              )}
+            </View>
+            <View style={styles.buttonContainer}>
+              {route.params?.isOtherUser ? (
+                <TouchableOpacity
+                  style={[
+                    styles.masterOutlineButton,
+                    isFollowing && { backgroundColor: "#1f219c" },
+                  ]}
+                  onPress={isFollowing ? null : handleFollow}
+                >
+                  <Text style={[styles.button, isFollowing && { color: "white" }]}>
+                    {isFollowing ? "Following" : "Follow"}
+                  </Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity style={styles.masterOutlineButton} onPress={handleProfileButtonPress}>
+                  <Text style={styles.button}>Edit Profile</Text>
+                </TouchableOpacity>
+              )}
+              {route.params?.isOtherUser && userData?.role === "founder" && (
+                <TouchableOpacity
+                  style={[styles.masterOutlineButton, { backgroundColor: "#1f219c" }]}
+                  onPress={() => navigation.navigate("ConnectInvestor", { user: userData })}
+                >
+                  <Text style={[styles.button, { color: "white" }]}>Connect</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+
+          {/* Moved "Our Journey" Stories section here, above the tabs */}
+          <Stories
+            title="Our Journey"
+            sectionId="milestones"
+            stories={stories}
+            onAddStory={handleAddStory}
+            onStoryPress={handleStoryPress}
           />
+
+          <View style={styles.tab}>
+            {renderTab("stories", "Our Journey")}
+            {renderTab("startups", "Key Metrics")}
+            {renderTab("bucks", "Updates")}
+          </View>
+
           {renderPostsTab()}
         </View>
       )}
@@ -936,7 +994,7 @@ const Profile = ({ route, isBusinessProfile = false }) => {
             {!sectionType ? (
               <View style={styles.modalOptions}>
                 <TouchableOpacity
-                  style={[styles.modalButtonBase, styles.modalButton]}
+                  style={styles.modalButton}
                   onPress={() => {
                     setSectionType("story");
                     setStorySectionModalVisible(true);
@@ -944,20 +1002,14 @@ const Profile = ({ route, isBusinessProfile = false }) => {
                 >
                   <Text style={styles.modalButtonText}>Story Section</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.modalButtonBase, styles.modalButton]}
-                  onPress={() => setSectionType("image")}
-                >
+                <TouchableOpacity style={styles.modalButton} onPress={() => setSectionType("image")}>
                   <Text style={styles.modalButtonText}>Image Section</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.modalButtonBase, styles.modalButton]}
-                  onPress={() => setSectionType("text")}
-                >
+                <TouchableOpacity style={styles.modalButton} onPress={() => setSectionType("text")}>
                   <Text style={styles.modalButtonText}>Text Section</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.modalButtonBase, styles.cancelButton]}
+                  style={[styles.modalButton, styles.cancelButton]}
                   onPress={() => setSectionModalVisible(false)}
                 >
                   <Text style={styles.modalButtonText}>Cancel</Text>
@@ -982,21 +1034,18 @@ const Profile = ({ route, isBusinessProfile = false }) => {
                     />
                   )}
                   {sectionType === "image" && (
-                    <TouchableOpacity style={[styles.modalButtonBase, styles.modalButton]} onPress={pickImage}>
+                    <TouchableOpacity style={styles.modalButton} onPress={pickImage}>
                       <Text style={styles.modalButtonText}>
                         {imageUri ? "Image Selected" : "Pick Image"}
                       </Text>
                     </TouchableOpacity>
                   )}
                   <View style={styles.modalFormButtons}>
-                    <TouchableOpacity
-                      style={[styles.modalButtonBase, styles.modalSubmitButton]}
-                      onPress={handleSectionSubmit}
-                    >
+                    <TouchableOpacity style={styles.modalSubmitButton} onPress={handleSectionSubmit}>
                       <Text style={styles.modalButtonText}>Add Section</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={[styles.modalButtonBase, styles.cancelButton]}
+                      style={[styles.modalButton, styles.cancelButton]}
                       onPress={() => {
                         setSectionModalVisible(false);
                         resetSectionModal();
@@ -1062,7 +1111,7 @@ const Profile = ({ route, isBusinessProfile = false }) => {
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.modalButtonBase, styles.cancelButton]}
+                style={[styles.modalButton, styles.cancelButton]}
                 onPress={() => setStorySectionModalVisible(false)}
               >
                 <Text style={styles.modalButtonText}>Cancel</Text>
@@ -1078,17 +1127,41 @@ const Profile = ({ route, isBusinessProfile = false }) => {
           <View style={styles.modalContainer}>
             <Text style={styles.modalTitle}>Add Link Section</Text>
             <View style={styles.modalOptions}>
-              {linkOptions.map((option) => (
-                <LinkOption
-                  key={option.linkType}
-                  linkType={option.linkType}
-                  label={option.label}
-                  onPress={handleLinkSectionSubmit}
-                  sampleProfile={sampleProfile}
-                />
-              ))}
               <TouchableOpacity
-                style={[styles.modalButtonBase, styles.cancelButton]}
+                style={styles.linkOptionContainer}
+                onPress={() => handleLinkSectionSubmit("team")}
+              >
+                <StoryItem
+                  story={sampleProfile}
+                  onPress={() => handleLinkSectionSubmit("team")}
+                  isAddButton={false}
+                />
+                <Text style={styles.linkOptionText}>Team Profiles</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.linkOptionContainer}
+                onPress={() => handleLinkSectionSubmit("startups")}
+              >
+                <StoryItem
+                  story={sampleProfile}
+                  onPress={() => handleLinkSectionSubmit("startups")}
+                  isAddButton={false}
+                />
+                <Text style={styles.linkOptionText}>Startup Profiles</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.linkOptionContainer}
+                onPress={() => handleLinkSectionSubmit("singleStartup")}
+              >
+                <StoryItem
+                  story={sampleProfile}
+                  onPress={() => handleLinkSectionSubmit("singleStartup")}
+                  isAddButton={false}
+                />
+                <Text style={styles.linkOptionText}>Single Startup Profile</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
                 onPress={() => setLinkSectionModalVisible(false)}
               >
                 <Text style={styles.modalButtonText}>Cancel</Text>
@@ -1117,20 +1190,14 @@ const styles = StyleSheet.create({
   addStoryText: { fontSize: 24, color: "#666", fontWeight: "600" },
   storyUsername: { marginTop: 6, fontSize: 12, textAlign: "center", color: "#666", fontFamily: "AvenirNextCyr", fontWeight: "500" },
   unreadIndicator: { position: "absolute", bottom: 2, right: 2, width: 8, height: 8, borderRadius: 4, backgroundColor: "#1f219c", borderWidth: 1, borderColor: "#fff" },
-  actionButton: {
-    backgroundColor: "#1f219c",
-    padding: 15,
-    borderRadius: 10,
-    alignItems: "center",
-    width: "90%",
-    alignSelf: "center",
-  },
-  addStorySectionButton: { marginVertical: 20 },
-  addLinkSectionButton: { marginVertical: 10 },
-  addGraphButton: { marginVertical: 20 },
-  actionButtonText: { color: "white", fontSize: 16, fontWeight: "600" },
+  addStorySectionButton: { backgroundColor: "#1f219c", padding: 15, borderRadius: 10, marginVertical: 20, alignItems: "center", width: "90%", alignSelf: "center" },
+  addStorySectionText: { color: "white", fontSize: 16, fontWeight: "600" },
+  addLinkSectionButton: { backgroundColor: "#1f219c", padding: 15, borderRadius: 10, marginVertical: 10, alignItems: "center", width: "90%", alignSelf: "center" },
+  addLinkSectionText: { color: "white", fontSize: 16, fontWeight: "600" },
   linkButton: { backgroundColor: "#1f219c", padding: 10, borderRadius: 5, alignItems: "center", marginHorizontal: 15, marginVertical: 5 },
   linkText: { color: "white", fontSize: 14, fontWeight: "600" },
+  addGraphButton: { backgroundColor: "#1f219c", padding: 15, borderRadius: 10, marginVertical: 20, alignItems: "center", width: "90%", alignSelf: "center" },
+  addGraphButtonText: { color: "white", fontSize: 16, fontWeight: "600" },
   try: { flexDirection: "column", alignItems: "center", paddingVertical: 20, width: "100%" },
   cardStyle: { width: "90%", height: 300, marginBottom: 20, backgroundColor: "white", borderRadius: 15, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 },
   graphTitle: { fontSize: 18, fontWeight: "600", color: "#333", textAlign: "center", padding: 15, borderBottomWidth: 1, borderBottomColor: "#eee" },
@@ -1160,7 +1227,6 @@ const styles = StyleSheet.create({
   buttonContainer: { width: "100%", flexDirection: "row", justifyContent: "center", gap: 10 },
   masterOutlineButton: { borderRadius: 14, borderColor: "#ccc", borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: "#f9f9f9", alignItems: "center", justifyContent: "center" },
   button: { fontSize: 12, lineHeight: 18, color: "#666", fontFamily: "AvenirNextCyr-Bold", fontWeight: "600" },
-  disabledButton: { backgroundColor: "#ccc", borderColor: "#aaa" },
   tab: { width: "90%", flexDirection: "row", backgroundColor: "#f3f3f3", borderRadius: 18, borderColor: "#ddd", borderWidth: 1, padding: 4, gap: 8, marginTop: 10, alignSelf: "center", marginBottom: 20 },
   tab1: { flex: 1, height: 30, backgroundColor: "#1f219c", borderRadius: 18, paddingVertical: 4, paddingHorizontal: 8, justifyContent: "center", alignItems: "center" },
   tab2: { flex: 1, height: 28, borderRadius: 14, paddingVertical: 4, paddingHorizontal: 8, justifyContent: "center", alignItems: "center" },
@@ -1173,15 +1239,14 @@ const styles = StyleSheet.create({
   modalContainer: { width: "80%", backgroundColor: "white", borderRadius: 10, padding: 20, alignItems: "center", maxHeight: Dimensions.get("window").height * 0.7 },
   modalTitle: { fontSize: 20, fontWeight: "600", marginBottom: 20 },
   modalOptions: { width: "100%", gap: 15 },
-  modalButtonBase: { backgroundColor: "#1f219c", padding: 10, borderRadius: 5, alignItems: "center" },
-  modalButton: {},
-  modalSubmitButton: { flex: 1, marginRight: 5 },
+  modalButton: { backgroundColor: "#1f219c", padding: 10, borderRadius: 5, alignItems: "center" },
   cancelButton: { backgroundColor: "#666" },
   modalButtonText: { color: "white", fontSize: 16, fontWeight: "600" },
   modalForm: { width: "100%", gap: 15 },
   modalInput: { borderWidth: 1, borderColor: "#ccc", borderRadius: 5, padding: 10, fontSize: 16, width: "100%" },
   modalTextArea: { height: 100, textAlignVertical: "top" },
   modalFormButtons: { flexDirection: "row", justifyContent: "space-between", width: "100%" },
+  modalSubmitButton: { backgroundColor: "#1f219c", padding: 10, borderRadius: 5, alignItems: "center", flex: 1, marginRight: 5 },
   linkOptionContainer: { flexDirection: "row", alignItems: "center", justifyContent: "flex-start", width: "100%" },
   linkOptionText: { fontSize: 16, fontWeight: "600", color: "#333", marginLeft: 10 },
   errorContainer: { flexDirection: "row", alignItems: "center", marginVertical: 10 },
