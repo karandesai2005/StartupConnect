@@ -1,9 +1,8 @@
-// backend/controllers/profileController.js
 require('dotenv').config();
 const Story = require('../models/storyModel');
 const Section = require('../models/sectionModel');
 const Graph = require('../models/graphModel');
-const User = require('../models/userModel'); // Added User model
+const User = require('../models/userModel');
 const { uploadAndConvertPostMedia } = require('../config/multerConfig');
 const path = require('path');
 
@@ -75,24 +74,20 @@ const profileController = {
         return res.status(400).json({ error: 'Username to follow is required.' });
       }
 
-      // Find the user to follow
       const followee = await User.getUserByUsername(username);
       if (!followee) {
         return res.status(404).json({ error: 'User to follow not found.' });
       }
 
-      // Prevent self-follow
       if (followerId === followee.user_id) {
         return res.status(400).json({ error: 'You cannot follow yourself.' });
       }
 
-      // Check if already following
       const isAlreadyFollowing = await User.isFollowing(followerId, followee.user_id);
       if (isAlreadyFollowing) {
         return res.status(400).json({ error: 'You are already following this user.' });
       }
 
-      // Follow the user
       await User.followUser(followerId, followee.user_id);
       console.log(`User ${followerId} followed user ${followee.user_id}`);
       res.status(200).json({ message: 'Successfully followed user.' });
@@ -102,7 +97,7 @@ const profileController = {
     }
   },
 
-  // Unfollow a user (optional)
+  // Unfollow a user
   unfollowUser: async (req, res) => {
     try {
       console.log('=== Unfollow User Debug ===');
@@ -118,19 +113,16 @@ const profileController = {
         return res.status(400).json({ error: 'Username to unfollow is required.' });
       }
 
-      // Find the user to unfollow
       const followee = await User.getUserByUsername(username);
       if (!followee) {
         return res.status(404).json({ error: 'User to unfollow not found.' });
       }
 
-      // Check if not following
       const isFollowing = await User.isFollowing(followerId, followee.user_id);
       if (!isFollowing) {
         return res.status(400).json({ error: 'You are not following this user.' });
       }
 
-      // Unfollow the user
       await User.unfollowUser(followerId, followee.user_id);
       console.log(`User ${followerId} unfollowed user ${followee.user_id}`);
       res.status(200).json({ message: 'Successfully unfollowed user.' });
@@ -140,6 +132,7 @@ const profileController = {
     }
   },
 
+  // Get authenticated user's stories
   getStories: async (req, res) => {
     try {
       console.log('=== Fetching Stories ===');
@@ -160,6 +153,28 @@ const profileController = {
     }
   },
 
+  // Get another user's stories by username
+  getUserStories: async (req, res) => {
+    try {
+      console.log('=== Fetching User Stories ===');
+      const { username } = req.params;
+      console.log('Fetching stories for username:', username);
+
+      const user = await User.getUserByUsername(username);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found.' });
+      }
+
+      const stories = await Story.findByUserId(user.user_id);
+      console.log('User stories fetched:', stories.length);
+      res.json(stories);
+    } catch (error) {
+      console.error('Error in getUserStories:', error);
+      res.status(500).json({ error: 'Server error', details: error.message });
+    }
+  },
+
+  // Add a story (authenticated user only)
   addStory: [
     uploadAndConvertPostMedia,
     async (req, res) => {
@@ -168,8 +183,8 @@ const profileController = {
         console.log('User:', req.user, '| Body:', req.body, '| File:', req.file);
 
         const userId = req.user?.userId || req.user?.id;
-        const username = req.user.username; // Assuming username is in the token payload
-        const section = req.body.section || 'default'; // Get section from request body, default to 'default'
+        const username = req.user.username;
+        const section = req.body.section || 'default';
 
         if (!userId) {
           return res.status(400).json({ error: 'User ID is required.' });
@@ -190,7 +205,7 @@ const profileController = {
         res.status(201).json({
           story_id: storyId,
           image_url: imageUrl,
-          section: section, // Include section in response
+          section: section,
         });
       } catch (error) {
         console.error('Error in addStory:', error);
@@ -199,6 +214,7 @@ const profileController = {
     },
   ],
 
+  // Get authenticated user's sections
   getSections: async (req, res) => {
     try {
       console.log('=== Fetching Sections ===');
@@ -219,13 +235,35 @@ const profileController = {
     }
   },
 
+  // Get another user's sections by username
+  getUserSections: async (req, res) => {
+    try {
+      console.log('=== Fetching User Sections ===');
+      const { username } = req.params;
+      console.log('Fetching sections for username:', username);
+
+      const user = await User.getUserByUsername(username);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found.' });
+      }
+
+      const sections = await Section.findByUserId(user.user_id);
+      console.log('User sections fetched:', sections.length);
+      res.json(sections);
+    } catch (error) {
+      console.error('Error in getUserSections:', error);
+      res.status(500).json({ error: 'Server error', details: error.message });
+    }
+  },
+
+  // Add a section (authenticated user only)
   addSection: async (req, res) => {
     try {
       console.log('=== Add Section Debug ===');
       console.log('User:', req.user, '| Body:', req.body);
 
       const userId = req.user?.userId || req.user?.id;
-      const { type, title, content, image_uri } = req.body;
+      const { type, title, content, image_uri, section } = req.body; // Added section if needed
 
       if (!userId) {
         return res.status(400).json({ error: 'User ID is required.' });
@@ -235,8 +273,8 @@ const profileController = {
         return res.status(400).json({ error: 'Type and title are required.' });
       }
 
-      console.log('Creating section:', { userId, type, title, content, image_uri });
-      const sectionId = await Section.create(userId, type, title, content, image_uri);
+      console.log('Creating section:', { userId, type, title, content, image_uri, section });
+      const sectionId = await Section.create(userId, type, title, content, image_uri, section);
       console.log('Section created with ID:', sectionId);
       res.status(201).json({ section_id: sectionId });
     } catch (error) {
@@ -245,6 +283,7 @@ const profileController = {
     }
   },
 
+  // Get authenticated user's graphs
   getGraphs: async (req, res) => {
     try {
       console.log('=== Fetching Graphs ===');
@@ -265,6 +304,28 @@ const profileController = {
     }
   },
 
+  // Get another user's graphs by username
+  getUserGraphs: async (req, res) => {
+    try {
+      console.log('=== Fetching User Graphs ===');
+      const { username } = req.params;
+      console.log('Fetching graphs for username:', username);
+
+      const user = await User.getUserByUsername(username);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found.' });
+      }
+
+      const graphs = await Graph.findByUserId(user.user_id);
+      console.log('User graphs fetched:', graphs.length);
+      res.json(graphs);
+    } catch (error) {
+      console.error('Error in getUserGraphs:', error);
+      res.status(500).json({ error: 'Server error', details: error.message });
+    }
+  },
+
+  // Add a graph (authenticated user only)
   addGraph: async (req, res) => {
     try {
       console.log('=== Add Graph Debug ===');

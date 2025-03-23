@@ -1,13 +1,25 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const SplashScreen = ({ navigation }) => {
   useEffect(() => {
-    // Navigate to Main (tab navigator with Home as default) after 3 seconds
-    const timer = setTimeout(() => {
-      navigation.replace('Login');
-    }, 3000);
-    return () => clearTimeout(timer);
+    const checkLoginStatus = async () => {
+      try {
+        const token = await AsyncStorage.getItem('token');
+        // Navigate based on whether token exists
+        const destination = token ? 'Main' : 'Login';
+        const timer = setTimeout(() => {
+          navigation.replace(destination);
+        }, 3000);
+        return () => clearTimeout(timer);
+      } catch (error) {
+        console.error('Error checking login status:', error);
+        navigation.replace('Login'); // Fallback to Login on error
+      }
+    };
+
+    checkLoginStatus();
   }, [navigation]);
 
   return (

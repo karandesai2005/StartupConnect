@@ -1,5 +1,6 @@
 import React from 'react';
 import { StyleSheet, View, Text, Image, TouchableOpacity, FlatList, Dimensions, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context'; // Added this
 import { useNavigation } from '@react-navigation/native';
 
 // Sample event data (fixed duplicate IDs)
@@ -85,7 +86,7 @@ const Events = () => {
   );
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}> {/* Swapped View for SafeAreaView */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Upcoming Events</Text>
       </View>
@@ -96,7 +97,7 @@ const Events = () => {
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
       />
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -109,7 +110,7 @@ const styles = StyleSheet.create({
   header: {
     paddingVertical: 15,
     paddingHorizontal: 20,
-    paddingTop: 60,
+    // Removed paddingTop: 60, SafeAreaView handles the top spacing now
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
   },
