@@ -25,14 +25,18 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.croww.StartupConnect",
+      "versionCode": 1,
       "permissions": [
         "CAMERA",
-        "LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
         "READ_EXTERNAL_STORAGE",
-        "INTERNET",
         "NOTIFICATIONS"
       ],
-      "googleServicesFile": "./google-services.json"
+      "googleServicesFile": "./google-services.json",
+      "colors": {
+        "notification_icon_color": "#FF0000"
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -53,7 +57,8 @@
           "color": "#ffffff",
           "mode": "production"
         }
-      ]
+      ],
+      "./plugins/withFirebaseNotificationColorFix"
     ],
     "owner": "croww"
   }
