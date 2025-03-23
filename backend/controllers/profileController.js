@@ -1,11 +1,145 @@
+// backend/controllers/profileController.js
 require('dotenv').config();
 const Story = require('../models/storyModel');
 const Section = require('../models/sectionModel');
 const Graph = require('../models/graphModel');
+const User = require('../models/userModel'); // Added User model
 const { uploadAndConvertPostMedia } = require('../config/multerConfig');
 const path = require('path');
 
 const profileController = {
+  // Get the authenticated user's profile
+  getProfile: async (req, res) => {
+    try {
+      console.log('=== Fetching Profile ===');
+      const userId = req.user?.userId || req.user?.id;
+      console.log('User:', req.user);
+
+      if (!userId) {
+        return res.status(400).json({ error: 'User ID is required.' });
+      }
+
+      console.log('Fetching profile for userId:', userId);
+      const user = await User.getUserById(userId);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found.' });
+      }
+      console.log('Profile fetched:', user);
+      res.json(user);
+    } catch (error) {
+      console.error('Error in getProfile:', error);
+      res.status(500).json({ error: 'Server error', details: error.message });
+    }
+  },
+
+  // Get another user's profile by username
+  getUserProfile: async (req, res) => {
+    try {
+      console.log('=== Fetching User Profile ===');
+      const { username } = req.params;
+      console.log('Fetching profile for username:', username);
+
+      const user = await User.getUserByUsername(username);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found.' });
+      }
+
+      // Check if the authenticated user is following this user
+      const followerId = req.user ? (req.user.userId || req.user.id) : null;
+      let isFollowing = false;
+      if (followerId) {
+        isFollowing = await User.isFollowing(followerId, user.user_id);
+      }
+
+      console.log('User profile fetched:', user);
+      res.json({ ...user, isFollowing });
+    } catch (error) {
+      console.error('Error in getUserProfile:', error);
+      res.status(500).json({ error: 'Server error', details: error.message });
+    }
+  },
+
+  // Follow a user
+  followUser: async (req, res) => {
+    try {
+      console.log('=== Follow User Debug ===');
+      const followerId = req.user?.userId || req.user?.id;
+      const { username } = req.body;
+      console.log('Follower ID:', followerId, '| Username to follow:', username);
+
+      if (!followerId) {
+        return res.status(400).json({ error: 'User ID is required.' });
+      }
+
+      if (!username) {
+        return res.status(400).json({ error: 'Username to follow is required.' });
+      }
+
+      // Find the user to follow
+      const followee = await User.getUserByUsername(username);
+      if (!followee) {
+        return res.status(404).json({ error: 'User to follow not found.' });
+      }
+
+      // Prevent self-follow
+      if (followerId === followee.user_id) {
+        return res.status(400).json({ error: 'You cannot follow yourself.' });
+      }
+
+      // Check if already following
+      const isAlreadyFollowing = await User.isFollowing(followerId, followee.user_id);
+      if (isAlreadyFollowing) {
+        return res.status(400).json({ error: 'You are already following this user.' });
+      }
+
+      // Follow the user
+      await User.followUser(followerId, followee.user_id);
+      console.log(`User ${followerId} followed user ${followee.user_id}`);
+      res.status(200).json({ message: 'Successfully followed user.' });
+    } catch (error) {
+      console.error('Error in followUser:', error);
+      res.status(500).json({ error: 'Server error', details: error.message });
+    }
+  },
+
+  // Unfollow a user (optional)
+  unfollowUser: async (req, res) => {
+    try {
+      console.log('=== Unfollow User Debug ===');
+      const followerId = req.user?.userId || req.user?.id;
+      const { username } = req.body;
+      console.log('Follower ID:', followerId, '| Username to unfollow:', username);
+
+      if (!followerId) {
+        return res.status(400).json({ error: 'User ID is required.' });
+      }
+
+      if (!username) {
+        return res.status(400).json({ error: 'Username to unfollow is required.' });
+      }
+
+      // Find the user to unfollow
+      const followee = await User.getUserByUsername(username);
+      if (!followee) {
+        return res.status(404).json({ error: 'User to unfollow not found.' });
+      }
+
+      // Check if not following
+      const isFollowing = await User.isFollowing(followerId, followee.user_id);
+      if (!isFollowing) {
+        return res.status(400).json({ error: 'You are not following this user.' });
+      }
+
+      // Unfollow the user
+      await User.unfollowUser(followerId, followee.user_id);
+      console.log(`User ${followerId} unfollowed user ${followee.user_id}`);
+      res.status(200).json({ message: 'Successfully unfollowed user.' });
+    } catch (error) {
+      console.error('Error in unfollowUser:', error);
+      res.status(500).json({ error: 'Server error', details: error.message });
+    }
+  },
+
   getStories: async (req, res) => {
     try {
       console.log('=== Fetching Stories ===');
