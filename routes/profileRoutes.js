@@ -1,4 +1,3 @@
-// backend/routes/profileRoutes.js
 const express = require('express');
 const router = express.Router();
 const profileController = require('../controllers/profileController');
@@ -10,22 +9,31 @@ router.get('/', authMiddleware, profileController.getProfile);
 // Get another user's profile by username
 router.get('/user/:username', authMiddleware, profileController.getUserProfile);
 
-// Get stories
+// Get authenticated user's stories
 router.get('/stories', authMiddleware, profileController.getStories);
 
-// Add a story (Multer is handled in addStory)
+// Get another user's stories
+router.get('/stories/user/:username', authMiddleware, profileController.getUserStories);
+
+// Add a story (authenticated user only)
 router.post('/stories', authMiddleware, profileController.addStory);
 
-// Get sections
+// Get authenticated user's sections
 router.get('/sections', authMiddleware, profileController.getSections);
 
-// Add a section
+// Get another user's sections
+router.get('/sections/user/:username', authMiddleware, profileController.getUserSections);
+
+// Add a section (authenticated user only)
 router.post('/sections', authMiddleware, profileController.addSection);
 
-// Get graphs
+// Get authenticated user's graphs
 router.get('/graphs', authMiddleware, profileController.getGraphs);
 
-// Add a graph
+// Get another user's graphs
+router.get('/graphs/user/:username', authMiddleware, profileController.getUserGraphs);
+
+// Add a graph (authenticated user only)
 router.post('/graphs', authMiddleware, profileController.addGraph);
 
 // Follow a user
