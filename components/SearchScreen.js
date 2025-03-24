@@ -12,7 +12,7 @@ import {
   Platform,
   StatusBar,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NGROK_URL } from '@env';
@@ -22,6 +22,8 @@ const SearchScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const navigation = useNavigation();
+  const route = useRoute();
+  const { onTeamMemberSelected } = route.params || {};
 
   const searchUsers = useCallback(
     debounce(async (query) => {
@@ -53,16 +55,23 @@ const SearchScreen = () => {
     searchUsers(text);
   };
 
-  const handleUserPress = (username) => {
+  const handleUserPress = (user) => {
     setSearchQuery('');
     setSearchResults([]);
-    navigation.navigate('Profile', { username, isOtherUser: true });
+    if (onTeamMemberSelected) {
+      // If this screen was opened to select a team member, call the callback
+      onTeamMemberSelected(user);
+      navigation.goBack(); // Return to the Profile screen
+    } else {
+      // Otherwise, navigate to the user's profile
+      navigation.navigate('Profile', { username: user.username, isOtherUser: true });
+    }
   };
 
   const renderSearchResult = ({ item }) => (
     <TouchableOpacity
       style={styles.searchResultItem}
-      onPress={() => handleUserPress(item.username)}
+      onPress={() => handleUserPress(item)}
     >
       <Image
         source={
@@ -90,7 +99,7 @@ const SearchScreen = () => {
         </TouchableOpacity>
         <TextInput
           style={styles.searchBar}
-          placeholder="Search..."
+          placeholder="Search team members..."
           placeholderTextColor="#aaa"
           value={searchQuery}
           onChangeText={handleSearchChange}
@@ -105,7 +114,6 @@ const SearchScreen = () => {
         keyboardShouldPersistTaps="handled"
       />
     </KeyboardAvoidingView>
-    
   );
 };
 
@@ -133,7 +141,6 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   searchBar: {
-    //flex: 1,
     paddingHorizontal: 15,
     backgroundColor: '#eee',
     borderRadius: 20,

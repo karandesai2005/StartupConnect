@@ -263,7 +263,7 @@ const profileController = {
       console.log('User:', req.user, '| Body:', req.body);
 
       const userId = req.user?.userId || req.user?.id;
-      const { type, title, content, image_uri, section } = req.body; // Added section if needed
+      const { type, title, content, image_uri, section, story } = req.body;
 
       if (!userId) {
         return res.status(400).json({ error: 'User ID is required.' });
@@ -273,10 +273,37 @@ const profileController = {
         return res.status(400).json({ error: 'Type and title are required.' });
       }
 
-      console.log('Creating section:', { userId, type, title, content, image_uri, section });
-      const sectionId = await Section.create(userId, type, title, content, image_uri, section);
-      console.log('Section created with ID:', sectionId);
-      res.status(201).json({ section_id: sectionId });
+      if (type === 'story' && story && section === 'team') {
+        // Check if a "Team" section already exists
+        let teamSection = await Section.findByUserIdAndSection(userId, 'team');
+
+        if (!teamSection) {
+          // Create a new "Team" section if it doesn’t exist
+          const sectionId = await Section.create(userId, type, title, null, null, 'team');
+          teamSection = { section_id: sectionId };
+        }
+
+        // Add the team member as a story linked to the "Team" section
+        const { image_url, has_story, viewed, username, profile_picture } = story;
+        const storyId = await Story.create(
+          userId,
+          username || req.user.username,
+          image_url || profile_picture,
+          has_story !== undefined ? has_story : 1,
+          viewed !== undefined ? viewed : 0,
+          'team',
+          teamSection.section_id // Link the story to the section
+        );
+
+        console.log('Team member story created with ID:', storyId);
+        res.status(201).json({ section_id: teamSection.section_id, story_id: storyId });
+      } else {
+        // Handle other section types (text, image, etc.)
+        console.log('Creating section:', { userId, type, title, content, image_uri, section });
+        const sectionId = await Section.create(userId, type, title, content, image_uri, section);
+        console.log('Section created with ID:', sectionId);
+        res.status(201).json({ section_id: sectionId });
+      }
     } catch (error) {
       console.error('Error in addSection:', error);
       res.status(500).json({ error: 'Server error', details: error.message });

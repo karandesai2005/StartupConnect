@@ -470,16 +470,54 @@ const Profile = ({ route }) => {
 
   const handleStorySectionSubmit = async (storyType) => {
     if (!isOwnProfile) return;
-    const titles = { team: "Team", startups: "Startups", startup: "Startup" };
-    const sectionData = { type: "story", title: titles[storyType], section: storyType };
-    const response = await fetchWithAuth("/sections", "POST", sectionData);
-    if (response) {
-      await fetchSections();
+  
+    if (storyType === "team") {
+      // Navigate to SearchScreen and pass a callback to handle the selected team member
+      navigation.navigate("SearchScreen", {
+        onTeamMemberSelected: (selectedUser) => {
+          // Add the selected team member to the stories under the "team" section
+          const newTeamMemberStory = {
+            story_id: `${selectedUser.user_id}-${Date.now()}`, // Unique ID for the story
+            image_url: selectedUser.profile_picture || null,
+            has_story: true,
+            viewed: false,
+            username: selectedUser.username,
+            profile_picture: selectedUser.profile_picture || null,
+            section: "team",
+          };
+  
+          // Update stories state
+          setStories((prev) => [...prev, newTeamMemberStory]);
+  
+          // Optionally, send this to the backend to persist the team member
+          const sectionData = {
+            type: "story",
+            title: "Team",
+            section: "team",
+            story: newTeamMemberStory,
+          };
+          fetchWithAuth("/sections", "POST", sectionData).then(() => {
+            fetchStories(); // Refresh stories from the backend
+            fetchSections(); // Refresh sections from the backend
+          });
+        },
+      });
       setStorySectionModalVisible(false);
       setSectionModalVisible(false);
       resetSectionModal();
     } else {
-      alert("Failed to create story section");
+      // Handle other story types (startups, startup) as before
+      const titles = { startups: "Startups", startup: "Startup" };
+      const sectionData = { type: "story", title: titles[storyType], section: storyType };
+      const response = await fetchWithAuth("/sections", "POST", sectionData);
+      if (response) {
+        await fetchSections();
+        setStorySectionModalVisible(false);
+        setSectionModalVisible(false);
+        resetSectionModal();
+      } else {
+        alert("Failed to create story section");
+      }
     }
   };
 
