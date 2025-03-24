@@ -11,6 +11,7 @@
   import Register1 from './components/Register1';
   import Register2 from './components/Register2';
   import Profile from './components/Profile/P_Profile/Profile';
+  import BusinessProfile from './components/Profile/B_Profile/BusinessProfile'; // Business Profile
   import EditProfilePage from './components/Profile/P_Profile/EditProfilePage';
   import Username from './components/username';
   import Preference from './components/preference';
@@ -82,6 +83,8 @@
               <Stack.Screen name="SelectTags" component={SelectTagsScreen} />
               <Stack.Screen name="ViewStory" component={ViewStory} options={{ headerShown: false }} />
               <Stack.Screen name="EventDetails" component={EventDetails} />
+              <Stack.Screen name="BusinessProfile" component={BusinessProfile} />
+
             </Stack.Navigator>
           </NavigationContainer>
         </UserRegistrationProvider>
