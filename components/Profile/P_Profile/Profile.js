@@ -13,6 +13,7 @@ import {
   TextInput,
   Dimensions,
   FlatList,
+  Alert,
 } from "react-native";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -22,7 +23,29 @@ import { Video } from "expo-av";
 import DynamicGraphs from "./DynamicGraphs";
 import * as ImagePicker from "expo-image-picker";
 
-const StoryItem = React.memo(({ story, onPress, isAddButton }) => {
+// Delete Button Component
+const DeleteButton = ({ onDelete }) => (
+  <TouchableOpacity 
+    style={styles.deleteButton}
+    onPress={() => {
+      Alert.alert(
+        "Confirm Delete",
+        "Are you sure you want to delete this item?",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Delete", onPress: onDelete, style: "destructive" }
+        ]
+      );
+    }}
+  >
+    <Image 
+      source={require('../../../assets/Arrow.png')} 
+      style={styles.deleteIcon}
+    />
+  </TouchableOpacity>
+);
+
+const StoryItem = React.memo(({ story, onPress, isAddButton, onDelete }) => {
   const imageSource = isAddButton
     ? require("../../../assets/del.png")
     : story.image_url
@@ -30,45 +53,52 @@ const StoryItem = React.memo(({ story, onPress, isAddButton }) => {
       : require("../../../assets/del.png");
 
   return (
-    <TouchableOpacity
-      onPress={onPress}
-      style={styles.storyItem}
-      activeOpacity={0.7}
-    >
-      <View
-        style={[
-          styles.storyRing,
-          { borderColor: story.viewed ? "#8e8e8e" : "#1f219c" },
-          story.has_story && styles.activeStoryRing,
-          isAddButton && { borderWidth: 0 },
-        ]}
+    <View style={styles.storyItemContainer}>
+      <TouchableOpacity
+        onPress={onPress}
+        style={styles.storyItem}
+        activeOpacity={0.7}
       >
-        <View style={styles.storyImageContainer}>
-          {isAddButton ? (
-            <Text style={styles.addStoryText}>+</Text>
-          ) : (
-            <Image
-              source={imageSource}
-              style={styles.storyImage}
-              resizeMode="cover"
-              defaultSource={require("../../../assets/del.png")}
-            />
-          )}
-          {story.has_story && !story.viewed && !isAddButton && (
-            <View style={styles.unreadIndicator} />
-          )}
+        <View
+          style={[
+            styles.storyRing,
+            { borderColor: story.viewed ? "#8e8e8e" : "#1f219c" },
+            story.has_story && styles.activeStoryRing,
+            isAddButton && { borderWidth: 0 },
+          ]}
+        >
+          <View style={styles.storyImageContainer}>
+            {isAddButton ? (
+              <Text style={styles.addStoryText}>+</Text>
+            ) : (
+              <Image
+                source={imageSource}
+                style={styles.storyImage}
+                resizeMode="cover"
+                defaultSource={require("../../../assets/del.png")}
+              />
+            )}
+            {story.has_story && !story.viewed && !isAddButton && (
+              <View style={styles.unreadIndicator} />
+            )}
+          </View>
         </View>
-      </View>
-      <Text style={styles.storyUsername} numberOfLines={1}>
-        {isAddButton ? "Add Story" : story.username}
-      </Text>
-    </TouchableOpacity>
+        <Text style={styles.storyUsername} numberOfLines={1}>
+          {isAddButton ? "Add Story" : story.username}
+        </Text>
+      </TouchableOpacity>
+      {!isAddButton && <DeleteButton onDelete={onDelete} />}
+    </View>
   );
 });
 
-const Stories = React.memo(({ stories, onStoryPress, onAddStory, title, sectionId }) => {
+const Stories = React.memo(({ stories, onStoryPress, onAddStory, title, sectionId, fetchWithAuth }) => {
   const addStoryItem = { id: "add", username: "Add Story", has_story: false, viewed: false };
   const filteredStories = stories.filter((story) => story.section === sectionId);
+
+  const handleDeleteStory = async (storyId) => {
+    await fetchWithAuth(`/stories/${storyId}`, "DELETE");
+  };
 
   return (
     <View style={styles.sectionContainer}>
@@ -90,6 +120,7 @@ const Stories = React.memo(({ stories, onStoryPress, onAddStory, title, sectionI
             key={story.story_id}
             story={story}
             onPress={() => onStoryPress(story, index)}
+            onDelete={() => handleDeleteStory(story.story_id)}
           />
         ))}
       </ScrollView>
@@ -98,10 +129,13 @@ const Stories = React.memo(({ stories, onStoryPress, onAddStory, title, sectionI
   );
 });
 
-const ImageSection = ({ title, imageUri }) => (
+const ImageSection = ({ title, imageUri, onDelete }) => (
   <View style={styles.sectionContainer}>
     <View style={styles.divider} />
-    <Text style={styles.sectionHeader}>{title}</Text>
+    <View style={styles.sectionHeaderContainer}>
+      <Text style={styles.sectionHeader}>{title}</Text>
+      <DeleteButton onDelete={onDelete} />
+    </View>
     <View style={styles.divider} />
     {imageUri ? (
       <Image
@@ -117,10 +151,13 @@ const ImageSection = ({ title, imageUri }) => (
   </View>
 );
 
-const TextSection = ({ title, content }) => (
+const TextSection = ({ title, content, onDelete }) => (
   <View style={styles.sectionContainer}>
     <View style={styles.divider} />
-    <Text style={styles.sectionHeader}>{title}</Text>
+    <View style={styles.sectionHeaderContainer}>
+      <Text style={styles.sectionHeader}>{title}</Text>
+      <DeleteButton onDelete={onDelete} />
+    </View>
     <View style={styles.divider} />
     <Text style={styles.sectionContent}>{content}</Text>
     <View style={styles.divider} />
@@ -216,11 +253,7 @@ const Profile = ({ route, isBusinessProfile = false }) => {
       const cachedUserData = await AsyncStorage.getItem("userData");
       if (cachedUserData) setUserData(JSON.parse(cachedUserData));
       const cachedPosts = await AsyncStorage.getItem("userPosts");
-      if (cachedPosts) {
-        const posts = JSON.parse(cachedPosts);
-        //console.log("Loaded cached posts:", posts);
-        setUserPosts(posts);
-      }
+      if (cachedPosts) setUserPosts(JSON.parse(cachedPosts));
       const cachedStories = await AsyncStorage.getItem("stories");
       if (cachedStories) setStories(JSON.parse(cachedStories));
       const cachedSections = await AsyncStorage.getItem("sections");
@@ -265,16 +298,11 @@ const Profile = ({ route, isBusinessProfile = false }) => {
 
   const fetchUserPosts = async () => {
     const token = await AsyncStorage.getItem("token");
-    if (!token) {
-      //console.log("No token found, skipping fetchUserPosts");
-      return;
-    }
+    if (!token) return;
     const { username } = route.params || {};
     const endpoint = username
       ? `${NGROK_URL}/api/profile/posts/user/${username}`
       : `${NGROK_URL}/api/posts/myposts`;
-    //console.log("Fetching posts from:", endpoint);
-    //console.log("Using token:", token);
     try {
       const response = await fetch(endpoint, {
         method: "GET",
@@ -283,10 +311,8 @@ const Profile = ({ route, isBusinessProfile = false }) => {
           "Content-Type": "application/json",
         },
       });
-      //console.log("Response status:", response.status);
       if (response.ok) {
         const data = await response.json();
-        //console.log("Raw posts data:", data);
         const mappedPosts = data
           .map((post) => ({
             _id: post.post_id,
@@ -302,14 +328,8 @@ const Profile = ({ route, isBusinessProfile = false }) => {
           }))
           .filter((post) => post.image_url && !post.image_url.includes("undefined"))
           .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-        //console.log("Mapped posts:", mappedPosts);
         setUserPosts(mappedPosts);
         await AsyncStorage.setItem("userPosts", JSON.stringify(mappedPosts));
-        //console.log("userPosts state updated with:", mappedPosts);
-      } else {
-        console.error("Failed to fetch posts:", response.status, response.statusText);
-        const errorText = await response.text();
-        console.error("Error response body:", errorText);
       }
     } catch (error) {
       console.error("Error in fetchUserPosts:", error.message);
@@ -351,7 +371,7 @@ const Profile = ({ route, isBusinessProfile = false }) => {
     }
   };
 
-  const refreshProfileData = useCallback(async (forceRefresh = false) => {
+  const refreshProfileData = useCallback(async () => {
     setIsLoading(true);
     setRefreshing(true);
     try {
@@ -362,7 +382,6 @@ const Profile = ({ route, isBusinessProfile = false }) => {
         fetchSections(),
         fetchGraphs(),
       ]);
-      //console.log("Refresh completed, userPosts should be updated");
     } catch (error) {
       console.error("Refresh failed:", error);
       await loadCachedData();
@@ -382,7 +401,6 @@ const Profile = ({ route, isBusinessProfile = false }) => {
 
   useFocusEffect(
     useCallback(() => {
-      //console.log("useFocusEffect triggered");
       if (!userData) {
         refreshProfileData();
       } else if (Date.now() - lastUpdate > 60000) {
@@ -515,6 +533,27 @@ const Profile = ({ route, isBusinessProfile = false }) => {
     }
   };
 
+  const handleDeleteSection = async (sectionId) => {
+    const response = await fetchWithAuth(`/sections/${sectionId}`, "DELETE");
+    if (response) {
+      await fetchSections();
+    }
+  };
+
+  const handleDeleteGraph = async (graphId) => {
+    const response = await fetchWithAuth(`/graphs/${graphId}`, "DELETE");
+    if (response) {
+      await fetchGraphs();
+    }
+  };
+
+  const handleDeletePost = async (postId) => {
+    const response = await fetchWithAuth(`/posts/${postId}`, "DELETE");
+    if (response) {
+      await fetchUserPosts();
+    }
+  };
+
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -575,7 +614,6 @@ const Profile = ({ route, isBusinessProfile = false }) => {
 
   const renderStoriesTab = () => (
     <View style={{ width: "100%" }}>
-      {/* Removed the "Our Journey" Stories section from here */}
       {sections.map((section) => {
         switch (section.type) {
           case "story":
@@ -592,12 +630,27 @@ const Profile = ({ route, isBusinessProfile = false }) => {
                     initialIndex: index,
                   })
                 }
+                fetchWithAuth={fetchWithAuth}
               />
             );
           case "image":
-            return <ImageSection key={section.section_id} title={section.title} imageUri={section.image_uri} />;
+            return (
+              <ImageSection 
+                key={section.section_id} 
+                title={section.title} 
+                imageUri={section.image_uri}
+                onDelete={() => handleDeleteSection(section.section_id)}
+              />
+            );
           case "text":
-            return <TextSection key={section.section_id} title={section.title} content={section.content} />;
+            return (
+              <TextSection 
+                key={section.section_id} 
+                title={section.title} 
+                content={section.content}
+                onDelete={() => handleDeleteSection(section.section_id)}
+              />
+            );
           case "link":
             return (
               <LinkSection
@@ -626,7 +679,10 @@ const Profile = ({ route, isBusinessProfile = false }) => {
     <View style={styles.try}>
       {userGraphs.map((graph) => (
         <View key={graph.graph_id} style={styles.cardStyle}>
-          <Text style={styles.graphTitle}>{graph.title}</Text>
+          <View style={styles.graphHeader}>
+            <Text style={styles.graphTitle}>{graph.title}</Text>
+            <DeleteButton onDelete={() => handleDeleteGraph(graph.graph_id)} />
+          </View>
           <View style={styles.graphContainer}>
             {graph.type === "pie" && (
               <PieChart
@@ -700,38 +756,40 @@ const Profile = ({ route, isBusinessProfile = false }) => {
   const renderGridItem = ({ item, index }) => {
     const isVideo = item.media_type === "video" || item.image_url?.includes(".mp4");
     return (
-      <TouchableOpacity
-        style={styles.gridItem}
-        onPress={() => navigation.navigate("PostView", { posts: userPosts, initialIndex: index })}
-      >
-        {isVideo ? (
-          <View style={styles.videoContainer}>
-            <Video
-              source={{ uri: item.image_url }}
+      <View style={styles.gridItemContainer}>
+        <TouchableOpacity
+          style={styles.gridItem}
+          onPress={() => navigation.navigate("PostView", { posts: userPosts, initialIndex: index })}
+        >
+          {isVideo ? (
+            <View style={styles.videoContainer}>
+              <Video
+                source={{ uri: item.image_url }}
+                style={styles.gridImage}
+                resizeMode="cover"
+                shouldPlay={false}
+                isMuted
+                useNativeControls={false}
+              />
+              <View style={styles.playIconContainer}>
+                <Text style={styles.playIcon}>▶</Text>
+              </View>
+            </View>
+          ) : (
+            <Image
+              source={item.image_url ? { uri: item.image_url } : require("../../../assets/del.png")}
               style={styles.gridImage}
               resizeMode="cover"
-              shouldPlay={false}
-              isMuted
-              useNativeControls={false}
+              defaultSource={require("../../../assets/del.png")}
             />
-            <View style={styles.playIconContainer}>
-              <Text style={styles.playIcon}>▶</Text>
-            </View>
-          </View>
-        ) : (
-          <Image
-            source={item.image_url ? { uri: item.image_url } : require("../../../assets/del.png")}
-            style={styles.gridImage}
-            resizeMode="cover"
-            defaultSource={require("../../../assets/del.png")}
-          />
-        )}
-      </TouchableOpacity>
+          )}
+        </TouchableOpacity>
+        <DeleteButton onDelete={() => handleDeletePost(item._id)} />
+      </View>
     );
   };
 
   const renderPostsTab = () => {
-    //console.log("Rendering posts tab, userPosts:", userPosts);
     if (!userPosts || userPosts.length === 0) {
       return (
         <View style={styles.noPostsContainer}>
@@ -753,9 +811,7 @@ const Profile = ({ route, isBusinessProfile = false }) => {
   };
 
   const handleProfileButtonPress = () => {
-    if (route.params?.isOtherUser) {
-      //console.log("Viewing another user's profile, no edit option.");
-    } else {
+    if (!route.params?.isOtherUser) {
       navigation.navigate("EditProfilePage", { userData });
     }
   };
@@ -873,6 +929,7 @@ const Profile = ({ route, isBusinessProfile = false }) => {
           stories={stories}
           onAddStory={handleAddStory}
           onStoryPress={handleStoryPress}
+          fetchWithAuth={fetchWithAuth}
         />
 
         <View style={styles.tab}>
@@ -886,7 +943,6 @@ const Profile = ({ route, isBusinessProfile = false }) => {
         {activeTab === "bucks" && renderPostsTab()}
       </ScrollView>
 
-      {/* Modals remain unchanged */}
       <Modal visible={isSectionModalVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
@@ -1071,13 +1127,26 @@ const Profile = ({ route, isBusinessProfile = false }) => {
 
 const styles = StyleSheet.create({
   sectionContainer: { width: "100%", paddingVertical: 5, backgroundColor: "#fff" },
-  sectionHeader: { fontSize: 18, fontWeight: "600", color: "#333", marginVertical: 2, paddingHorizontal: 15 },
+  sectionHeader: { fontSize: 18, fontWeight: "600", color: "#333", marginVertical: 2 },
+  sectionHeaderContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 15,
+  },
   divider: { height: 1, backgroundColor: "#ccc", width: Dimensions.get("window").width, marginVertical: 5 },
   sectionImage: { width: "100%", height: 200, borderRadius: 8, resizeMode: "cover", marginVertical: 2 },
   sectionContent: { fontSize: 14, color: "#666", lineHeight: 20, paddingHorizontal: 15 },
   placeholderText: { fontSize: 14, color: "#999", paddingHorizontal: 15 },
   storiesContainer: { paddingVertical: 2, flexDirection: "row", alignItems: "center", paddingHorizontal: 15 },
-  storyItem: { alignItems: "center", width: 72, marginHorizontal: 6, paddingVertical: 4 },
+  storyItemContainer: {
+    position: 'relative',
+    alignItems: 'center',
+    width: 72,
+    marginHorizontal: 6,
+    paddingVertical: 4,
+  },
+  storyItem: { alignItems: "center", width: 72 },
   storyRing: { borderWidth: 2, borderRadius: 37 },
   activeStoryRing: { borderWidth: 2.5, borderColor: "#1f219c" },
   storyImageContainer: { width: 70, height: 70, borderRadius: 35, overflow: "hidden", backgroundColor: "#f0f0f0", justifyContent: "center", alignItems: "center" },
@@ -1095,30 +1164,40 @@ const styles = StyleSheet.create({
   addGraphButtonText: { color: "white", fontSize: 16, fontWeight: "600" },
   try: { flexDirection: "column", alignItems: "center", paddingVertical: 20, width: "100%" },
   cardStyle: { width: "90%", height: 300, marginBottom: 20, backgroundColor: "white", borderRadius: 15, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 },
-  graphTitle: { fontSize: 18, fontWeight: "600", color: "#333", textAlign: "center", padding: 15, borderBottomWidth: 1, borderBottomColor: "#eee" },
+  graphHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  graphTitle: { fontSize: 18, fontWeight: "600", color: "#333" },
   graphContainer: { flex: 1, alignItems: "center", justifyContent: "center", padding: 10, width: 350 },
   videoContainer: { position: "relative", width: "100%", height: "100%" },
   playIconContainer: {
     position: "absolute",
-    top: 5, // Move to the top
-    right: 5, // Move to the right
-    width: 24, // Smaller width
-    height: 24, // Smaller height
-    borderRadius: 12, // Circular shape (half of width/height)
-    backgroundColor: "rgba(0,0,0,0.5)", // Slightly darker semi-transparent background
+    top: 5,
+    right: 5,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "center",
     alignItems: "center",
   },
-  playIcon: {
-    color: "white",
-    fontSize: 12, // Smaller font size
-  },
+  playIcon: { color: "white", fontSize: 12 },
   gridContainer: { paddingVertical: 20, width: "100%" },
-  gridItem: { width: (Dimensions.get("window").width - 34) / 3, height: (Dimensions.get("window").width - 34) / 3, backgroundColor: "#f0f0f0", marginBottom: 2 },
+  gridItemContainer: {
+    position: 'relative',
+    width: (Dimensions.get("window").width - 34) / 3,
+    height: (Dimensions.get("window").width - 34) / 3,
+    marginBottom: 2,
+  },
+  gridItem: { width: "100%", height: "100%", backgroundColor: "#f0f0f0" },
   gridImage: { width: "100%", height: "100%", borderRadius: 4 },
   container: { flex: 1, justifyContent: "center", alignItems: "center" },
   contentContainer: { flex: 1, alignItems: "center", paddingHorizontal: 0, width: "100%", position: "relative" },
-  fullScreenContainer: { flex: 1, width: "100%", alignItems: "center" },
   profileImage: { width: "100%", height: "100%", borderRadius: 48 },
   profile: { width: "100%", backgroundColor: "#fff", alignItems: "center", padding: 0, gap: 14, marginTop: 55 },
   profileSection: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", width: "100%", paddingHorizontal: 40, paddingTop: 20 },
@@ -1166,13 +1245,25 @@ const styles = StyleSheet.create({
   storySectionOption: { alignItems: "center", padding: 10, borderRadius: 5, backgroundColor: "#f9f9f9" },
   storySectionText: { fontSize: 16, fontWeight: "600", color: "#333", marginTop: 5 },
   teamIconsContainer: { flexDirection: "row", gap: 5 },
-  teamIcon: { width: 30, height: 30, borderRadius: 15, backgroundColor: "#e0e0e0" },
+  teamIcon: { width: 30, height: 30, borderRadius: 15 },
   startupsIconsContainer: { flexDirection: "row", gap: 5 },
-  startupIcon: { width: 30, height: 30, borderRadius: 15, backgroundColor: "#007bff" },
+  startupIcon: { width: 30, height: 30, borderRadius: 15 },
   startupSingleContainer: { alignItems: "center", width: "100%" },
   startupSingleIcon: { width: 50, height: 50, borderRadius: 25, backgroundColor: "#1f219c" },
   startupSingleText: { fontSize: 14, fontWeight: "600", color: "#333", marginTop: 5 },
   startupSingleDesc: { fontSize: 12, color: "#666", textAlign: "center", marginTop: 2 },
+  deleteButton: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    zIndex: 1,
+    padding: 5,
+  },
+  deleteIcon: {
+    width: 20,
+    height: 20,
+    tintColor: '#ff4444',
+  },
 });
 
 export default Profile;
