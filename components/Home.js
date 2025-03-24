@@ -1,3 +1,4 @@
+// components/Home.js
 import React, { useEffect, useState, useCallback, memo, useMemo } from 'react';
 import {
   View,
@@ -102,7 +103,7 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
     }
     return () => {
       if (isVideo && videoRef.current) {
-        videoRef.current.pauseAsync().catch(() => { });
+        videoRef.current.pauseAsync().catch(() => {});
       }
     };
   }, [isVisible, isVideo]);
@@ -136,11 +137,11 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
 
   const fetchLikeStatus = async () => {
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await AsyncStorage.getItem('token');
       if (!token || !item.post_id) return;
       const baseUrl = NGROK_URL.replace(/\/+$/, '');
       const response = await axios.get(`${baseUrl}/api/posts/${item.post_id}/likes`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (response.data) {
         setIsLiked(response.data.isLiked === 1);
@@ -155,11 +156,11 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
     try {
       console.log('Fetching comments for post:', item.post_id);
       setIsCommentsLoading(true);
-      const token = await AsyncStorage.getItem("token");
+      const token = await AsyncStorage.getItem('token');
       if (!token || !item.post_id) return;
       const baseUrl = NGROK_URL.replace(/\/+$/, '');
       const response = await axios.get(`${baseUrl}/api/posts/${item.post_id}/comments`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (response.data) {
         setComments(response.data || []);
@@ -177,11 +178,11 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
 
   const handleLike = async () => {
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await AsyncStorage.getItem('token');
       if (!token || !item.post_id) return;
       setIsLikeLoading(true);
-      setIsLiked(prev => !prev);
-      setLikeCount(prev => isLiked ? prev - 1 : prev + 1);
+      setIsLiked((prev) => !prev);
+      setLikeCount((prev) => (isLiked ? prev - 1 : prev + 1));
       const baseUrl = NGROK_URL.replace(/\/+$/, '');
       const response = await axios.post(
         `${baseUrl}/api/posts/${item.post_id}/toggle-like`,
@@ -194,15 +195,19 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
       }
     } catch (error) {
       console.error('Error updating like:', error);
-      setIsLiked(prev => !prev);
-      setLikeCount(prev => isLiked ? prev + 1 : prev - 1);
+      setIsLiked((prev) => !prev);
+      setLikeCount((prev) => (isLiked ? prev + 1 : prev - 1));
     } finally {
       setIsLikeLoading(false);
     }
   };
 
   const handleProfilePress = () => {
-    const username = isUserPost ? item.username : (item.name ? `${item.name.first} ${item.name.last}` : 'User');
+    const username = isUserPost
+      ? item.username
+      : item.name
+      ? `${item.name.first} ${item.name.last}`
+      : 'User';
     navigation.navigate('Profile', { username, isOtherUser: true });
   };
 
@@ -223,7 +228,7 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
       console.log('🔍 Starting to add comment - Post ID:', item.post_id);
       console.log('📝 Comment content:', newComment);
 
-      const token = await AsyncStorage.getItem("token");
+      const token = await AsyncStorage.getItem('token');
       console.log('🔑 Retrieved token from AsyncStorage:', token ? 'Token found' : 'No token found');
 
       if (!token) {
@@ -288,7 +293,9 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
             />
           </TouchableOpacity>
           <View>
-            <Text style={styles.name}>{isUserPost ? item.username : (item.name ? item.name.first : 'User')}</Text>
+            <Text style={styles.name}>
+              {isUserPost ? item.username : item.name ? item.name.first : 'User'}
+            </Text>
             <Text style={styles.timeStamp}>{formatTimestamp(item.created_at)}</Text>
           </View>
         </View>
@@ -324,8 +331,8 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
                 typeof item.image_url === 'string' && item.image_url.startsWith('http')
                   ? { uri: item.image_url }
                   : typeof item.media_url === 'string' && item.media_url.startsWith('http')
-                    ? { uri: item.media_url }
-                    : require('../assets/PITCH.png')
+                  ? { uri: item.media_url }
+                  : require('../assets/PITCH.png')
               }
               style={[styles.postImage, { height: imageHeight }]}
               onLoad={() => setIsLoading(false)}
@@ -343,7 +350,12 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
         <Text style={styles.comments}>💬 {item.comment_count || comments.length || 0} Comments</Text>
       </View>
       <View style={styles.actions}>
-        <TouchableOpacity style={styles.actionButton} onPress={debouncedHandleLike} activeOpacity={0.7} disabled={isLikeLoading}>
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={debouncedHandleLike}
+          activeOpacity={0.7}
+          disabled={isLikeLoading}
+        >
           <Image
             source={require('../assets/icon-like.png')}
             style={[styles.navIcon, isLiked && { tintColor: '#1f219c' }, isLikeLoading && { opacity: 0.5 }]}
@@ -363,7 +375,7 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
       <View style={styles.captionContainer}>
         <Text style={styles.caption} numberOfLines={expandedItems[index] ? undefined : 2}>
           <Text style={styles.username}>
-            {isUserPost ? item.username : (item.name ? item.name.first : 'User')}{' '}
+            {isUserPost ? item.username : item.name ? item.name.first : 'User'}{' '}
           </Text>
           {item.content || item.caption}
         </Text>
@@ -435,7 +447,7 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
   );
 });
 
-export default function HomeScreen() {
+export default function Home() {
   const [users, setUsers] = useState([]);
   const [myPosts, setMyPosts] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -448,61 +460,76 @@ export default function HomeScreen() {
   const [isFieldsModalVisible, setFieldsModalVisible] = useState(false);
   const [selectedFields, setSelectedFields] = useState([]);
   const [viewableItems, setViewableItems] = useState([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
-  const [isSearchActive, setIsSearchActive] = useState(false);
 
-  const onViewableItemsChanged = useCallback(debounce(({ viewableItems }) => {
-    setViewableItems(viewableItems.map(item => item.index));
-  }, 100), []);
+  const onViewableItemsChanged = useCallback(
+    debounce(({ viewableItems }) => {
+      setViewableItems(viewableItems.map((item) => item.index));
+    }, 100),
+    []
+  );
 
   const viewabilityConfig = {
     itemVisiblePercentThreshold: 50,
   };
 
   const FIELDS = [
-    "Tech", "AI", "Sustainability", "Finance", "Health", "Education",
-    "Gaming", "Robotics", "Marketing", "Blockchain", "Design", "Data Science"
+    'Tech',
+    'AI',
+    'Sustainability',
+    'Finance',
+    'Health',
+    'Education',
+    'Gaming',
+    'Robotics',
+    'Marketing',
+    'Blockchain',
+    'Design',
+    'Data Science',
   ];
 
   const combinedData = useMemo(() => {
-    const validPosts = myPosts.filter(post =>
-      post && (post.image_url || post.media_url) &&
-      !String(post.image_url || post.media_url).includes('undefined')
+    const validPosts = myPosts.filter(
+      (post) =>
+        post &&
+        (post.image_url || post.media_url) &&
+        !String(post.image_url || post.media_url).includes('undefined')
     );
     return [...validPosts, ...users];
   }, [myPosts, users]);
 
-  const loadUsers = useCallback(async (refresh = false) => {
-    try {
-      setLoading(true);
-      const response = await axios.get(`https://randomuser.me/api?results=10&page=${currentPage}`);
-      if (refresh) {
-        setUsers(response.data.results);
-      } else {
-        setUsers(prev => [...prev, ...response.data.results]);
+  const loadUsers = useCallback(
+    async (refresh = false) => {
+      try {
+        setLoading(true);
+        const response = await axios.get(`https://randomuser.me/api?results=10&page=${currentPage}`);
+        if (refresh) {
+          setUsers(response.data.results);
+        } else {
+          setUsers((prev) => [...prev, ...response.data.results]);
+        }
+      } catch (error) {
+        console.error('Error loading users:', error);
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
       }
-    } catch (error) {
-      console.error('Error loading users:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [currentPage]);
+    },
+    [currentPage]
+  );
 
   const fetchAllPosts = useCallback(async () => {
     try {
       setPostsError(null);
-      const token = await AsyncStorage.getItem("token");
+      const token = await AsyncStorage.getItem('token');
       const baseUrl = NGROK_URL.replace(/\/+$/, '');
       const response = await axios.get(`${baseUrl}/api/posts/all`, {
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        }
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
       });
       if (response.data && Array.isArray(response.data)) {
-        const mappedPosts = response.data.map(post => ({
+        const mappedPosts = response.data.map((post) => ({
           _id: post.post_id,
           post_id: post.post_id,
           username: post.username,
@@ -512,10 +539,10 @@ export default function HomeScreen() {
           created_at: post.created_at,
           likes: post.like_count || 0,
           comments: post.comment_count || 0,
-          caption: post.content
+          caption: post.content,
         }));
         const sortedPosts = mappedPosts
-          .filter(post => post.image_url && !post.image_url.includes('undefined'))
+          .filter((post) => post.image_url && !post.image_url.includes('undefined'))
           .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
         setMyPosts(sortedPosts);
       }
@@ -525,36 +552,13 @@ export default function HomeScreen() {
     }
   }, []);
 
-  const searchUsers = useCallback(debounce(async (query) => {
-    if (!query) {
-      setSearchResults([]);
-      return;
-    }
-    try {
-      const token = await AsyncStorage.getItem("token");
-      const baseUrl = NGROK_URL.replace(/\/+$/, '');
-      const response = await axios.get(`${baseUrl}/api/auth/search-users`, {
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        params: { q: query }
-      });
-      console.log("Search results:", response.data);
-      setSearchResults(response.data);
-    } catch (error) {
-      console.error('Error searching users:', error);
-      setSearchResults([]);
-    }
-  }, 300), []);
-
   useEffect(() => {
     loadUsers();
     fetchAllPosts();
   }, [currentPage]);
 
   const onRefresh = useCallback(() => {
-    console.log("🔄 Refresh triggered...");
+    console.log('🔄 Refresh triggered...');
     setRefreshing(true);
     setCurrentPage(1);
     loadUsers(true);
@@ -562,25 +566,26 @@ export default function HomeScreen() {
   }, []);
 
   const toggleExpand = useCallback((index) => {
-    setExpandedItems(prev => ({ ...prev, [index]: !prev[index] }));
+    setExpandedItems((prev) => ({ ...prev, [index]: !prev[index] }));
   }, []);
 
-  const renderFooter = () => loading && (
-    <View style={styles.loaderContainer}>
-      <ActivityIndicator size="large" color="#007AFF" />
-    </View>
-  );
+  const renderFooter = () =>
+    loading && (
+      <View style={styles.loaderContainer}>
+        <ActivityIndicator size="large" color="#007AFF" />
+      </View>
+    );
 
   const fetchUserData = useCallback(async () => {
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await AsyncStorage.getItem('token');
       if (!token) return;
       const baseUrl = NGROK_URL.replace(/\/+$/, '');
       const response = await fetch(`${baseUrl}/api/auth/profile`, {
-        method: "GET",
+        method: 'GET',
         headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json"
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
       });
       if (response.ok) {
@@ -588,7 +593,7 @@ export default function HomeScreen() {
         setUserData(data);
       }
     } catch (error) {
-      console.error("Error fetching user data:", error);
+      console.error('Error fetching user data:', error);
     }
   }, []);
 
@@ -596,9 +601,11 @@ export default function HomeScreen() {
     fetchUserData();
   }, []);
 
-  useFocusEffect(useCallback(() => {
-    fetchUserData();
-  }, [fetchUserData]));
+  useFocusEffect(
+    useCallback(() => {
+      fetchUserData();
+    }, [fetchUserData])
+  );
 
   const keyExtractor = useCallback((item, index) => {
     if (item.post_id) return `post-${item.post_id}`;
@@ -607,61 +614,14 @@ export default function HomeScreen() {
   }, []);
 
   const toggleField = (field) => {
-    setSelectedFields(current =>
-      current.includes(field)
-        ? current.filter(item => item !== field)
-        : [...current, field]
+    setSelectedFields((current) =>
+      current.includes(field) ? current.filter((item) => item !== field) : [...current, field]
     );
   };
 
-  const renderFieldBubble = ({ item }) => (
-    <TouchableOpacity
-      style={[
-        styles.fieldBubble,
-        selectedFields.includes(item) && styles.selectedFieldBubble
-      ]}
-      onPress={() => toggleField(item)}
-    >
-      <Text style={styles.fieldBubbleText}>{item}</Text>
-    </TouchableOpacity>
-  );
-
   const handleSearchFocus = () => {
-    setIsSearchActive(true);
+    navigation.navigate('Search');
   };
-
-  const handleSearchBlur = () => {
-    setTimeout(() => setIsSearchActive(false), 200);
-  };
-
-  const handleSearchChange = (text) => {
-    setSearchQuery(text);
-    searchUsers(text);
-  };
-
-  const handleUserPress = (username) => {
-    console.log("User pressed:", username);
-    setSearchQuery('');
-    setSearchResults([]);
-    setIsSearchActive(false);
-    navigation.navigate('Profile', { username, isOtherUser: true });
-    console.log("Navigation triggered to Profile with:", { username, isOtherUser: true });
-  };
-
-  const renderSearchResult = ({ item }) => (
-    <TouchableOpacity
-      style={styles.searchResultItem}
-      onPress={() => handleUserPress(item.username)}
-    >
-      <Image
-        source={
-          item.profile_picture ? { uri: item.profile_picture } : require('../assets/del.png')
-        }
-        style={styles.searchAvatar}
-      />
-      <Text style={styles.searchUsername}>{item.username}</Text>
-    </TouchableOpacity>
-  );
 
   return (
     <View style={styles.container}>
@@ -682,20 +642,9 @@ export default function HomeScreen() {
             style={styles.searchBar}
             placeholder="Search..."
             placeholderTextColor="#aaa"
-            value={searchQuery}
-            onChangeText={handleSearchChange}
             onFocus={handleSearchFocus}
-            onBlur={handleSearchBlur}
+            editable={true}
           />
-          {isSearchActive && searchResults.length > 0 && (
-            <FlatList
-              data={searchResults}
-              renderItem={renderSearchResult}
-              keyExtractor={(item) => item.user_id.toString()}
-              style={styles.searchResultsList}
-              keyboardShouldPersistTaps="handled"
-            />
-          )}
         </View>
 
         <View style={styles.iconsContainer}>
@@ -703,7 +652,10 @@ export default function HomeScreen() {
             <Image source={require('../assets/Arrow.png')} style={styles.chatIcon} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.iconSpacing} onPress={() => setFieldsModalVisible(true)}>
+          <TouchableOpacity
+            style={styles.iconSpacing}
+            onPress={() => setFieldsModalVisible(true)}
+          >
             <Image source={require('../assets/options.png')} style={styles.filterIcon} />
           </TouchableOpacity>
         </View>
@@ -724,7 +676,7 @@ export default function HomeScreen() {
             />
           )}
           keyExtractor={keyExtractor}
-          onEndReached={() => setCurrentPage(prev => prev + 1)}
+          onEndReached={() => setCurrentPage((prev) => prev + 1)}
           onEndReachedThreshold={0.5}
           ListFooterComponent={renderFooter}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
@@ -748,7 +700,7 @@ export default function HomeScreen() {
                 key={field}
                 style={[
                   styles.fieldBubble,
-                  selectedFields.includes(field) && styles.selectedFieldBubble
+                  selectedFields.includes(field) && styles.selectedFieldBubble,
                 ]}
                 onPress={() => toggleField(field)}
               >
@@ -764,7 +716,6 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
       </Modal>
-
     </View>
   );
 }
@@ -776,7 +727,7 @@ const styles = StyleSheet.create({
   },
   topBar: {
     flexDirection: 'row',
-    marginTop: Platform.OS === 'ios' ? 37: 0,
+    marginTop: Platform.OS === 'ios' ? 37 : 0,
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
@@ -791,12 +742,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   iconSpacing: {
-    marginLeft: 20,  // Add spacing between icons
+    marginLeft: 20,
   },
   profilePic: {
     width: 40,
     height: 40,
-    borderRadius: 20
+    borderRadius: 20,
   },
   searchContainer: {
     flex: 1,
@@ -804,51 +755,19 @@ const styles = StyleSheet.create({
     marginHorizontal: 10,
   },
   searchBar: {
-    width: '100%',  // Changed from 55% to 100%
+    width: '100%',
     paddingHorizontal: 15,
     backgroundColor: '#eee',
     borderRadius: 20,
     height: 40,
   },
-  searchResultsList: {
-    position: 'absolute',
-    top: 45,
-    left: 0,
-    right: 0,
-    backgroundColor: '#fff',
-    borderRadius: 5,
-    maxHeight: 200,
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    zIndex: 10,
-  },
-  searchResultItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  searchAvatar: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    marginRight: 10,
-  },
-  searchUsername: {
-    fontSize: 16,
-    color: '#212529',
-  },
   chatIcon: {
     width: 24,
-    height: 24
+    height: 24,
   },
   filterIcon: {
     width: 24,
-    height: 24
+    height: 24,
   },
   card: {
     backgroundColor: '#fff',
@@ -961,7 +880,6 @@ const styles = StyleSheet.create({
     color: '#868E96',
     marginTop: 4,
   },
-
   listContentContainer: {
     paddingBottom: 8,
   },
@@ -991,7 +909,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: '50%',
     left: '50%',
-    transform: [{ translateX: -12 }, { translateY: -12 }]
+    transform: [{ translateX: -12 }, { translateY: -12 }],
   },
   modal: {
     justifyContent: 'center',
