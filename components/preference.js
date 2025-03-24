@@ -9,7 +9,6 @@ const Signup = () => {
     const route = useRoute();
 
     React.useEffect(() => {
-        // Verify userId exists when component mounts
         const checkUserId = async () => {
             try {
                 const userId = await AsyncStorage.getItem('userId');
@@ -35,43 +34,41 @@ const Signup = () => {
     const handlePersonalAccount = async () => {
         try {
             const userId = await AsyncStorage.getItem('userId');
-            console.log("UserId from AsyncStorage:", userId);
             if (!userId) {
                 Alert.alert("Error", "User session not found. Please try again.");
                 return;
             }
-    
+
             const requestBody = {
                 step: 4,
                 data: {
-                    preference: "personal", // Use "personal" or "business" as a string
+                    preference: "personal",
                     userId: parseInt(userId),
                 },
             };
-            
-            console.log("Request Body:", requestBody);
-    
+
+            console.log("Personal Account Request:", requestBody);
+
             const response = await fetch(`${NGROK_URL}/api/auth/save-user-details`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(requestBody),
             });
-    
+
             const result = await response.json();
-            console.log("Response from server:", result);
-    
+            console.log("Server Response:", result);
+
             if (response.ok) {
                 navigation.navigate("handlePersonal");
             } else {
-                Alert.alert("Error", result.message || "Failed to save preference. Please try again.");
+                Alert.alert("Error", result.message || "Failed to save preference.");
             }
         } catch (error) {
             console.error("Error in handlePersonalAccount:", error);
             Alert.alert("Error", "Something went wrong. Please try again.");
         }
     };
-    
-    
+
     const handleBusinessAccount = async () => {
         try {
             const userId = await AsyncStorage.getItem('userId');
@@ -79,24 +76,30 @@ const Signup = () => {
                 Alert.alert("Error", "User session not found. Please try again.");
                 return;
             }
-    
+
+            const requestBody = {
+                step: 4,
+                data: {
+                    preference: "business",
+                    userId: parseInt(userId),
+                },
+            };
+
+            console.log("Business Account Request:", requestBody);
+
             const response = await fetch(`${NGROK_URL}/api/auth/save-user-details`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    step: 4,
-                    data: {
-                        preference: 2,  // Changed to numeric value: 2 for business
-                        userId: parseInt(userId)
-                    },
-                }),
+                body: JSON.stringify(requestBody),
             });
-    
+
+            const result = await response.json();
+            console.log("Server Response:", result);
+
             if (response.ok) {
                 navigation.navigate("handleBusiness");
             } else {
-                const result = await response.json();
-                Alert.alert("Error", result.message || "Failed to save preference. Please try again.");
+                Alert.alert("Error", result.message || "Failed to save preference.");
             }
         } catch (error) {
             console.error("Error in handleBusinessAccount:", error);
@@ -205,21 +208,6 @@ const styles = StyleSheet.create({
         color: "#000",
         fontFamily: "Avenir Next Cyr",
         fontWeight: "700",
-    },
-    nextButton: {
-        backgroundColor: "#535353",
-        borderRadius: 21,
-        width: 82,
-        height: 42,
-        justifyContent: "center",
-        alignItems: "center",
-        marginTop: "auto",
-        marginBottom: 140,
-    },
-    nextButtonText: {
-        fontSize: 15,
-        color: "#fff",
-        fontFamily: "Avenir Next",
     },
 });
 

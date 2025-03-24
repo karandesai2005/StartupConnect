@@ -1,57 +1,71 @@
 import * as React from "react";
 import { Text, StyleSheet, View, TextInput, Pressable } from "react-native";
 import { useNavigation } from '@react-navigation/native';
-import field from '../../field';
 
-
-
-const Signup = () => {
-    const [name, setName] = React.useState("");
+const SetupBusinessProfile = () => {
+    const [companyName, setCompanyName] = React.useState("");
     const navigation = useNavigation();
     
     const handleBack = () => {
         navigation.goBack();
     };
     
-    const nxtpage = () => {
-        navigation.navigate("field");
+    const handleNext = () => {
+        if (!companyName.trim()) {
+            Alert.alert("Error", "Please enter your company's name");
+            return;
+        }
+        // Here you might want to save the company name to AsyncStorage or send it to your backend
+        navigation.navigate("field"); // Assuming "field" is your next screen
     };
 
     return (
-        <View style={styles.signup5}>
+        <View style={styles.container}>
+            <Pressable style={styles.backButton} onPress={handleBack}>
+                <Text style={styles.backButtonText}>←</Text>
+            </Pressable>
+
             <Text style={[styles.createAccount, styles.centeredText]}>Create account</Text>
-            <Text style={[styles.whatsYourName, styles.centeredText]}>What’s your Company's name?</Text>
+            <Text style={[styles.whatsYourName, styles.centeredText]}>
+                What’s your company's name?
+            </Text>
 
             <TextInput
                 style={styles.textInput}
-                placeholder="Enter your Company's name"
-                value={name}
-                onChangeText={(text) => setName(text)}
+                placeholder="Enter your company's name"
+                value={companyName}
+                onChangeText={(text) => setCompanyName(text)}
             />
 
-            <Pressable style={styles.signupButton} onPress={nxtpage}>
-                <Text style={styles.signupButtonText}>Create an account</Text>
+            <Pressable style={styles.signupButton} onPress={handleNext}>
+                <Text style={styles.signupButtonText}>Next</Text>
             </Pressable>
 
-            {/* <Image source={require("../assets/create-watch-face.png")} style={styles.imageIcon} /> */}
-            {/* <Image source={require("../assets/line-1.png")} style={styles.imageIconLine} /> */}
-
-            <Text style={styles.byTappingOn}>
-                {`By tapping on “Create account”, you agree to the Pitch Terms of Use.\n\nTo learn more about how Pitch collects, uses, shares, and protects your personal data, please see the Pitch Privacy Policy.`}
+            <Text style={styles.termsText}>
+                {`By tapping "Next", you agree to the Pitch Terms of Use.\n\nTo learn more about how Pitch collects, uses, shares, and protects your personal data, please see the Pitch Privacy Policy.`}
             </Text>
-            <Text style={[styles.privacyPolicy, styles.termsText]}>Privacy Policy</Text>
-            <Text style={[styles.termsOfUse, styles.termsText]}>Terms of Use</Text>
+            <Text style={[styles.privacyPolicy, styles.linkText]}>Privacy Policy</Text>
+            <Text style={[styles.termsOfUse, styles.linkText]}>Terms of Use</Text>
         </View>
     );
 };
 
 const styles = StyleSheet.create({
-    signup5: {
+    container: {
         flex: 1,
         backgroundColor: "#fff",
         justifyContent: "center",
         alignItems: "center",
         padding: 20,
+    },
+    backButton: {
+        position: "absolute",
+        left: 20,
+        top: 40,
+    },
+    backButtonText: {
+        fontSize: 32,
+        color: "#000",
     },
     centeredText: {
         textAlign: "center",
@@ -91,19 +105,7 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: "600",
     },
-    imageIcon: {
-        width: 100,
-        height: 100,
-        resizeMode: "contain",
-        marginBottom: 20,
-    },
-    imageIconLine: {
-        width: "100%",
-        height: 2,
-        backgroundColor: "#ccc",
-        marginBottom: 20,
-    },
-    byTappingOn: {
+    termsText: {
         fontSize: 12,
         color: "#000",
         textAlign: "center",
@@ -120,9 +122,9 @@ const styles = StyleSheet.create({
         fontSize: 12,
         textAlign: "center",
     },
-    termsText: {
+    linkText: {
         fontWeight: "500",
     },
 });
 
-export default Signup;
+export default SetupBusinessProfile;
