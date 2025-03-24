@@ -137,12 +137,9 @@ const profileController = {
     try {
       console.log('=== Fetching Stories ===');
       const userId = req.user?.userId || req.user?.id;
-      console.log('User:', req.user);
-
       if (!userId) {
         return res.status(400).json({ error: 'User ID is required.' });
       }
-
       console.log('Fetching stories for userId:', userId);
       const stories = await Story.findByUserId(userId);
       console.log('Stories fetched:', stories.length);
@@ -186,13 +183,8 @@ const profileController = {
         const username = req.user.username;
         const section = req.body.section || 'default';
 
-        if (!userId) {
-          return res.status(400).json({ error: 'User ID is required.' });
-        }
-
-        if (!req.file) {
-          return res.status(400).json({ error: 'Media file is required.' });
-        }
+        if (!userId) return res.status(400).json({ error: 'User ID is required.' });
+        if (!req.file) return res.status(400).json({ error: 'Media file is required.' });
 
         const imageUrl = `/uploads/posts/${req.file.filename}`;
         const has_story = 1;
@@ -202,11 +194,7 @@ const profileController = {
         const storyId = await Story.create(userId, username, imageUrl, has_story, viewed, section);
         console.log('Story created with ID:', storyId);
 
-        res.status(201).json({
-          story_id: storyId,
-          image_url: imageUrl,
-          section: section,
-        });
+        res.status(201).json({ story_id: storyId, image_url: imageUrl, section });
       } catch (error) {
         console.error('Error in addStory:', error);
         res.status(500).json({ error: 'Server error', details: error.message });
@@ -214,16 +202,34 @@ const profileController = {
     },
   ],
 
-  // Get authenticated user's sections
+  deleteStory: async (req, res) => {
+    try {
+      console.log('=== Deleting Story ===');
+      const userId = req.user?.userId || req.user?.id;
+      const { storyId } = req.params;
+
+      if (!userId) return res.status(400).json({ error: 'User ID is required.' });
+      if (!storyId) return res.status(400).json({ error: 'Story ID is required.' });
+
+      console.log('Deleting story with ID:', storyId, 'for userId:', userId);
+      const deleted = await Story.deleteById(storyId, userId);
+      if (!deleted) {
+        return res.status(404).json({ error: 'Story not found or not authorized.' });
+      }
+
+      console.log('Story deleted successfully');
+      res.status(200).json({ message: 'Story deleted successfully.' });
+    } catch (error) {
+      console.error('Error in deleteStory:', error);
+      res.status(500).json({ error: 'Server error', details: error.message });
+    }
+  },
+
   getSections: async (req, res) => {
     try {
       console.log('=== Fetching Sections ===');
       const userId = req.user?.userId || req.user?.id;
-      console.log('User:', req.user);
-
-      if (!userId) {
-        return res.status(400).json({ error: 'User ID is required.' });
-      }
+      if (!userId) return res.status(400).json({ error: 'User ID is required.' });
 
       console.log('Fetching sections for userId:', userId);
       const sections = await Section.findByUserId(userId);
@@ -265,13 +271,8 @@ const profileController = {
       const userId = req.user?.userId || req.user?.id;
       const { type, title, content, image_uri, section, story } = req.body;
 
-      if (!userId) {
-        return res.status(400).json({ error: 'User ID is required.' });
-      }
-
-      if (!type || !title) {
-        return res.status(400).json({ error: 'Type and title are required.' });
-      }
+      if (!userId) return res.status(400).json({ error: 'User ID is required.' });
+      if (!type || !title) return res.status(400).json({ error: 'Type and title are required.' });
 
       if (type === 'story' && story && section === 'team') {
         // Check if a "Team" section already exists
@@ -310,16 +311,34 @@ const profileController = {
     }
   },
 
-  // Get authenticated user's graphs
+  deleteSection: async (req, res) => {
+    try {
+      console.log('=== Deleting Section ===');
+      const userId = req.user?.userId || req.user?.id;
+      const { sectionId } = req.params;
+
+      if (!userId) return res.status(400).json({ error: 'User ID is required.' });
+      if (!sectionId) return res.status(400).json({ error: 'Section ID is required.' });
+
+      console.log('Deleting section with ID:', sectionId, 'for userId:', userId);
+      const deleted = await Section.deleteById(sectionId, userId);
+      if (!deleted) {
+        return res.status(404).json({ error: 'Section not found or not authorized.' });
+      }
+
+      console.log('Section deleted successfully');
+      res.status(200).json({ message: 'Section deleted successfully.' });
+    } catch (error) {
+      console.error('Error in deleteSection:', error);
+      res.status(500).json({ error: 'Server error', details: error.message });
+    }
+  },
+
   getGraphs: async (req, res) => {
     try {
       console.log('=== Fetching Graphs ===');
       const userId = req.user?.userId || req.user?.id;
-      console.log('User:', req.user);
-
-      if (!userId) {
-        return res.status(400).json({ error: 'User ID is required.' });
-      }
+      if (!userId) return res.status(400).json({ error: 'User ID is required.' });
 
       console.log('Fetching graphs for userId:', userId);
       const graphs = await Graph.findByUserId(userId);
@@ -361,13 +380,8 @@ const profileController = {
       const userId = req.user?.userId || req.user?.id;
       const { type, title, data } = req.body;
 
-      if (!userId) {
-        return res.status(400).json({ error: 'User ID is required.' });
-      }
-
-      if (!type || !title || !data) {
-        return res.status(400).json({ error: 'Type, title, and data are required.' });
-      }
+      if (!userId) return res.status(400).json({ error: 'User ID is required.' });
+      if (!type || !title || !data) return res.status(400).json({ error: 'Type, title, and data are required.' });
 
       console.log('Creating graph:', { userId, type, title, data });
       const graphId = await Graph.create(userId, type, title, data);
@@ -375,6 +389,29 @@ const profileController = {
       res.status(201).json({ graph_id: graphId });
     } catch (error) {
       console.error('Error in addGraph:', error);
+      res.status(500).json({ error: 'Server error', details: error.message });
+    }
+  },
+
+  deleteGraph: async (req, res) => {
+    try {
+      console.log('=== Deleting Graph ===');
+      const userId = req.user?.userId || req.user?.id;
+      const { graphId } = req.params;
+
+      if (!userId) return res.status(400).json({ error: 'User ID is required.' });
+      if (!graphId) return res.status(400).json({ error: 'Graph ID is required.' });
+
+      console.log('Deleting graph with ID:', graphId, 'for userId:', userId);
+      const deleted = await Graph.deleteById(graphId, userId);
+      if (!deleted) {
+        return res.status(404).json({ error: 'Graph not found or not authorized.' });
+      }
+
+      console.log('Graph deleted successfully');
+      res.status(200).json({ message: 'Graph deleted successfully.' });
+    } catch (error) {
+      console.error('Error in deleteGraph:', error);
       res.status(500).json({ error: 'Server error', details: error.message });
     }
   },

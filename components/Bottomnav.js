@@ -6,6 +6,7 @@ import CreatePostScreen from '../components/CreatePostScreen';
 import Events from '../components/Events';
 import Settings from '../components/settings';
 
+
 const Tab = createBottomTabNavigator();
 
 export default function Bottomnav() {

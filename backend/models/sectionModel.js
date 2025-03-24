@@ -14,7 +14,12 @@ const Section = {
         .input('imageUri', sql.VarChar, imageUri)
         .input('section', sql.VarChar, section)
         .query(
+<<<<<<< HEAD
           'INSERT INTO dbo.sections (user_id, type, title, content, image_uri, section) VALUES (@userId, @type, @title, @content, @imageUri, @section); SELECT SCOPE_IDENTITY() AS section_id'
+=======
+          'INSERT INTO dbo.sections (user_id, type, title, content, image_uri) VALUES (@userId, @type, @title, @content, @imageUri); ' +
+          'SELECT SCOPE_IDENTITY() AS section_id'
+>>>>>>> aa067c21842c0564d437bbe6af6168e1f03c4bbf
         );
       return result.recordset[0].section_id;
     } catch (error) {
@@ -81,6 +86,24 @@ const Section = {
         .query('SELECT * FROM dbo.sections WHERE user_id = @userId AND section = @section');
       return result.recordset[0]; // Return the first matching section
     } catch (error) {
+      throw error;
+    }
+  },
+
+  async deleteById(sectionId, userId) {
+    try {
+      const pool = await connectDB();
+      const request = pool.request();
+      const result = await request
+        .input('sectionId', sql.Int, sectionId)
+        .input('userId', sql.Int, userId)
+        .query(
+          'DELETE FROM dbo.sections WHERE section_id = @sectionId AND user_id = @userId; ' +
+          'SELECT @@ROWCOUNT AS deleted'
+        );
+      return result.recordset[0].deleted > 0;
+    } catch (error) {
+      console.error('Error deleting section:', error.message);
       throw error;
     }
   },

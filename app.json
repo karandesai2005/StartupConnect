@@ -16,7 +16,10 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.croww.StartupConnect",
       "infoPlist": {
-        "UIBackgroundModes": ["remote-notification"]
+        "UIBackgroundModes": [
+          "remote-notification",
+          "remote-notification"
+        ]
       }
     },
     "android": {
@@ -27,6 +30,11 @@
       "package": "com.croww.StartupConnect",
       "versionCode": 1,
       "permissions": [
+        "CAMERA",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "READ_EXTERNAL_STORAGE",
+        "NOTIFICATIONS",
         "CAMERA",
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
@@ -60,6 +68,12 @@
       ],
       "./plugins/withFirebaseNotificationColorFix"
     ],
-    "owner": "startupconnectteam"
+    "owner": "startupconnectteam",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/8eba90f6-1cae-4a59-9c56-f5f3c265103b"
+    }
   }
 }

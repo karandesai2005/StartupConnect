@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect } from "react";
 import {
+  Platform,
   StyleSheet,
   View,
   Text,
@@ -12,6 +13,7 @@ import {
   TextInput,
   Dimensions,
   FlatList,
+  Alert,
 } from "react-native";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -20,64 +22,83 @@ import { BarChart, PieChart, LineChart } from "react-native-gifted-charts";
 import { Video } from "expo-av";
 import DynamicGraphs from "./DynamicGraphs";
 import * as ImagePicker from "expo-image-picker";
-import PropTypes from "prop-types";
 
-// StoryItem Component
-const StoryItem = React.memo(({ story, onPress, isAddButton }) => {
+// Delete Button Component
+const DeleteButton = ({ onDelete }) => (
+  <TouchableOpacity 
+    style={styles.deleteButton}
+    onPress={() => {
+      Alert.alert(
+        "Confirm Delete",
+        "Are you sure you want to delete this item?",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Delete", onPress: onDelete, style: "destructive" }
+        ]
+      );
+    }}
+  >
+    <Image 
+      source={require('../../../assets/Arrow.png')} 
+      style={styles.deleteIcon}
+    />
+  </TouchableOpacity>
+);
+
+const StoryItem = React.memo(({ story, onPress, isAddButton, onDelete }) => {
   const imageSource = isAddButton
     ? require("../../../assets/del.png")
     : story.image_url
-    ? { uri: story.image_url }
-    : require("../../../assets/del.png");
+      ? { uri: story.image_url }
+      : require("../../../assets/del.png");
 
   return (
-    <TouchableOpacity onPress={onPress} style={styles.storyItem} activeOpacity={0.7}>
-      <View
-        style={[
-          styles.storyRing,
-          { borderColor: story.viewed ? "#8e8e8e" : "#1f219c" },
-          story.has_story && styles.activeStoryRing,
-          isAddButton && { borderWidth: 0 },
-        ]}
+    <View style={styles.storyItemContainer}>
+      <TouchableOpacity
+        onPress={onPress}
+        style={styles.storyItem}
+        activeOpacity={0.7}
       >
-        <View style={styles.storyImageContainer}>
-          {isAddButton ? (
-            <Text style={styles.addStoryText}>+</Text>
-          ) : (
-            <Image
-              source={imageSource}
-              style={styles.storyImage}
-              resizeMode="cover"
-              defaultSource={require("../../../assets/del.png")}
-            />
-          )}
-          {story.has_story && !story.viewed && !isAddButton && (
-            <View style={styles.unreadIndicator} />
-          )}
+        <View
+          style={[
+            styles.storyRing,
+            { borderColor: story.viewed ? "#8e8e8e" : "#1f219c" },
+            story.has_story && styles.activeStoryRing,
+            isAddButton && { borderWidth: 0 },
+          ]}
+        >
+          <View style={styles.storyImageContainer}>
+            {isAddButton ? (
+              <Text style={styles.addStoryText}>+</Text>
+            ) : (
+              <Image
+                source={imageSource}
+                style={styles.storyImage}
+                resizeMode="cover"
+                defaultSource={require("../../../assets/del.png")}
+              />
+            )}
+            {story.has_story && !story.viewed && !isAddButton && (
+              <View style={styles.unreadIndicator} />
+            )}
+          </View>
         </View>
-      </View>
-      <Text style={styles.storyUsername} numberOfLines={1}>
-        {isAddButton ? "Add Story" : story.username}
-      </Text>
-    </TouchableOpacity>
+        <Text style={styles.storyUsername} numberOfLines={1}>
+          {isAddButton ? "Add Story" : story.username}
+        </Text>
+      </TouchableOpacity>
+      {!isAddButton && <DeleteButton onDelete={onDelete} />}
+    </View>
   );
 });
 
-StoryItem.propTypes = {
-  story: PropTypes.object.isRequired,
-  onPress: PropTypes.func.isRequired,
-  isAddButton: PropTypes.bool,
-};
-
-// Stories Component
-const Stories = React.memo(({ stories, onStoryPress, onAddStory, title, sectionId, isOwnProfile }) => {
-  const addStoryItem = {
-    id: "add",
-    username: "Add Story",
-    has_story: false,
-    viewed: false,
-  };
+const Stories = React.memo(({ stories, onStoryPress, onAddStory, title, sectionId, fetchWithAuth }) => {
+  const addStoryItem = { id: "add", username: "Add Story", has_story: false, viewed: false };
   const filteredStories = stories.filter((story) => story.section === sectionId);
+
+  const handleDeleteStory = async (storyId) => {
+    await fetchWithAuth(`/stories/${storyId}`, "DELETE");
+  };
 
   return (
     <View style={styles.sectionContainer}>
@@ -89,14 +110,17 @@ const Stories = React.memo(({ stories, onStoryPress, onAddStory, title, sectionI
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.storiesContainer}
       >
-        {isOwnProfile && (
-          <StoryItem story={addStoryItem} onPress={() => onAddStory(sectionId)} isAddButton />
-        )}
+        <StoryItem
+          story={addStoryItem}
+          onPress={() => onAddStory(sectionId)}
+          isAddButton={true}
+        />
         {filteredStories.map((story, index) => (
           <StoryItem
             key={story.story_id}
             story={story}
             onPress={() => onStoryPress(story, index)}
+            onDelete={() => handleDeleteStory(story.story_id)}
           />
         ))}
       </ScrollView>
@@ -105,20 +129,13 @@ const Stories = React.memo(({ stories, onStoryPress, onAddStory, title, sectionI
   );
 });
 
-Stories.propTypes = {
-  stories: PropTypes.array.isRequired,
-  onStoryPress: PropTypes.func.isRequired,
-  onAddStory: PropTypes.func.isRequired,
-  title: PropTypes.string.isRequired,
-  sectionId: PropTypes.string.isRequired,
-  isOwnProfile: PropTypes.bool.isRequired,
-};
-
-// ImageSection Component
-const ImageSection = ({ title, imageUri }) => (
+const ImageSection = ({ title, imageUri, onDelete }) => (
   <View style={styles.sectionContainer}>
     <View style={styles.divider} />
-    <Text style={styles.sectionHeader}>{title}</Text>
+    <View style={styles.sectionHeaderContainer}>
+      <Text style={styles.sectionHeader}>{title}</Text>
+      <DeleteButton onDelete={onDelete} />
+    </View>
     <View style={styles.divider} />
     {imageUri ? (
       <Image
@@ -134,28 +151,19 @@ const ImageSection = ({ title, imageUri }) => (
   </View>
 );
 
-ImageSection.propTypes = {
-  title: PropTypes.string.isRequired,
-  imageUri: PropTypes.string,
-};
-
-// TextSection Component
-const TextSection = ({ title, content }) => (
+const TextSection = ({ title, content, onDelete }) => (
   <View style={styles.sectionContainer}>
     <View style={styles.divider} />
-    <Text style={styles.sectionHeader}>{title}</Text>
+    <View style={styles.sectionHeaderContainer}>
+      <Text style={styles.sectionHeader}>{title}</Text>
+      <DeleteButton onDelete={onDelete} />
+    </View>
     <View style={styles.divider} />
     <Text style={styles.sectionContent}>{content}</Text>
     <View style={styles.divider} />
   </View>
 );
 
-TextSection.propTypes = {
-  title: PropTypes.string.isRequired,
-  content: PropTypes.string.isRequired,
-};
-
-// LinkSection Component
 const LinkSection = ({ title, linkType, onPress }) => (
   <View style={styles.sectionContainer}>
     <View style={styles.divider} />
@@ -166,22 +174,15 @@ const LinkSection = ({ title, linkType, onPress }) => (
         {linkType === "team"
           ? "View Team Profiles"
           : linkType === "startups"
-          ? "View Startup Profiles"
-          : "View Startup Profile"}
+            ? "View Startup Profiles"
+            : "View Startup Profile"}
       </Text>
     </TouchableOpacity>
     <View style={styles.divider} />
   </View>
 );
 
-LinkSection.propTypes = {
-  title: PropTypes.string.isRequired,
-  linkType: PropTypes.string.isRequired,
-  onPress: PropTypes.func.isRequired,
-};
-
-// Profile Component
-const Profile = ({ route }) => {
+const Profile = ({ route, isBusinessProfile = false }) => {
   const navigation = useNavigation();
   const [userData, setUserData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -203,16 +204,13 @@ const Profile = ({ route }) => {
   const [networkError, setNetworkError] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
 
-  const isOwnProfile = !route.params?.isOtherUser;
-  const { username } = route.params || {};
-
   const sectionMap = {
     "Our Journey": "milestones",
     "Key Metrics": "metrics",
     "Updates": "updates",
-    Team: "team",
-    Startups: "startups",
-    Startup: "startup",
+    "Team": "team",
+    "Startups": "startups",
+    "Startup": "startup",
   };
 
   const fetchWithAuth = async (endpoint, method = "GET", body = null) => {
@@ -222,7 +220,9 @@ const Profile = ({ route }) => {
       return null;
     }
     try {
-      const url = `${NGROK_URL}/api/profile${endpoint}`;
+      const baseUrl = NGROK_URL.endsWith("/") ? NGROK_URL.slice(0, -1) : NGROK_URL;
+      const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+      const url = `${baseUrl}/api/profile${cleanEndpoint}`;
       const response = await fetch(url, {
         method,
         headers: {
@@ -233,31 +233,33 @@ const Profile = ({ route }) => {
       });
 
       if (!response.ok) {
-        if (response.status === 401) navigation.navigate("Login");
+        if (response.status === 401) {
+          navigation.navigate("Login");
+          return null;
+        }
         throw new Error(`Failed to fetch ${endpoint}: ${response.status}`);
       }
+
       return await response.json();
     } catch (error) {
-      setNetworkError(true);
       console.error(`Error fetching ${endpoint}:`, error);
+      setNetworkError(true);
       return null;
     }
   };
 
   const loadCachedData = async () => {
     try {
-      const keys = ["userData", "userPosts", "stories", "sections", "userGraphs"];
-      const cachedData = await Promise.all(
-        keys.map((key) => AsyncStorage.getItem(`${key}_${isOwnProfile ? "self" : username}`).then((data) => [key, data]))
-      );
-      const parsedData = Object.fromEntries(
-        cachedData.map(([key, value]) => [key, value ? JSON.parse(value) : null])
-      );
-      setUserData(parsedData.userData);
-      setUserPosts(parsedData.userPosts || []);
-      setStories(parsedData.stories || []);
-      setSections(parsedData.sections || []);
-      setUserGraphs(parsedData.userGraphs || []);
+      const cachedUserData = await AsyncStorage.getItem("userData");
+      if (cachedUserData) setUserData(JSON.parse(cachedUserData));
+      const cachedPosts = await AsyncStorage.getItem("userPosts");
+      if (cachedPosts) setUserPosts(JSON.parse(cachedPosts));
+      const cachedStories = await AsyncStorage.getItem("stories");
+      if (cachedStories) setStories(JSON.parse(cachedStories));
+      const cachedSections = await AsyncStorage.getItem("sections");
+      if (cachedSections) setSections(JSON.parse(cachedSections));
+      const cachedGraphs = await AsyncStorage.getItem("userGraphs");
+      if (cachedGraphs) setUserGraphs(JSON.parse(cachedGraphs));
     } catch (error) {
       console.error("Error loading cached data:", error);
     }
@@ -269,14 +271,17 @@ const Profile = ({ route }) => {
       navigation.navigate("Login");
       return;
     }
-    const endpoint = isOwnProfile
-      ? `${NGROK_URL}/api/auth/profile?timestamp=${Date.now()}`
-      : `${NGROK_URL}/api/profile/user/${username}`; // Updated to match backend route
+    const { username, isOtherUser } = route.params || {};
+    const endpoint = isOtherUser && username
+      ? `${NGROK_URL}/api/auth/users/${username}`
+      : `${NGROK_URL}/api/auth/profile?timestamp=${Date.now()}`;
     const response = await fetch(endpoint, {
+      method: "GET",
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
         "Cache-Control": "no-cache",
+        Pragma: "no-cache",
       },
     });
     if (response.ok) {
@@ -284,50 +289,55 @@ const Profile = ({ route }) => {
       setUserData(data);
       setIsFollowing(data.isFollowing || false);
       setLastUpdate(Date.now());
-      await AsyncStorage.setItem(`userData_${isOwnProfile ? "self" : username}`, JSON.stringify(data));
+      await AsyncStorage.setItem("userData", JSON.stringify(data));
       setNetworkError(false);
     } else {
-      throw new Error(`Failed to fetch user data: ${response.status}`);
+      throw new Error("Failed to fetch user data");
     }
   };
 
   const fetchUserPosts = async () => {
     const token = await AsyncStorage.getItem("token");
     if (!token) return;
-    const endpoint = isOwnProfile
-      ? `${NGROK_URL}/api/posts/myposts`
-      : `${NGROK_URL}/api/profile/posts/user/${username}`;
-    const response = await fetch(endpoint, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-    });
-    if (response.ok) {
-      const data = await response.json();
-      const mappedPosts = data
-        .map((post) => ({
-          _id: post.post_id,
-          username: post.username,
-          profile_picture: post.profile_picture,
-          image_url: post.media_url,
-          content: post.content,
-          created_at: post.created_at,
-          likes: post.like_count || 0,
-          comments: 0,
-          caption: post.content,
-          media_type: post.media_type || (post.media_url?.includes(".mp4") ? "video" : "image"),
-        }))
-        .filter((post) => post.image_url && !post.image_url.includes("undefined"))
-        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-      setUserPosts(mappedPosts);
-      await AsyncStorage.setItem(`userPosts_${isOwnProfile ? "self" : username}`, JSON.stringify(mappedPosts));
+    const { username } = route.params || {};
+    const endpoint = username
+      ? `${NGROK_URL}/api/profile/posts/user/${username}`
+      : `${NGROK_URL}/api/posts/myposts`;
+    try {
+      const response = await fetch(endpoint, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const mappedPosts = data
+          .map((post) => ({
+            _id: post.post_id,
+            username: post.username,
+            profile_picture: post.profile_picture,
+            image_url: post.media_url,
+            content: post.content,
+            created_at: post.created_at,
+            likes: post.like_count || 0,
+            comments: 0,
+            caption: post.content,
+            media_type: post.media_type || (post.media_url?.includes(".mp4") ? "video" : "image"),
+          }))
+          .filter((post) => post.image_url && !post.image_url.includes("undefined"))
+          .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        setUserPosts(mappedPosts);
+        await AsyncStorage.setItem("userPosts", JSON.stringify(mappedPosts));
+      }
+    } catch (error) {
+      console.error("Error in fetchUserPosts:", error.message);
     }
   };
 
   const fetchStories = async () => {
-    const endpoint = isOwnProfile ? "/stories" : `/stories/user/${username}`;
-    const storiesData = await fetchWithAuth(endpoint);
+    const storiesData = await fetchWithAuth("/stories");
     if (storiesData) {
       const validStories = storiesData.map((story) => ({
         story_id: story.story_id,
@@ -341,25 +351,23 @@ const Profile = ({ route }) => {
         section: story.section || "milestones",
       }));
       setStories(validStories);
-      await AsyncStorage.setItem(`stories_${isOwnProfile ? "self" : username}`, JSON.stringify(validStories));
+      await AsyncStorage.setItem("stories", JSON.stringify(validStories));
     }
   };
 
   const fetchSections = async () => {
-    const endpoint = isOwnProfile ? "/sections" : `/sections/user/${username}`;
-    const sectionsData = await fetchWithAuth(endpoint);
+    const sectionsData = await fetchWithAuth("/sections");
     if (sectionsData) {
       setSections(sectionsData);
-      await AsyncStorage.setItem(`sections_${isOwnProfile ? "self" : username}`, JSON.stringify(sectionsData));
+      await AsyncStorage.setItem("sections", JSON.stringify(sectionsData));
     }
   };
 
   const fetchGraphs = async () => {
-    const endpoint = isOwnProfile ? "/graphs" : `/graphs/user/${username}`;
-    const graphsData = await fetchWithAuth(endpoint);
+    const graphsData = await fetchWithAuth("/graphs");
     if (graphsData) {
       setUserGraphs(graphsData);
-      await AsyncStorage.setItem(`userGraphs_${isOwnProfile ? "self" : username}`, JSON.stringify(graphsData));
+      await AsyncStorage.setItem("userGraphs", JSON.stringify(graphsData));
     }
   };
 
@@ -375,13 +383,13 @@ const Profile = ({ route }) => {
         fetchGraphs(),
       ]);
     } catch (error) {
-      console.error("Error refreshing profile data:", error);
+      console.error("Refresh failed:", error);
       await loadCachedData();
     } finally {
       setIsLoading(false);
       setRefreshing(false);
     }
-  }, [isOwnProfile, username]);
+  }, []);
 
   useEffect(() => {
     if (route.params?.updatedUser) {
@@ -405,7 +413,6 @@ const Profile = ({ route }) => {
   );
 
   const handleAddStory = (sectionId) => {
-    if (!isOwnProfile) return;
     navigation.navigate("AddStory", {
       onStoryAdded: (newStory) => {
         const fullImageUrl = newStory.image_url.startsWith("http")
@@ -430,7 +437,6 @@ const Profile = ({ route }) => {
   };
 
   const handleAddSection = () => {
-    if (!isOwnProfile) return;
     setSectionType(null);
     setSectionTitle("");
     setSectionContent("");
@@ -439,11 +445,9 @@ const Profile = ({ route }) => {
   };
 
   const handleSectionSubmit = async () => {
-    if (!isOwnProfile) return;
     if (!sectionTitle) return alert("Please provide a section title");
     if (sectionType === "text" && !sectionContent) return alert("Please provide section content");
     if (sectionType === "image" && !imageUri) return alert("Please select an image");
-
     const sectionData = {
       type: sectionType,
       title: sectionTitle,
@@ -469,65 +473,32 @@ const Profile = ({ route }) => {
   };
 
   const handleStorySectionSubmit = async (storyType) => {
-    if (!isOwnProfile) return;
-  
-    if (storyType === "team") {
-      // Navigate to SearchScreen and pass a callback to handle the selected team member
-      navigation.navigate("SearchScreen", {
-        onTeamMemberSelected: (selectedUser) => {
-          // Add the selected team member to the stories under the "team" section
-          const newTeamMemberStory = {
-            story_id: `${selectedUser.user_id}-${Date.now()}`, // Unique ID for the story
-            image_url: selectedUser.profile_picture || null,
-            has_story: true,
-            viewed: false,
-            username: selectedUser.username,
-            profile_picture: selectedUser.profile_picture || null,
-            section: "team",
-          };
-  
-          // Update stories state
-          setStories((prev) => [...prev, newTeamMemberStory]);
-  
-          // Optionally, send this to the backend to persist the team member
-          const sectionData = {
-            type: "story",
-            title: "Team",
-            section: "team",
-            story: newTeamMemberStory,
-          };
-          fetchWithAuth("/sections", "POST", sectionData).then(() => {
-            fetchStories(); // Refresh stories from the backend
-            fetchSections(); // Refresh sections from the backend
-          });
-        },
-      });
+    const titles = {
+      team: "Team",
+      startups: "Startups",
+      startup: "Startup",
+    };
+    const sectionData = {
+      type: "story",
+      title: titles[storyType],
+      section: storyType,
+    };
+    const response = await fetchWithAuth("/sections", "POST", sectionData);
+    if (response) {
+      await fetchSections();
       setStorySectionModalVisible(false);
       setSectionModalVisible(false);
       resetSectionModal();
     } else {
-      // Handle other story types (startups, startup) as before
-      const titles = { startups: "Startups", startup: "Startup" };
-      const sectionData = { type: "story", title: titles[storyType], section: storyType };
-      const response = await fetchWithAuth("/sections", "POST", sectionData);
-      if (response) {
-        await fetchSections();
-        setStorySectionModalVisible(false);
-        setSectionModalVisible(false);
-        resetSectionModal();
-      } else {
-        alert("Failed to create story section");
-      }
+      alert("Failed to create story section");
     }
   };
 
   const handleAddLinkSection = () => {
-    if (!isOwnProfile) return;
     setLinkSectionModalVisible(true);
   };
 
   const handleLinkSectionSubmit = async (linkType) => {
-    if (!isOwnProfile) return;
     const sectionData = {
       type: "link",
       title: `${linkType === "team" ? "Team Profiles" : linkType === "startups" ? "Startup Profiles" : "Startup Profile"}`,
@@ -543,16 +514,16 @@ const Profile = ({ route }) => {
   };
 
   const handleSectionNavigation = (linkType) => {
-    const routes = {
-      team: "TeamProfiles",
-      startups: "StartupProfiles",
-      singleStartup: "StartupProfile",
-    };
-    navigation.navigate(routes[linkType]);
+    if (linkType === "team") {
+      navigation.navigate("TeamProfiles");
+    } else if (linkType === "startups") {
+      navigation.navigate("StartupProfiles");
+    } else if (linkType === "singleStartup") {
+      navigation.navigate("StartupProfile");
+    }
   };
 
   const handleAddGraph = async (graphData) => {
-    if (!isOwnProfile) return;
     const response = await fetchWithAuth("/graphs", "POST", graphData);
     if (response) {
       await fetchGraphs();
@@ -562,8 +533,28 @@ const Profile = ({ route }) => {
     }
   };
 
+  const handleDeleteSection = async (sectionId) => {
+    const response = await fetchWithAuth(`/sections/${sectionId}`, "DELETE");
+    if (response) {
+      await fetchSections();
+    }
+  };
+
+  const handleDeleteGraph = async (graphId) => {
+    const response = await fetchWithAuth(`/graphs/${graphId}`, "DELETE");
+    if (response) {
+      await fetchGraphs();
+    }
+  };
+
+  const handleDeletePost = async (postId) => {
+    const response = await fetchWithAuth(`/posts/${postId}`, "DELETE");
+    if (response) {
+      await fetchUserPosts();
+    }
+  };
+
   const pickImage = async () => {
-    if (!isOwnProfile) return;
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
@@ -575,7 +566,10 @@ const Profile = ({ route }) => {
 
   const handleFollow = async () => {
     const token = await AsyncStorage.getItem("token");
-    if (!token) return navigation.navigate("Login");
+    if (!token) {
+      navigation.navigate("Login");
+      return;
+    }
     try {
       const response = await fetch(`${NGROK_URL}/api/profile/follow`, {
         method: "POST",
@@ -587,11 +581,15 @@ const Profile = ({ route }) => {
       });
       if (response.ok) {
         setIsFollowing(true);
-        setUserData((prev) => ({ ...prev, followers: (prev.followers || 0) + 1 }));
+        setUserData((prev) => ({
+          ...prev,
+          followers: (prev.followers || 0) + 1,
+        }));
       } else {
         throw new Error("Failed to follow user");
       }
     } catch (error) {
+      console.error("Follow error:", error);
       alert("Failed to follow user");
     }
   };
@@ -608,7 +606,9 @@ const Profile = ({ route }) => {
       style={[styles.tabButton, activeTab === tabName ? styles.tab1 : styles.tab2]}
       onPress={() => setActiveTab(tabName)}
     >
-      <Text style={activeTab === tabName ? styles.tabs : styles.tabs1}>{label}</Text>
+      <Text style={activeTab === tabName ? styles.tabs : styles.tabs1}>
+        {label}
+      </Text>
     </TouchableOpacity>
   );
 
@@ -626,24 +626,30 @@ const Profile = ({ route }) => {
                 onAddStory={handleAddStory}
                 onStoryPress={(story, index) =>
                   navigation.navigate("ViewStory", {
-                    stories: stories.filter(
-                      (s) =>
-                        s.section ===
-                        (sectionMap[section.title] || section.title.toLowerCase().replace(/ /g, "_"))
-                    ),
+                    stories: stories.filter((s) => s.section === (sectionMap[section.title] || section.title.toLowerCase().replace(/ /g, "_"))),
                     initialIndex: index,
                   })
                 }
-                isOwnProfile={isOwnProfile}
+                fetchWithAuth={fetchWithAuth}
               />
             );
           case "image":
             return (
-              <ImageSection key={section.section_id} title={section.title} imageUri={section.image_uri} />
+              <ImageSection 
+                key={section.section_id} 
+                title={section.title} 
+                imageUri={section.image_uri}
+                onDelete={() => handleDeleteSection(section.section_id)}
+              />
             );
           case "text":
             return (
-              <TextSection key={section.section_id} title={section.title} content={section.content} />
+              <TextSection 
+                key={section.section_id} 
+                title={section.title} 
+                content={section.content}
+                onDelete={() => handleDeleteSection(section.section_id)}
+              />
             );
           case "link":
             return (
@@ -658,17 +664,13 @@ const Profile = ({ route }) => {
             return null;
         }
       })}
-      {isOwnProfile && (
-        <>
-          <TouchableOpacity style={styles.addStorySectionButton} onPress={handleAddSection}>
-            <Text style={styles.addStorySectionText}>+ Add New Section</Text>
-          </TouchableOpacity>
-          {userData?.role === "founder" && (
-            <TouchableOpacity style={styles.addLinkSectionButton} onPress={handleAddLinkSection}>
-              <Text style={styles.addLinkSectionText}>+ Add Link Section</Text>
-            </TouchableOpacity>
-          )}
-        </>
+      <TouchableOpacity style={styles.addStorySectionButton} onPress={handleAddSection}>
+        <Text style={styles.addStorySectionText}>+ Add New Section</Text>
+      </TouchableOpacity>
+      {userData?.role === "founder" && !route.params?.isOtherUser && (
+        <TouchableOpacity style={styles.addLinkSectionButton} onPress={handleAddLinkSection}>
+          <Text style={styles.addLinkSectionText}>+ Add Link Section</Text>
+        </TouchableOpacity>
       )}
     </View>
   );
@@ -677,16 +679,17 @@ const Profile = ({ route }) => {
     <View style={styles.try}>
       {userGraphs.map((graph) => (
         <View key={graph.graph_id} style={styles.cardStyle}>
-          <Text style={styles.graphTitle}>{graph.title}</Text>
+          <View style={styles.graphHeader}>
+            <Text style={styles.graphTitle}>{graph.title}</Text>
+            <DeleteButton onDelete={() => handleDeleteGraph(graph.graph_id)} />
+          </View>
           <View style={styles.graphContainer}>
             {graph.type === "pie" && (
               <PieChart
                 data={graph.data.map((item, i) => ({
                   ...item,
                   color: ["#007bff", "#004999", "#002d5f", "#000000", "#696969"][i % 5],
-                  gradientCenterColor: ["#007bff", "#004999", "#002d5f", "#000000", "#696969"][
-                    (i + 1) % 5
-                  ],
+                  gradientCenterColor: ["#007bff", "#004999", "#002d5f", "#000000", "#696969"][(i + 1) % 5],
                   focused: true,
                 }))}
                 donut
@@ -739,73 +742,76 @@ const Profile = ({ route }) => {
           </View>
         </View>
       ))}
-      {isOwnProfile && (
-        <>
-          <TouchableOpacity style={styles.addGraphButton} onPress={() => setGraphModalVisible(true)}>
-            <Text style={styles.addGraphButtonText}>+ Add New Graph</Text>
-          </TouchableOpacity>
-          <DynamicGraphs
-            visible={isGraphModalVisible}
-            onClose={() => setGraphModalVisible(false)}
-            onAddGraph={handleAddGraph}
-          />
-        </>
-      )}
+      <TouchableOpacity style={styles.addGraphButton} onPress={() => setGraphModalVisible(true)}>
+        <Text style={styles.addGraphButtonText}>+ Add New Graph</Text>
+      </TouchableOpacity>
+      <DynamicGraphs
+        visible={isGraphModalVisible}
+        onClose={() => setGraphModalVisible(false)}
+        onAddGraph={handleAddGraph}
+      />
     </View>
   );
 
   const renderGridItem = ({ item, index }) => {
     const isVideo = item.media_type === "video" || item.image_url?.includes(".mp4");
     return (
-      <TouchableOpacity
-        style={styles.gridItem}
-        onPress={() => navigation.navigate("PostView", { posts: userPosts, initialIndex: index })}
-      >
-        {isVideo ? (
-          <View style={styles.videoContainer}>
-            <Video
-              source={{ uri: item.image_url }}
+      <View style={styles.gridItemContainer}>
+        <TouchableOpacity
+          style={styles.gridItem}
+          onPress={() => navigation.navigate("PostView", { posts: userPosts, initialIndex: index })}
+        >
+          {isVideo ? (
+            <View style={styles.videoContainer}>
+              <Video
+                source={{ uri: item.image_url }}
+                style={styles.gridImage}
+                resizeMode="cover"
+                shouldPlay={false}
+                isMuted
+                useNativeControls={false}
+              />
+              <View style={styles.playIconContainer}>
+                <Text style={styles.playIcon}>▶</Text>
+              </View>
+            </View>
+          ) : (
+            <Image
+              source={item.image_url ? { uri: item.image_url } : require("../../../assets/del.png")}
               style={styles.gridImage}
               resizeMode="cover"
-              shouldPlay={false}
-              isMuted
-              useNativeControls={false}
+              defaultSource={require("../../../assets/del.png")}
             />
-            <View style={styles.playIconContainer}>
-              <Text style={styles.playIcon}>▶</Text>
-            </View>
-          </View>
-        ) : (
-          <Image
-            source={item.image_url ? { uri: item.image_url } : require("../../../assets/del.png")}
-            style={styles.gridImage}
-            resizeMode="cover"
-            defaultSource={require("../../../assets/del.png")}
-          />
-        )}
-      </TouchableOpacity>
+          )}
+        </TouchableOpacity>
+        <DeleteButton onDelete={() => handleDeletePost(item._id)} />
+      </View>
     );
   };
 
-  const renderPostsTab = () => (
-    <FlatList
-      data={userPosts}
-      renderItem={renderGridItem}
-      keyExtractor={(item) => item._id}
-      numColumns={3}
-      contentContainerStyle={styles.gridContainer}
-      columnWrapperStyle={{ gap: 2 }}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refreshProfileData} />}
-      ListEmptyComponent={
+  const renderPostsTab = () => {
+    if (!userPosts || userPosts.length === 0) {
+      return (
         <View style={styles.noPostsContainer}>
           <Text style={styles.noPostsText}>No posts available</Text>
         </View>
-      }
-    />
-  );
+      );
+    }
+    return (
+      <FlatList
+        data={userPosts}
+        renderItem={renderGridItem}
+        keyExtractor={(item) => item._id}
+        numColumns={3}
+        contentContainerStyle={styles.gridContainer}
+        columnWrapperStyle={{ gap: 2 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refreshProfileData} />}
+      />
+    );
+  };
 
   const handleProfileButtonPress = () => {
-    if (isOwnProfile) {
+    if (!route.params?.isOtherUser) {
       navigation.navigate("EditProfilePage", { userData });
     }
   };
@@ -889,14 +895,7 @@ const Profile = ({ route }) => {
             )}
           </View>
           <View style={styles.buttonContainer}>
-            {isOwnProfile ? (
-              <TouchableOpacity
-                style={styles.masterOutlineButton}
-                onPress={handleProfileButtonPress}
-              >
-                <Text style={styles.button}>Edit Profile</Text>
-              </TouchableOpacity>
-            ) : (
+            {route.params?.isOtherUser ? (
               <TouchableOpacity
                 style={[
                   styles.masterOutlineButton,
@@ -908,8 +907,12 @@ const Profile = ({ route }) => {
                   {isFollowing ? "Following" : "Follow"}
                 </Text>
               </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={styles.masterOutlineButton} onPress={handleProfileButtonPress}>
+                <Text style={styles.button}>Edit Profile</Text>
+              </TouchableOpacity>
             )}
-            {!isOwnProfile && userData?.role === "founder" && (
+            {route.params?.isOtherUser && userData?.role === "founder" && (
               <TouchableOpacity
                 style={[styles.masterOutlineButton, { backgroundColor: "#1f219c" }]}
                 onPress={() => navigation.navigate("ConnectInvestor", { user: userData })}
@@ -926,7 +929,7 @@ const Profile = ({ route }) => {
           stories={stories}
           onAddStory={handleAddStory}
           onStoryPress={handleStoryPress}
-          isOwnProfile={isOwnProfile}
+          fetchWithAuth={fetchWithAuth}
         />
 
         <View style={styles.tab}>
@@ -940,296 +943,236 @@ const Profile = ({ route }) => {
         {activeTab === "bucks" && renderPostsTab()}
       </ScrollView>
 
-      {isOwnProfile && (
-        <>
-          <Modal visible={isSectionModalVisible} transparent animationType="slide">
-            <View style={styles.modalOverlay}>
-              <View style={styles.modalContainer}>
-                <Text style={styles.modalTitle}>Add New Section</Text>
-                {!sectionType ? (
-                  <View style={styles.modalOptions}>
-                    <TouchableOpacity
-                      style={styles.modalButton}
-                      onPress={() => {
-                        setSectionType("story");
-                        setStorySectionModalVisible(true);
-                      }}
-                    >
-                      <Text style={styles.modalButtonText}>Story Section</Text>
+      <Modal visible={isSectionModalVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Add New Section</Text>
+            {!sectionType ? (
+              <View style={styles.modalOptions}>
+                <TouchableOpacity
+                  style={styles.modalButton}
+                  onPress={() => {
+                    setSectionType("story");
+                    setStorySectionModalVisible(true);
+                  }}
+                >
+                  <Text style={styles.modalButtonText}>Story Section</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.modalButton} onPress={() => setSectionType("image")}>
+                  <Text style={styles.modalButtonText}>Image Section</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.modalButton} onPress={() => setSectionType("text")}>
+                  <Text style={styles.modalButtonText}>Text Section</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.cancelButton]}
+                  onPress={() => setSectionModalVisible(false)}
+                >
+                  <Text style={styles.modalButtonText}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <ScrollView style={{ width: "100%" }} contentContainerStyle={{ paddingBottom: 20 }}>
+                <View style={styles.modalForm}>
+                  <TextInput
+                    style={styles.modalInput}
+                    placeholder="Section Title"
+                    value={sectionTitle}
+                    onChangeText={setSectionTitle}
+                  />
+                  {sectionType === "text" && (
+                    <TextInput
+                      style={[styles.modalInput, styles.modalTextArea]}
+                      placeholder="Section Content"
+                      value={sectionContent}
+                      onChangeText={setSectionContent}
+                      multiline
+                    />
+                  )}
+                  {sectionType === "image" && (
+                    <TouchableOpacity style={styles.modalButton} onPress={pickImage}>
+                      <Text style={styles.modalButtonText}>
+                        {imageUri ? "Image Selected" : "Pick Image"}
+                      </Text>
                     </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.modalButton}
-                      onPress={() => setSectionType("image")}
-                    >
-                      <Text style={styles.modalButtonText}>Image Section</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.modalButton}
-                      onPress={() => setSectionType("text")}
-                    >
-                      <Text style={styles.modalButtonText}>Text Section</Text>
+                  )}
+                  <View style={styles.modalFormButtons}>
+                    <TouchableOpacity style={styles.modalSubmitButton} onPress={handleSectionSubmit}>
+                      <Text style={styles.modalButtonText}>Add Section</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.modalButton, styles.cancelButton]}
-                      onPress={() => setSectionModalVisible(false)}
+                      onPress={() => {
+                        setSectionModalVisible(false);
+                        resetSectionModal();
+                      }}
                     >
                       <Text style={styles.modalButtonText}>Cancel</Text>
                     </TouchableOpacity>
                   </View>
-                ) : (
-                  <ScrollView style={{ width: "100%" }} contentContainerStyle={{ paddingBottom: 20 }}>
-                    <View style={styles.modalForm}>
-                      <TextInput
-                        style={styles.modalInput}
-                        placeholder="Section Title"
-                        value={sectionTitle}
-                        onChangeText={setSectionTitle}
-                      />
-                      {sectionType === "text" && (
-                        <TextInput
-                          style={[styles.modalInput, styles.modalTextArea]}
-                          placeholder="Section Content"
-                          value={sectionContent}
-                          onChangeText={setSectionContent}
-                          multiline
-                        />
-                      )}
-                      {sectionType === "image" && (
-                        <TouchableOpacity style={styles.modalButton} onPress={pickImage}>
-                          <Text style={styles.modalButtonText}>
-                            {imageUri ? "Image Selected" : "Pick Image"}
-                          </Text>
-                        </TouchableOpacity>
-                      )}
-                      <View style={styles.modalFormButtons}>
-                        <TouchableOpacity
-                          style={styles.modalSubmitButton}
-                          onPress={handleSectionSubmit}
-                        >
-                          <Text style={styles.modalButtonText}>Add Section</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.modalButton, styles.cancelButton]}
-                          onPress={() => {
-                            setSectionModalVisible(false);
-                            resetSectionModal();
-                          }}
-                        >
-                          <Text style={styles.modalButtonText}>Cancel</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  </ScrollView>
-                )}
-              </View>
-            </View>
-          </Modal>
-
-          <Modal visible={isStorySectionModalVisible} transparent animationType="slide">
-            <View style={styles.modalOverlay}>
-              <View style={styles.modalContainer}>
-                <Text style={styles.modalTitle}>Choose Story Section Type</Text>
-                <View style={styles.modalOptions}>
-                  <TouchableOpacity
-                    style={styles.storySectionOption}
-                    onPress={() => handleStorySectionSubmit("team")}
-                  >
-                    <View style={styles.teamIconsContainer}>
-                      <View style={[styles.teamIcon, { backgroundColor: "#e0e0e0" }]} />
-                      <View style={[styles.teamIcon, { backgroundColor: "#d0d0d0" }]} />
-                      <View style={[styles.teamIcon, { backgroundColor: "#c0c0c0" }]} />
-                    </View>
-                    <Text style={styles.storySectionText}>Team</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.storySectionOption}
-                    onPress={() => handleStorySectionSubmit("startups")}
-                  >
-                    <View style={styles.startupsIconsContainer}>
-                      <View style={[styles.startupIcon, { backgroundColor: "#007bff" }]} />
-                      <View style={[styles.startupIcon, { backgroundColor: "#004999" }]} />
-                      <View style={[styles.startupIcon, { backgroundColor: "#002d5f" }]} />
-                    </View>
-                    <Text style={styles.storySectionText}>Startups</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.storySectionOption}
-                    onPress={() => handleStorySectionSubmit("startup")}
-                  >
-                    <View style={styles.startupSingleContainer}>
-                      <View style={styles.startupSingleIcon} />
-                      <Text style={styles.startupSingleText}>
-                        {userData?.startup_name || "Startup Name"}
-                      </Text>
-                      <Text style={styles.startupSingleDesc}>
-                        {userData?.startup_desc || "A brief description of the startup"}
-                      </Text>
-                    </View>
-                    <Text style={styles.storySectionText}>Startup</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.modalButton, styles.cancelButton]}
-                    onPress={() => setStorySectionModalVisible(false)}
-                  >
-                    <Text style={styles.modalButtonText}>Cancel</Text>
-                  </TouchableOpacity>
                 </View>
-              </View>
-            </View>
-          </Modal>
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
 
-          <Modal visible={isLinkSectionModalVisible} transparent animationType="slide">
-            <View style={styles.modalOverlay}>
-              <View style={styles.modalContainer}>
-                <Text style={styles.modalTitle}>Add Link Section</Text>
-                <View style={styles.modalOptions}>
-                  <TouchableOpacity
-                    style={styles.linkOptionContainer}
-                    onPress={() => handleLinkSectionSubmit("team")}
-                  >
-                    <StoryItem story={sampleProfile} onPress={() => {}} isAddButton={false} />
-                    <Text style={styles.linkOptionText}>Team Profiles</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.linkOptionContainer}
-                    onPress={() => handleLinkSectionSubmit("startups")}
-                  >
-                    <StoryItem story={sampleProfile} onPress={() => {}} isAddButton={false} />
-                    <Text style={styles.linkOptionText}>Startup Profiles</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.linkOptionContainer}
-                    onPress={() => handleLinkSectionSubmit("singleStartup")}
-                  >
-                    <StoryItem story={sampleProfile} onPress={() => {}} isAddButton={false} />
-                    <Text style={styles.linkOptionText}>Single Startup Profile</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.modalButton, styles.cancelButton]}
-                    onPress={() => setLinkSectionModalVisible(false)}
-                  >
-                    <Text style={styles.modalButtonText}>Cancel</Text>
-                  </TouchableOpacity>
+      <Modal visible={isStorySectionModalVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Choose Story Section Type</Text>
+            <View style={styles.modalOptions}>
+              <TouchableOpacity
+                style={styles.storySectionOption}
+                onPress={() => handleStorySectionSubmit("team")}
+              >
+                <View style={styles.teamIconsContainer}>
+                  <View style={[styles.teamIcon, { backgroundColor: "#e0e0e0" }]} />
+                  <View style={[styles.teamIcon, { backgroundColor: "#d0d0d0" }]} />
+                  <View style={[styles.teamIcon, { backgroundColor: "#c0c0c0" }]} />
                 </View>
-              </View>
+                <Text style={styles.storySectionText}>Team</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.storySectionOption}
+                onPress={() => handleStorySectionSubmit("startups")}
+              >
+                <View style={styles.startupsIconsContainer}>
+                  <View style={[styles.startupIcon, { backgroundColor: "#007bff" }]} />
+                  <View style={[styles.startupIcon, { backgroundColor: "#004999" }]} />
+                  <View style={[styles.startupIcon, { backgroundColor: "#002d5f" }]} />
+                </View>
+                <Text style={styles.storySectionText}>Startups</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.storySectionOption}
+                onPress={() => handleStorySectionSubmit("startup")}
+              >
+                <View style={styles.startupSingleContainer}>
+                  <View style={styles.startupSingleIcon} />
+                  <Text style={styles.startupSingleText}>
+                    {userData?.startup_name || "Startup Name"}
+                  </Text>
+                  <Text style={styles.startupSingleDesc}>
+                    {userData?.startup_desc || "A brief description of the startup"}
+                  </Text>
+                </View>
+                <Text style={styles.storySectionText}>Startup</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setStorySectionModalVisible(false)}
+              >
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
             </View>
-          </Modal>
-        </>
-      )}
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={isLinkSectionModalVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Add Link Section</Text>
+            <View style={styles.modalOptions}>
+              <TouchableOpacity
+                style={styles.linkOptionContainer}
+                onPress={() => handleLinkSectionSubmit("team")}
+              >
+                <StoryItem
+                  story={sampleProfile}
+                  onPress={() => handleLinkSectionSubmit("team")}
+                  isAddButton={false}
+                />
+                <Text style={styles.linkOptionText}>Team Profiles</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.linkOptionContainer}
+                onPress={() => handleLinkSectionSubmit("startups")}
+              >
+                <StoryItem
+                  story={sampleProfile}
+                  onPress={() => handleLinkSectionSubmit("startups")}
+                  isAddButton={false}
+                />
+                <Text style={styles.linkOptionText}>Startup Profiles</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.linkOptionContainer}
+                onPress={() => handleLinkSectionSubmit("singleStartup")}
+              >
+                <StoryItem
+                  story={sampleProfile}
+                  onPress={() => handleLinkSectionSubmit("singleStartup")}
+                  isAddButton={false}
+                />
+                <Text style={styles.linkOptionText}>Single Startup Profile</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setLinkSectionModalVisible(false)}
+              >
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
 
-Profile.propTypes = {
-  route: PropTypes.object.isRequired,
-};
-
-// Styles (unchanged)
 const styles = StyleSheet.create({
   sectionContainer: { width: "100%", paddingVertical: 5, backgroundColor: "#fff" },
-  sectionHeader: { fontSize: 18, fontWeight: "600", color: "#333", marginVertical: 2, paddingHorizontal: 15 },
+  sectionHeader: { fontSize: 18, fontWeight: "600", color: "#333", marginVertical: 2 },
+  sectionHeaderContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 15,
+  },
   divider: { height: 1, backgroundColor: "#ccc", width: Dimensions.get("window").width, marginVertical: 5 },
-  sectionImage: { width: "100%", height: 200, borderRadius: 8 },
+  sectionImage: { width: "100%", height: 200, borderRadius: 8, resizeMode: "cover", marginVertical: 2 },
   sectionContent: { fontSize: 14, color: "#666", lineHeight: 20, paddingHorizontal: 15 },
   placeholderText: { fontSize: 14, color: "#999", paddingHorizontal: 15 },
   storiesContainer: { paddingVertical: 2, flexDirection: "row", alignItems: "center", paddingHorizontal: 15 },
-  storyItem: { alignItems: "center", width: 72, marginHorizontal: 6, paddingVertical: 4 },
+  storyItemContainer: {
+    position: 'relative',
+    alignItems: 'center',
+    width: 72,
+    marginHorizontal: 6,
+    paddingVertical: 4,
+  },
+  storyItem: { alignItems: "center", width: 72 },
   storyRing: { borderWidth: 2, borderRadius: 37 },
   activeStoryRing: { borderWidth: 2.5, borderColor: "#1f219c" },
-  storyImageContainer: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    overflow: "hidden",
-    backgroundColor: "#f0f0f0",
-    justifyContent: "center",
-    alignItems: "center",
-  },
+  storyImageContainer: { width: 70, height: 70, borderRadius: 35, overflow: "hidden", backgroundColor: "#f0f0f0", justifyContent: "center", alignItems: "center" },
   storyImage: { width: "100%", height: "100%" },
   addStoryText: { fontSize: 24, color: "#666", fontWeight: "600" },
-  storyUsername: {
-    marginTop: 6,
-    fontSize: 12,
-    textAlign: "center",
-    color: "#666",
-    fontFamily: "AvenirNextCyr",
-    fontWeight: "500",
-  },
-  unreadIndicator: {
-    position: "absolute",
-    bottom: 2,
-    right: 2,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#1f219c",
-    borderWidth: 1,
-    borderColor: "#fff",
-  },
-  addStorySectionButton: {
-    backgroundColor: "#1f219c",
-    padding: 15,
-    borderRadius: 10,
-    marginVertical: 20,
-    alignItems: "center",
-    width: "90%",
-    alignSelf: "center",
-  },
+  storyUsername: { marginTop: 6, fontSize: 12, textAlign: "center", color: "#666", fontFamily: "AvenirNextCyr", fontWeight: "500" },
+  unreadIndicator: { position: "absolute", bottom: 2, right: 2, width: 8, height: 8, borderRadius: 4, backgroundColor: "#1f219c", borderWidth: 1, borderColor: "#fff" },
+  addStorySectionButton: { backgroundColor: "#1f219c", padding: 15, borderRadius: 10, marginVertical: 20, alignItems: "center", width: "90%", alignSelf: "center" },
   addStorySectionText: { color: "white", fontSize: 16, fontWeight: "600" },
-  addLinkSectionButton: {
-    backgroundColor: "#1f219c",
-    padding: 15,
-    borderRadius: 10,
-    marginVertical: 10,
-    alignItems: "center",
-    width: "90%",
-    alignSelf: "center",
-  },
+  addLinkSectionButton: { backgroundColor: "#1f219c", padding: 15, borderRadius: 10, marginVertical: 10, alignItems: "center", width: "90%", alignSelf: "center" },
   addLinkSectionText: { color: "white", fontSize: 16, fontWeight: "600" },
-  linkButton: {
-    backgroundColor: "#1f219c",
-    padding: 10,
-    borderRadius: 5,
-    alignItems: "center",
-    marginHorizontal: 15,
-    marginVertical: 5,
-  },
+  linkButton: { backgroundColor: "#1f219c", padding: 10, borderRadius: 5, alignItems: "center", marginHorizontal: 15, marginVertical: 5 },
   linkText: { color: "white", fontSize: 14, fontWeight: "600" },
-  addGraphButton: {
-    backgroundColor: "#1f219c",
-    padding: 10,
-    borderRadius: 10,
-    marginVertical: 20,
-    alignItems: "center",
-    width: "90%",
-    alignSelf: "center",
-  },
+  addGraphButton: { backgroundColor: "#1f219c", padding: 10, borderRadius: 10, marginVertical: 20, alignItems: "center", width: "90%", alignSelf: "center" },
   addGraphButtonText: { color: "white", fontSize: 16, fontWeight: "600" },
   try: { flexDirection: "column", alignItems: "center", paddingVertical: 20, width: "100%" },
-  cardStyle: {
-    width: "90%",
-    height: 300,
-    marginBottom: 20,
-    backgroundColor: "white",
-    borderRadius: 15,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  graphTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#333",
-    textAlign: "center",
+  cardStyle: { width: "90%", height: 300, marginBottom: 20, backgroundColor: "white", borderRadius: 15, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 },
+  graphHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     padding: 15,
     borderBottomWidth: 1,
-    borderBottomColor: "#eee",
+    borderBottomColor: '#eee',
   },
+  graphTitle: { fontSize: 18, fontWeight: "600", color: "#333" },
   graphContainer: { flex: 1, alignItems: "center", justifyContent: "center", padding: 10, width: 350 },
   videoContainer: { position: "relative", width: "100%", height: "100%" },
   playIconContainer: {
@@ -1245,122 +1188,42 @@ const styles = StyleSheet.create({
   },
   playIcon: { color: "white", fontSize: 12 },
   gridContainer: { paddingVertical: 20, width: "100%" },
-  gridItem: {
+  gridItemContainer: {
+    position: 'relative',
     width: (Dimensions.get("window").width - 34) / 3,
     height: (Dimensions.get("window").width - 34) / 3,
-    backgroundColor: "#f0f0f0",
     marginBottom: 2,
   },
+  gridItem: { width: "100%", height: "100%", backgroundColor: "#f0f0f0" },
   gridImage: { width: "100%", height: "100%", borderRadius: 4 },
   container: { flex: 1, justifyContent: "center", alignItems: "center" },
-  contentContainer: { flex: 1, alignItems: "center", paddingHorizontal: 0, width: "100%" },
+  contentContainer: { flex: 1, alignItems: "center", paddingHorizontal: 0, width: "100%", position: "relative" },
   profileImage: { width: "100%", height: "100%", borderRadius: 48 },
   profile: { width: "100%", backgroundColor: "#fff", alignItems: "center", padding: 0, gap: 14, marginTop: 55 },
-  profileSection: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    width: "100%",
-    paddingHorizontal: 40,
-    paddingTop: 20,
-  },
-  avatarMultiVariants: {
-    width: 96,
-    height: 96,
-    marginHorizontal: 20,
-    backgroundColor: "#f0f8ff",
-    borderRadius: 48,
-    overflow: "hidden",
-  },
+  profileSection: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", width: "100%", paddingHorizontal: 40, paddingTop: 20 },
+  avatarMultiVariants: { width: 96, height: 96, marginHorizontal: 20, backgroundColor: "#f0f8ff", borderRadius: 48, overflow: "hidden" },
   statsContainer: { alignItems: "center", justifyContent: "center" },
   statsNumber: { fontSize: 18, fontWeight: "700", color: "#000", fontFamily: "AvenirNextCyr" },
   statsLabel: { fontSize: 14, color: "#666", fontFamily: "AvenirNextCyr" },
   text: { width: "100%", gap: 4, alignItems: "center" },
-  userName: {
-    fontSize: 20,
-    lineHeight: 26,
-    fontWeight: "700",
-    color: "#000",
-    fontFamily: "AvenirNextCyr",
-    textAlign: "center",
-  },
+  userName: { fontSize: 20, lineHeight: 26, fontWeight: "700", color: "#000", fontFamily: "AvenirNextCyr", textAlign: "center" },
   id: { flexDirection: "row", alignItems: "center", gap: 4 },
   about: { fontSize: 14, lineHeight: 20, fontWeight: "500", color: "#000", fontFamily: "AvenirNextCyr" },
   fundingAsk: { fontSize: 14, color: "#1f219c", fontWeight: "600", marginTop: 5 },
   checkCircleIcon: { marginLeft: 5, color: "green" },
-  buttonContainer: { alignItems: "center", width: "100%", flexDirection: "column", justifyContent: "center", gap: 10 },
-  masterOutlineButton: {
-    borderRadius: 14,
-    width: 90,
-    borderColor: "#ccc",
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    backgroundColor: "#f9f9f9",
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  buttonContainer: { alignItems: 'center', width: "100%", flexDirection: "column", justifyContent: "center", gap: 10 },
+  masterOutlineButton: { borderRadius: 14, width: 90, borderColor: "#ccc", borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: "#f9f9f9", alignItems: "center", justifyContent: "center" },
   button: { fontSize: 12, lineHeight: 18, color: "#666", fontFamily: "AvenirNextCyr-Bold", fontWeight: "600" },
-  tab: {
-    width: "90%",
-    flexDirection: "row",
-    backgroundColor: "#f3f3f3",
-    borderRadius: 18,
-    borderColor: "#ddd",
-    borderWidth: 1,
-    padding: 4,
-    gap: 8,
-    marginTop: 10,
-    alignSelf: "center",
-    marginBottom: 20,
-  },
-  tab1: {
-    flex: 1,
-    height: 30,
-    backgroundColor: "#1f219c",
-    borderRadius: 18,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  tab2: {
-    flex: 1,
-    height: 28,
-    borderRadius: 14,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  tabs: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: "#fff",
-    fontFamily: "AvenirNextCyr-Bold",
-    fontWeight: "600",
-    textAlign: "center",
-  },
-  tabs1: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: "#666",
-    fontFamily: "AvenirNextCyr-Bold",
-    fontWeight: "600",
-    textAlign: "center",
-  },
+  tab: { width: "90%", flexDirection: "row", backgroundColor: "#f3f3f3", borderRadius: 18, borderColor: "#ddd", borderWidth: 1, padding: 4, gap: 8, marginTop: 10, alignSelf: "center", marginBottom: 20 },
+  tab1: { flex: 1, height: 30, backgroundColor: "#1f219c", borderRadius: 18, paddingVertical: 4, paddingHorizontal: 8, justifyContent: "center", alignItems: "center" },
+  tab2: { flex: 1, height: 28, borderRadius: 14, paddingVertical: 4, paddingHorizontal: 8, justifyContent: "center", alignItems: "center" },
+  tabs: { fontSize: 14, lineHeight: 20, color: "#fff", fontFamily: "AvenirNextCyr-Bold", fontWeight: "600", textAlign: "center" },
+  tabs1: { fontSize: 14, lineHeight: 20, color: "#666", fontFamily: "AvenirNextCyr-Bold", fontWeight: "600", textAlign: "center" },
   backButton: { position: "absolute", left: 28, top: 20, zIndex: 1 },
   backButtonText: { fontSize: 32, color: "#000", paddingTop: 20 },
   scrollViewContent: { paddingBottom: 80, width: "100%", alignItems: "center" },
   modalOverlay: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.5)" },
-  modalContainer: {
-    width: "80%",
-    backgroundColor: "white",
-    borderRadius: 10,
-    padding: 20,
-    alignItems: "center",
-    maxHeight: Dimensions.get("window").height * 0.7,
-  },
+  modalContainer: { width: "80%", backgroundColor: "white", borderRadius: 10, padding: 20, alignItems: "center", maxHeight: Dimensions.get("window").height * 0.7 },
   modalTitle: { fontSize: 20, fontWeight: "600", marginBottom: 20 },
   modalOptions: { width: "100%", gap: 15 },
   modalButton: { backgroundColor: "#1f219c", padding: 10, borderRadius: 5, alignItems: "center" },
@@ -1370,14 +1233,7 @@ const styles = StyleSheet.create({
   modalInput: { borderWidth: 1, borderColor: "#ccc", borderRadius: 5, padding: 10, fontSize: 16, width: "100%" },
   modalTextArea: { height: 100, textAlignVertical: "top" },
   modalFormButtons: { flexDirection: "row", justifyContent: "space-between", width: "100%" },
-  modalSubmitButton: {
-    backgroundColor: "#1f219c",
-    padding: 10,
-    borderRadius: 5,
-    alignItems: "center",
-    flex: 1,
-    marginRight: 5,
-  },
+  modalSubmitButton: { backgroundColor: "#1f219c", padding: 10, borderRadius: 5, alignItems: "center", flex: 1, marginRight: 5 },
   linkOptionContainer: { flexDirection: "row", alignItems: "center", justifyContent: "flex-start", width: "100%" },
   linkOptionText: { fontSize: 16, fontWeight: "600", color: "#333", marginLeft: 10 },
   errorContainer: { flexDirection: "row", alignItems: "center", marginVertical: 10 },
@@ -1396,6 +1252,18 @@ const styles = StyleSheet.create({
   startupSingleIcon: { width: 50, height: 50, borderRadius: 25, backgroundColor: "#1f219c" },
   startupSingleText: { fontSize: 14, fontWeight: "600", color: "#333", marginTop: 5 },
   startupSingleDesc: { fontSize: 12, color: "#666", textAlign: "center", marginTop: 2 },
+  deleteButton: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    zIndex: 1,
+    padding: 5,
+  },
+  deleteIcon: {
+    width: 20,
+    height: 20,
+    tintColor: '#ff4444',
+  },
 });
 
 export default Profile;

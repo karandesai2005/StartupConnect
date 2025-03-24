@@ -12,7 +12,11 @@ import {
   Platform,
   StatusBar,
 } from 'react-native';
+<<<<<<< HEAD
 import { useNavigation, useRoute } from '@react-navigation/native';
+=======
+import { useNavigation } from '@react-navigation/native';
+>>>>>>> aa067c21842c0564d437bbe6af6168e1f03c4bbf
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NGROK_URL } from '@env';
@@ -22,8 +26,11 @@ const SearchScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const navigation = useNavigation();
+<<<<<<< HEAD
   const route = useRoute();
   const { onTeamMemberSelected } = route.params || {};
+=======
+>>>>>>> aa067c21842c0564d437bbe6af6168e1f03c4bbf
 
   const searchUsers = useCallback(
     debounce(async (query) => {
@@ -55,6 +62,7 @@ const SearchScreen = () => {
     searchUsers(text);
   };
 
+<<<<<<< HEAD
   const handleUserPress = (user) => {
     setSearchQuery('');
     setSearchResults([]);
@@ -66,12 +74,22 @@ const SearchScreen = () => {
       // Otherwise, navigate to the user's profile
       navigation.navigate('Profile', { username: user.username, isOtherUser: true });
     }
+=======
+  const handleUserPress = (username) => {
+    setSearchQuery('');
+    setSearchResults([]);
+    navigation.navigate('Profile', { username, isOtherUser: true });
+>>>>>>> aa067c21842c0564d437bbe6af6168e1f03c4bbf
   };
 
   const renderSearchResult = ({ item }) => (
     <TouchableOpacity
       style={styles.searchResultItem}
+<<<<<<< HEAD
       onPress={() => handleUserPress(item)}
+=======
+      onPress={() => handleUserPress(item.username)}
+>>>>>>> aa067c21842c0564d437bbe6af6168e1f03c4bbf
     >
       <Image
         source={
@@ -99,7 +117,11 @@ const SearchScreen = () => {
         </TouchableOpacity>
         <TextInput
           style={styles.searchBar}
+<<<<<<< HEAD
           placeholder="Search team members..."
+=======
+          placeholder="Search..."
+>>>>>>> aa067c21842c0564d437bbe6af6168e1f03c4bbf
           placeholderTextColor="#aaa"
           value={searchQuery}
           onChangeText={handleSearchChange}
@@ -114,6 +136,10 @@ const SearchScreen = () => {
         keyboardShouldPersistTaps="handled"
       />
     </KeyboardAvoidingView>
+<<<<<<< HEAD
+=======
+    
+>>>>>>> aa067c21842c0564d437bbe6af6168e1f03c4bbf
   );
 };
 
@@ -141,6 +167,10 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   searchBar: {
+<<<<<<< HEAD
+=======
+    //flex: 1,
+>>>>>>> aa067c21842c0564d437bbe6af6168e1f03c4bbf
     paddingHorizontal: 15,
     backgroundColor: '#eee',
     borderRadius: 20,
