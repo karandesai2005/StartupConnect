@@ -624,6 +624,23 @@ export default function Home() {
     navigation.navigate('Search');
   };
 
+  // Updated function to handle profile navigation based on user type
+  const handleProfilePress = () => {
+    if (!userData) {
+      console.log('User data not loaded yet');
+      return;
+    }
+
+    const isBusinessUser = userData.is_business; // Directly use boolean value
+    const username = userData.username;
+
+    if (isBusinessUser) {
+      navigation.navigate('BusinessProfile', { username, isOtherUser: false });
+    } else {
+      navigation.navigate('Profile', { username, isOtherUser: false });
+    }
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.topBar}>

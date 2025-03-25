@@ -269,35 +269,35 @@ const profileController = {
       console.log('User:', req.user, '| Body:', req.body);
 
       const userId = req.user?.userId || req.user?.id;
-      const { type, title, content, image_uri, section, story } = req.body;
+      const { type, title, content, image_uri, section, teamMember } = req.body; // Add teamMember to destructuring
 
       if (!userId) return res.status(400).json({ error: 'User ID is required.' });
       if (!type || !title) return res.status(400).json({ error: 'Type and title are required.' });
 
-      if (type === 'story' && story && section === 'team') {
-        // Check if a "Team" section already exists
+      if (type === 'story' && title === 'Team' && teamMember) {
+        // Handle Team section with teamMember
         let teamSection = await Section.findByUserIdAndSection(userId, 'team');
 
         if (!teamSection) {
           // Create a new "Team" section if it doesn’t exist
-          const sectionId = await Section.create(userId, type, title, null, null, 'team');
+          const sectionId = await Section.create(
+            userId,
+            type,
+            title,
+            JSON.stringify({ teamMember }), // Store teamMember as JSON in content
+            null,
+            'team'
+          );
           teamSection = { section_id: sectionId };
+        } else {
+          // Update existing "Team" section with new teamMember (append or replace based on your needs)
+          const existingContent = teamSection.content ? JSON.parse(teamSection.content) : {};
+          const updatedContent = { ...existingContent, teamMember };
+          await Section.update(teamSection.section_id, { content: JSON.stringify(updatedContent) });
         }
 
-        // Add the team member as a story linked to the "Team" section
-        const { image_url, has_story, viewed, username, profile_picture } = story;
-        const storyId = await Story.create(
-          userId,
-          username || req.user.username,
-          image_url || profile_picture,
-          has_story !== undefined ? has_story : 1,
-          viewed !== undefined ? viewed : 0,
-          'team',
-          teamSection.section_id // Link the story to the section
-        );
-
-        console.log('Team member story created with ID:', storyId);
-        res.status(201).json({ section_id: teamSection.section_id, story_id: storyId });
+        console.log('Team section created/updated with ID:', teamSection.section_id);
+        res.status(201).json({ section_id: teamSection.section_id });
       } else {
         // Handle other section types (text, image, etc.)
         console.log('Creating section:', { userId, type, title, content, image_uri, section });

@@ -25,7 +25,7 @@ import * as ImagePicker from "expo-image-picker";
 
 // Delete Button Component
 const DeleteButton = ({ onDelete }) => (
-  <TouchableOpacity 
+  <TouchableOpacity
     style={styles.deleteButton}
     onPress={() => {
       Alert.alert(
@@ -38,8 +38,8 @@ const DeleteButton = ({ onDelete }) => (
       );
     }}
   >
-    <Image 
-      source={require('../../../assets/Arrow.png')} 
+    <Image
+      source={require('../../../assets/Arrow.png')}
       style={styles.deleteIcon}
     />
   </TouchableOpacity>
@@ -51,6 +51,11 @@ const StoryItem = React.memo(({ story, onPress, isAddButton, onDelete }) => {
     : story.image_url
       ? { uri: story.image_url }
       : require("../../../assets/del.png");
+
+  // Log if image_url is invalid
+  if (!isAddButton && !story.image_url) {
+    console.log(`No profile picture for ${story.username}`);
+  }
 
   return (
     <View style={styles.storyItemContainer}>
@@ -76,6 +81,7 @@ const StoryItem = React.memo(({ story, onPress, isAddButton, onDelete }) => {
                 style={styles.storyImage}
                 resizeMode="cover"
                 defaultSource={require("../../../assets/del.png")}
+                onError={(e) => console.log(`Image load error for ${story.username}:`, e.nativeEvent.error)} // Add this
               />
             )}
             {story.has_story && !story.viewed && !isAddButton && (
@@ -358,8 +364,20 @@ const Profile = ({ route, isBusinessProfile = false }) => {
   const fetchSections = async () => {
     const sectionsData = await fetchWithAuth("/sections");
     if (sectionsData) {
-      setSections(sectionsData);
-      await AsyncStorage.setItem("sections", JSON.stringify(sectionsData));
+      const parsedSections = sectionsData.map((section) => {
+        if (section.type === "story" && section.title === "Team" && section.content) {
+          try {
+            const parsedContent = JSON.parse(section.content);
+            return { ...section, teamMember: parsedContent.teamMember };
+          } catch (e) {
+            console.error("Failed to parse teamMember content:", e);
+            return section;
+          }
+        }
+        return section;
+      });
+      setSections(parsedSections);
+      await AsyncStorage.setItem("sections", JSON.stringify(parsedSections));
     }
   };
 
@@ -397,7 +415,31 @@ const Profile = ({ route, isBusinessProfile = false }) => {
       setLastUpdate(Date.now());
       if (route.params.forceRefresh) refreshProfileData();
     }
-  }, [route.params?.updatedUser, refreshProfileData]);
+    if (route.params?.selectedTeamMember) {
+      console.log("Received Team Member:", route.params.selectedTeamMember);
+      const newTeamSection = {
+        section_id: `team_${Date.now()}`,
+        type: "story",
+        title: "Team",
+        section: "milestones",
+        teamMember: route.params.selectedTeamMember,
+      };
+      setSections((prev) => {
+        const teamExists = prev.some((section) => section.title === "Team" && section.type === "story");
+        const newSections = teamExists
+          ? prev.map((section) =>
+            section.title === "Team" && section.type === "story"
+              ? { ...section, teamMember: route.params.selectedTeamMember }
+              : section
+          )
+          : [...prev, newTeamSection];
+        console.log("Updated sections:", newSections);
+        return newSections;
+      });
+      setActiveTab("stories"); // Ensure the "stories" tab is active
+      navigation.setParams({ selectedTeamMember: null });
+    }
+  }, [route.params?.updatedUser, route.params?.selectedTeamMember, refreshProfileData, navigation]);
 
   useFocusEffect(
     useCallback(() => {
@@ -437,11 +479,7 @@ const Profile = ({ route, isBusinessProfile = false }) => {
   };
 
   const handleAddSection = () => {
-    setSectionType(null);
-    setSectionTitle("");
-    setSectionContent("");
-    setImageUri(null);
-    setSectionModalVisible(true);
+    setStorySectionModalVisible(true);
   };
 
   const handleSectionSubmit = async () => {
@@ -612,68 +650,105 @@ const Profile = ({ route, isBusinessProfile = false }) => {
     </TouchableOpacity>
   );
 
-  const renderStoriesTab = () => (
-    <View style={{ width: "100%" }}>
-      {sections.map((section) => {
-        switch (section.type) {
-          case "story":
-            return (
-              <Stories
-                key={section.section_id}
-                title={section.title}
-                sectionId={sectionMap[section.title] || section.title.toLowerCase().replace(/ /g, "_")}
-                stories={stories}
-                onAddStory={handleAddStory}
-                onStoryPress={(story, index) =>
-                  navigation.navigate("ViewStory", {
-                    stories: stories.filter((s) => s.section === (sectionMap[section.title] || section.title.toLowerCase().replace(/ /g, "_"))),
-                    initialIndex: index,
-                  })
-                }
-                fetchWithAuth={fetchWithAuth}
-              />
-            );
-          case "image":
-            return (
-              <ImageSection 
-                key={section.section_id} 
-                title={section.title} 
-                imageUri={section.image_uri}
-                onDelete={() => handleDeleteSection(section.section_id)}
-              />
-            );
-          case "text":
-            return (
-              <TextSection 
-                key={section.section_id} 
-                title={section.title} 
-                content={section.content}
-                onDelete={() => handleDeleteSection(section.section_id)}
-              />
-            );
-          case "link":
-            return (
-              <LinkSection
-                key={section.section_id}
-                title={section.title}
-                linkType={section.linkType}
-                onPress={() => handleSectionNavigation(section.linkType)}
-              />
-            );
-          default:
-            return null;
-        }
-      })}
-      <TouchableOpacity style={styles.addStorySectionButton} onPress={handleAddSection}>
-        <Text style={styles.addStorySectionText}>+ Add New Section</Text>
-      </TouchableOpacity>
-      {userData?.role === "founder" && !route.params?.isOtherUser && (
-        <TouchableOpacity style={styles.addLinkSectionButton} onPress={handleAddLinkSection}>
-          <Text style={styles.addLinkSectionText}>+ Add Link Section</Text>
+  const renderStoriesTab = () => {
+    console.log("Rendering stories tab with sections:", sections);
+    return (
+      <View style={{ width: "100%" }}>
+        {sections.map((section) => {
+          console.log("Processing section:", section); // Log each section
+          switch (section.type) {
+            case "story":
+              if (section.title === "Team" && section.teamMember) {
+                return (
+                  <View key={section.section_id} style={styles.sectionContainer}>
+                    <View style={styles.divider} />
+                    <Text style={styles.sectionHeader}>{section.title}</Text>
+                    <View style={styles.divider} />
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.storiesContainer}
+                    >
+                      <StoryItem
+                        story={{
+                          story_id: `team_${section.teamMember.username}`,
+                          username: section.teamMember.username,
+                          image_url: section.teamMember.profile_picture,
+                          has_story: true,
+                          viewed: false,
+                        }}
+                        onPress={() =>
+                          navigation.navigate("Profile", {
+                            username: section.teamMember.username,
+                            isOtherUser: true,
+                          })
+                        }
+                        isAddButton={false}
+                        onDelete={() => handleDeleteSection(section.section_id)}
+                      />
+                    </ScrollView>
+                    <View style={styles.divider} />
+                  </View>
+                );
+              }
+              return (
+                <Stories
+                  key={section.section_id}
+                  title={section.title}
+                  sectionId={sectionMap[section.title] || section.title.toLowerCase().replace(/ /g, "_")}
+                  stories={stories}
+                  onAddStory={handleAddStory}
+                  onStoryPress={(story, index) =>
+                    navigation.navigate("ViewStory", {
+                      stories: stories.filter((s) => s.section === (sectionMap[section.title] || section.title.toLowerCase().replace(/ /g, "_"))),
+                      initialIndex: index,
+                    })
+                  }
+                  fetchWithAuth={fetchWithAuth}
+                />
+              );
+            case "image":
+              return (
+                <ImageSection
+                  key={section.section_id}
+                  title={section.title}
+                  imageUri={section.image_uri}
+                  onDelete={() => handleDeleteSection(section.section_id)}
+                />
+              );
+            case "text":
+              return (
+                <TextSection
+                  key={section.section_id}
+                  title={section.title}
+                  content={section.content}
+                  onDelete={() => handleDeleteSection(section.section_id)}
+                />
+              );
+            case "link":
+              return (
+                <LinkSection
+                  key={section.section_id}
+                  title={section.title}
+                  linkType={section.linkType}
+                  onPress={() => handleSectionNavigation(section.linkType)}
+                />
+              );
+            default:
+              return null;
+          }
+        })}
+        <TouchableOpacity style={styles.addStorySectionButton} onPress={handleAddSection}>
+          <Text style={styles.addStorySectionText}>+ Add New Section</Text>
         </TouchableOpacity>
-      )}
-    </View>
-  );
+        {userData?.role === "founder" && !route.params?.isOtherUser && (
+          <TouchableOpacity style={styles.addLinkSectionButton} onPress={handleAddLinkSection}>
+            <Text style={styles.addLinkSectionText}>+ Add Link Section</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  };
 
   const renderAnalyticsTab = () => (
     <View style={styles.try}>
@@ -1024,7 +1099,8 @@ const Profile = ({ route, isBusinessProfile = false }) => {
             <View style={styles.modalOptions}>
               <TouchableOpacity
                 style={styles.storySectionOption}
-                onPress={() => handleStorySectionSubmit("team")}
+
+                onPress={() => navigation.navigate("Search")}
               >
                 <View style={styles.teamIconsContainer}>
                   <View style={[styles.teamIcon, { backgroundColor: "#e0e0e0" }]} />
@@ -1266,4 +1342,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default Profile;
+export default Profile; 
