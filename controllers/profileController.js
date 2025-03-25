@@ -26,7 +26,7 @@ const profileController = {
       console.log('Profile fetched:', user);
       res.json(user);
     } catch (error) {
-      console.error('Error in getProfile:', error);
+      console.error('Error in getProfile:', error.message, error.stack);
       res.status(500).json({ error: 'Server error', details: error.message });
     }
   },
@@ -53,7 +53,7 @@ const profileController = {
       console.log('User profile fetched:', user);
       res.json({ ...user, isFollowing });
     } catch (error) {
-      console.error('Error in getUserProfile:', error);
+      console.error('Error in getUserProfile:', error.message, error.stack);
       res.status(500).json({ error: 'Server error', details: error.message });
     }
   },
@@ -92,7 +92,7 @@ const profileController = {
       console.log(`User ${followerId} followed user ${followee.user_id}`);
       res.status(200).json({ message: 'Successfully followed user.' });
     } catch (error) {
-      console.error('Error in followUser:', error);
+      console.error('Error in followUser:', error.message, error.stack);
       res.status(500).json({ error: 'Server error', details: error.message });
     }
   },
@@ -127,7 +127,7 @@ const profileController = {
       console.log(`User ${followerId} unfollowed user ${followee.user_id}`);
       res.status(200).json({ message: 'Successfully unfollowed user.' });
     } catch (error) {
-      console.error('Error in unfollowUser:', error);
+      console.error('Error in unfollowUser:', error.message, error.stack);
       res.status(500).json({ error: 'Server error', details: error.message });
     }
   },
@@ -145,7 +145,7 @@ const profileController = {
       console.log('Stories fetched:', stories.length);
       res.json(stories);
     } catch (error) {
-      console.error('Error in getStories:', error);
+      console.error('Error in getStories:', error.message, error.stack);
       res.status(500).json({ error: 'Server error', details: error.message });
     }
   },
@@ -166,7 +166,7 @@ const profileController = {
       console.log('User stories fetched:', stories.length);
       res.json(stories);
     } catch (error) {
-      console.error('Error in getUserStories:', error);
+      console.error('Error in getUserStories:', error.message, error.stack);
       res.status(500).json({ error: 'Server error', details: error.message });
     }
   },
@@ -181,22 +181,51 @@ const profileController = {
 
         const userId = req.user?.userId || req.user?.id;
         const username = req.user.username;
-        const section = req.body.section || 'default';
+        const sectionName = req.body.section || 'default';
 
         if (!userId) return res.status(400).json({ error: 'User ID is required.' });
         if (!req.file) return res.status(400).json({ error: 'Media file is required.' });
 
         const imageUrl = `/uploads/posts/${req.file.filename}`;
-        const has_story = 1;
+        const hasStory = 1;
         const viewed = 0;
 
-        console.log('Creating story:', { userId, username, imageUrl, has_story, viewed, section });
-        const storyId = await Story.create(userId, username, imageUrl, has_story, viewed, section);
+        // Find or create the section
+        let section = await Section.findByUserIdAndSection(userId, sectionName);
+        if (!section) {
+          const sectionId = await Section.create(userId, 'story', sectionName, null, null, sectionName);
+          section = { section_id: sectionId };
+        }
+
+        // Get user's profile picture
+        const user = await User.getUserById(userId);
+        const profilePicture = user.profile_picture || null;
+
+        console.log('Creating story:', {
+          userId,
+          username,
+          imageUrl,
+          hasStory,
+          viewed,
+          sectionName,
+          sectionId: section.section_id,
+          profilePicture,
+        });
+        const storyId = await Story.create(
+          userId,
+          username,
+          imageUrl,
+          hasStory,
+          viewed,
+          sectionName,
+          section.section_id, // Link to section
+          profilePicture // Set profile picture
+        );
         console.log('Story created with ID:', storyId);
 
-        res.status(201).json({ story_id: storyId, image_url: imageUrl, section });
+        res.status(201).json({ story_id: storyId, image_url: imageUrl, section: sectionName });
       } catch (error) {
-        console.error('Error in addStory:', error);
+        console.error('Error in addStory:', error.message, error.stack);
         res.status(500).json({ error: 'Server error', details: error.message });
       }
     },
@@ -220,7 +249,7 @@ const profileController = {
       console.log('Story deleted successfully');
       res.status(200).json({ message: 'Story deleted successfully.' });
     } catch (error) {
-      console.error('Error in deleteStory:', error);
+      console.error('Error in deleteStory:', error.message, error.stack);
       res.status(500).json({ error: 'Server error', details: error.message });
     }
   },
@@ -236,7 +265,7 @@ const profileController = {
       console.log('Sections fetched:', sections.length);
       res.json(sections);
     } catch (error) {
-      console.error('Error in getSections:', error);
+      console.error('Error in getSections:', error.message, error.stack);
       res.status(500).json({ error: 'Server error', details: error.message });
     }
   },
@@ -257,7 +286,7 @@ const profileController = {
       console.log('User sections fetched:', sections.length);
       res.json(sections);
     } catch (error) {
-      console.error('Error in getUserSections:', error);
+      console.error('Error in getUserSections:', error.message, error.stack);
       res.status(500).json({ error: 'Server error', details: error.message });
     }
   },
@@ -269,44 +298,43 @@ const profileController = {
       console.log('User:', req.user, '| Body:', req.body);
 
       const userId = req.user?.userId || req.user?.id;
-      const { type, title, content, image_uri, section, teamMember } = req.body; // Add teamMember to destructuring
+      const { type, title, content, image_uri, section, teamMember } = req.body;
 
       if (!userId) return res.status(400).json({ error: 'User ID is required.' });
       if (!type || !title) return res.status(400).json({ error: 'Type and title are required.' });
 
       if (type === 'story' && title === 'Team' && teamMember) {
-        // Handle Team section with teamMember
+        console.log('Processing Team section with teamMember:', teamMember);
         let teamSection = await Section.findByUserIdAndSection(userId, 'team');
 
         if (!teamSection) {
-          // Create a new "Team" section if it doesn’t exist
           const sectionId = await Section.create(
             userId,
             type,
             title,
-            JSON.stringify({ teamMember }), // Store teamMember as JSON in content
+            JSON.stringify({ teamMember }),
             null,
             'team'
           );
+          console.log('Created new Team section with ID:', sectionId);
           teamSection = { section_id: sectionId };
         } else {
-          // Update existing "Team" section with new teamMember (append or replace based on your needs)
           const existingContent = teamSection.content ? JSON.parse(teamSection.content) : {};
           const updatedContent = { ...existingContent, teamMember };
           await Section.update(teamSection.section_id, { content: JSON.stringify(updatedContent) });
+          console.log('Updated existing Team section with ID:', teamSection.section_id);
         }
 
         console.log('Team section created/updated with ID:', teamSection.section_id);
         res.status(201).json({ section_id: teamSection.section_id });
       } else {
-        // Handle other section types (text, image, etc.)
         console.log('Creating section:', { userId, type, title, content, image_uri, section });
         const sectionId = await Section.create(userId, type, title, content, image_uri, section);
         console.log('Section created with ID:', sectionId);
         res.status(201).json({ section_id: sectionId });
       }
     } catch (error) {
-      console.error('Error in addSection:', error);
+      console.error('Error in addSection:', error.message, error.stack);
       res.status(500).json({ error: 'Server error', details: error.message });
     }
   },
@@ -329,7 +357,7 @@ const profileController = {
       console.log('Section deleted successfully');
       res.status(200).json({ message: 'Section deleted successfully.' });
     } catch (error) {
-      console.error('Error in deleteSection:', error);
+      console.error('Error in deleteSection:', error.message, error.stack);
       res.status(500).json({ error: 'Server error', details: error.message });
     }
   },
@@ -345,7 +373,7 @@ const profileController = {
       console.log('Graphs fetched:', graphs.length);
       res.json(graphs);
     } catch (error) {
-      console.error('Error in getGraphs:', error);
+      console.error('Error in getGraphs:', error.message, error.stack);
       res.status(500).json({ error: 'Server error', details: error.message });
     }
   },
@@ -366,7 +394,7 @@ const profileController = {
       console.log('User graphs fetched:', graphs.length);
       res.json(graphs);
     } catch (error) {
-      console.error('Error in getUserGraphs:', error);
+      console.error('Error in getUserGraphs:', error.message, error.stack);
       res.status(500).json({ error: 'Server error', details: error.message });
     }
   },
@@ -388,7 +416,7 @@ const profileController = {
       console.log('Graph created with ID:', graphId);
       res.status(201).json({ graph_id: graphId });
     } catch (error) {
-      console.error('Error in addGraph:', error);
+      console.error('Error in addGraph:', error.message, error.stack);
       res.status(500).json({ error: 'Server error', details: error.message });
     }
   },
@@ -411,7 +439,7 @@ const profileController = {
       console.log('Graph deleted successfully');
       res.status(200).json({ message: 'Graph deleted successfully.' });
     } catch (error) {
-      console.error('Error in deleteGraph:', error);
+      console.error('Error in deleteGraph:', error.message, error.stack);
       res.status(500).json({ error: 'Server error', details: error.message });
     }
   },
