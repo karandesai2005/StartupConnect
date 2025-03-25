@@ -9,37 +9,23 @@ router.get('/', authMiddleware, profileController.getProfile);
 // Get another user's profile by username
 router.get('/user/:username', authMiddleware, profileController.getUserProfile);
 
-// Get authenticated user's stories
+// Stories
 router.get('/stories', authMiddleware, profileController.getStories);
-
-// Get another user's stories
-router.get('/stories/user/:username', authMiddleware, profileController.getUserStories);
-
-// Add a story (authenticated user only)
 router.post('/stories', authMiddleware, profileController.addStory);
+router.delete('/stories/:storyId', authMiddleware, profileController.deleteStory); // New DELETE route
 
-// Get authenticated user's sections
+// Sections
 router.get('/sections', authMiddleware, profileController.getSections);
-
-// Get another user's sections
-router.get('/sections/user/:username', authMiddleware, profileController.getUserSections);
-
-// Add a section (authenticated user only)
 router.post('/sections', authMiddleware, profileController.addSection);
+router.delete('/sections/:sectionId', authMiddleware, profileController.deleteSection); // New DELETE route
 
-// Get authenticated user's graphs
+// Graphs
 router.get('/graphs', authMiddleware, profileController.getGraphs);
-
-// Get another user's graphs
-router.get('/graphs/user/:username', authMiddleware, profileController.getUserGraphs);
-
-// Add a graph (authenticated user only)
 router.post('/graphs', authMiddleware, profileController.addGraph);
+router.delete('/graphs/:graphId', authMiddleware, profileController.deleteGraph); // New DELETE route
 
-// Follow a user
+// Follow/Unfollow
 router.post('/follow', authMiddleware, profileController.followUser);
-
-// Unfollow a user (optional)
 router.post('/unfollow', authMiddleware, profileController.unfollowUser);
 
 module.exports = router;
