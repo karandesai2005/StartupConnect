@@ -27,5 +27,5 @@ router.delete('/graphs/:graphId', authMiddleware, profileController.deleteGraph)
 // Follow/Unfollow
 router.post('/follow', authMiddleware, profileController.followUser);
 router.post('/unfollow', authMiddleware, profileController.unfollowUser);
-
+router.delete('/sections/:sectionId/team/:username', authMiddleware, profileController.deleteTeamMember);
 module.exports = router;

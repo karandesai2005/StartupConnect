@@ -292,53 +292,55 @@ const profileController = {
   },
 
   // Add a section (authenticated user only)
-  addSection: async (req, res) => {
-    try {
-      console.log('=== Add Section Debug ===');
-      console.log('User:', req.user, '| Body:', req.body);
+  // In profileController.js
+addSection: async (req, res) => {
+  try {
+    console.log('=== Add Section Debug ===');
+    console.log('User:', req.user, '| Body:', req.body);
 
-      const userId = req.user?.userId || req.user?.id;
-      const { type, title, content, image_uri, section, teamMember } = req.body;
+    const userId = req.user?.userId || req.user?.id;
+    const { type, title, content, image_uri, section, teamMember } = req.body;
 
-      if (!userId) return res.status(400).json({ error: 'User ID is required.' });
-      if (!type || !title) return res.status(400).json({ error: 'Type and title are required.' });
+    if (!userId) return res.status(400).json({ error: 'User ID is required.' });
+    if (!type || !title) return res.status(400).json({ error: 'Type and title are required.' });
 
-      if (type === 'story' && title === 'Team' && teamMember) {
-        console.log('Processing Team section with teamMember:', teamMember);
-        let teamSection = await Section.findByUserIdAndSection(userId, 'team');
+    if (type === 'story' && title === 'Team' && teamMember) {
+      let teamSection = await Section.findByUserIdAndSection(userId, 'team');
 
-        if (!teamSection) {
-          const sectionId = await Section.create(
-            userId,
-            type,
-            title,
-            JSON.stringify({ teamMember }),
-            null,
-            'team'
-          );
-          console.log('Created new Team section with ID:', sectionId);
-          teamSection = { section_id: sectionId };
-        } else {
-          const existingContent = teamSection.content ? JSON.parse(teamSection.content) : {};
-          const updatedContent = { ...existingContent, teamMember };
-          await Section.update(teamSection.section_id, { content: JSON.stringify(updatedContent) });
-          console.log('Updated existing Team section with ID:', teamSection.section_id);
-        }
-
-        console.log('Team section created/updated with ID:', teamSection.section_id);
-        res.status(201).json({ section_id: teamSection.section_id });
-      } else {
-        console.log('Creating section:', { userId, type, title, content, image_uri, section });
-        const sectionId = await Section.create(userId, type, title, content, image_uri, section);
-        console.log('Section created with ID:', sectionId);
+      if (!teamSection) {
+        // Create a new "Team" section with an array of team members
+        const sectionId = await Section.create(
+          userId,
+          type,
+          title,
+          JSON.stringify({ teamMembers: [teamMember] }),
+          null,
+          'team'
+        );
+        console.log('Team section created with ID:', sectionId);
         res.status(201).json({ section_id: sectionId });
+      } else {
+        // Update existing "Team" section by appending the new team member
+        const existingContent = teamSection.content ? JSON.parse(teamSection.content) : { teamMembers: [] };
+        const updatedTeamMembers = [...existingContent.teamMembers, teamMember];
+        await Section.update(teamSection.section_id, {
+          content: JSON.stringify({ teamMembers: updatedTeamMembers }),
+        });
+        console.log('Team section updated with ID:', teamSection.section_id);
+        res.status(200).json({ section_id: teamSection.section_id });
       }
-    } catch (error) {
-      console.error('Error in addSection:', error.message, error.stack);
-      res.status(500).json({ error: 'Server error', details: error.message });
+    } else {
+      // Handle other section types
+      console.log('Creating section:', { userId, type, title, content, image_uri, section });
+      const sectionId = await Section.create(userId, type, title, content, image_uri, section);
+      console.log('Section created with ID:', sectionId);
+      res.status(201).json({ section_id: sectionId });
     }
-  },
-
+  } catch (error) {
+    console.error('Error in addSection:', error);
+    res.status(500).json({ error: 'Server error', details: error.message });
+  }
+},
   deleteSection: async (req, res) => {
     try {
       console.log('=== Deleting Section ===');
@@ -420,6 +422,34 @@ const profileController = {
       res.status(500).json({ error: 'Server error', details: error.message });
     }
   },
+
+  // In profileController.js
+deleteTeamMember: async (req, res) => {
+  try {
+    const userId = req.user?.userId || req.user?.id;
+    const { sectionId, username } = req.params;
+
+    if (!userId) return res.status(400).json({ error: 'User ID is required.' });
+    if (!sectionId || !username) return res.status(400).json({ error: 'Section ID and username are required.' });
+
+    const section = await Section.findByUserIdAndSection(userId, 'team');
+    if (!section || section.section_id !== parseInt(sectionId)) {
+      return res.status(404).json({ error: 'Team section not found.' });
+    }
+
+    const content = JSON.parse(section.content);
+    const updatedTeamMembers = content.teamMembers.filter(member => member.username !== username);
+    await Section.update(section.section_id, {
+      content: JSON.stringify({ teamMembers: updatedTeamMembers }),
+    });
+
+    console.log(`Team member ${username} deleted from section ${sectionId}`);
+    res.status(200).json({ message: 'Team member deleted successfully.' });
+  } catch (error) {
+    console.error('Error in deleteTeamMember:', error);
+    res.status(500).json({ error: 'Server error', details: error.message });
+  }
+},
 
   deleteGraph: async (req, res) => {
     try {
