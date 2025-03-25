@@ -374,14 +374,14 @@ const Profile = ({ route, isBusinessProfile = false }) => {
     const sectionsData = await fetchWithAuth("/sections");
     if (sectionsData) {
       const parsedSections = sectionsData.map((section) => {
-        console.log("Parsed section with section_id:", section.section_id); // Add logging
+        console.log("Parsed section with section_id:", section.section_id);
         if (section.type === "story" && section.title === "Team" && section.content) {
           try {
             const parsedContent = JSON.parse(section.content);
-            return { ...section, teamMember: parsedContent.teamMember };
+            return { ...section, teamMembers: parsedContent.teamMembers || [] }; // Use teamMembers array
           } catch (e) {
-            console.error("Failed to parse teamMember content:", e);
-            return section;
+            console.error("Failed to parse teamMembers content:", e);
+            return { ...section, teamMembers: [] };
           }
         }
         return section;
@@ -434,21 +434,25 @@ const Profile = ({ route, isBusinessProfile = false }) => {
         teamMember: route.params.selectedTeamMember,
       };
       console.log("Sending POST /sections request with payload:", sectionData);
-      fetchWithAuth("/sections", "POST", sectionData).then((response) => {
-        if (response) {
-          console.log("POST /sections response:", response);
-          fetchSections(); // Refresh sections to get the updated section with teamMember
-        } else {
-          console.error("Failed to add Team section: No response received");
-        }
-      }).catch((error) => {
-        console.error("Error in POST /sections request:", error);
-      });
+      fetchWithAuth("/sections", "POST", sectionData)
+        .then((response) => {
+          if (response) {
+            console.log("POST /sections response:", response);
+            fetchSections(); // Refresh sections to get the updated team members
+          } else {
+            console.error("Failed to add Team section: No response received");
+            Alert.alert("Error", "Failed to add team member. Please try again.");
+          }
+        })
+        .catch((error) => {
+          console.error("Error in POST /sections request:", error);
+          Alert.alert("Error", "An error occurred. Please check your connection and try again.");
+        });
       setActiveTab("stories");
       navigation.setParams({ selectedTeamMember: null });
     }
   }, [route.params?.updatedUser, route.params?.selectedTeamMember, refreshProfileData, navigation]);
-  
+
   useFocusEffect(
     useCallback(() => {
       if (!userData) {
@@ -525,19 +529,25 @@ const Profile = ({ route, isBusinessProfile = false }) => {
       startups: "Startups",
       startup: "Startup",
     };
-    const sectionData = {
-      type: "story",
-      title: titles[storyType],
-      section: storyType,
-    };
-    const response = await fetchWithAuth("/sections", "POST", sectionData);
-    if (response) {
-      await fetchSections();
+    if (storyType === "team") {
+      navigation.navigate("Search"); // This is already correct
       setStorySectionModalVisible(false);
       setSectionModalVisible(false);
-      resetSectionModal();
     } else {
-      alert("Failed to create story section");
+      const sectionData = {
+        type: "story",
+        title: titles[storyType],
+        section: storyType,
+      };
+      const response = await fetchWithAuth("/sections", "POST", sectionData);
+      if (response) {
+        await fetchSections();
+        setStorySectionModalVisible(false);
+        setSectionModalVisible(false);
+        resetSectionModal();
+      } else {
+        alert("Failed to create story section");
+      }
     }
   };
 
@@ -667,7 +677,7 @@ const Profile = ({ route, isBusinessProfile = false }) => {
           console.log("Processing section:", section);
           switch (section.type) {
             case "story":
-              if (section.title === "Team" && section.teamMember) {
+              if (section.title === "Team" && section.teamMembers && section.teamMembers.length > 0) {
                 return (
                   <View key={section.section_id} style={styles.sectionContainer}>
                     <View style={styles.divider} />
@@ -678,22 +688,34 @@ const Profile = ({ route, isBusinessProfile = false }) => {
                       showsHorizontalScrollIndicator={false}
                       contentContainerStyle={styles.storiesContainer}
                     >
+                      {section.teamMembers.map((member, index) => (
+                        <StoryItem
+                          key={`${member.username}_${index}`}
+                          story={{
+                            story_id: `team_${member.username}`,
+                            username: member.username,
+                            image_url: member.profile_picture,
+                            has_story: true,
+                            viewed: false,
+                          }}
+                          onPress={() =>
+                            navigation.navigate("Profile", {
+                              username: member.username,
+                              isOtherUser: true,
+                            })
+                          }
+                          isAddButton={false}
+                          onDelete={() => {
+                            fetchWithAuth(`/sections/${section.section_id}/team/${member.username}`, "DELETE")
+                              .then(() => fetchSections())
+                              .catch((error) => console.error("Error deleting team member:", error));
+                          }}
+                        />
+                      ))}
                       <StoryItem
-                        story={{
-                          story_id: `team_${section.teamMember.username}`,
-                          username: section.teamMember.username,
-                          image_url: section.teamMember.profile_picture,
-                          has_story: true,
-                          viewed: false,
-                        }}
-                        onPress={() =>
-                          navigation.navigate("Profile", {
-                            username: section.teamMember.username,
-                            isOtherUser: true,
-                          })
-                        }
-                        isAddButton={false}
-                        onDelete={() => handleDeleteSection(section.section_id)}
+                        story={{ id: "add_team", username: "Add Team", has_story: false, viewed: false }}
+                        onPress={() => navigation.navigate("Search")}
+                        isAddButton={true}
                       />
                     </ScrollView>
                     <View style={styles.divider} />
@@ -704,7 +726,7 @@ const Profile = ({ route, isBusinessProfile = false }) => {
                 <Stories
                   key={section.section_id}
                   title={section.title}
-                  sectionId={section.section_id} // Use section.section_id directly
+                  sectionId={section.section_id}
                   stories={stories}
                   onAddStory={handleAddStory}
                   onStoryPress={(story, index) =>
@@ -1108,8 +1130,7 @@ const Profile = ({ route, isBusinessProfile = false }) => {
             <View style={styles.modalOptions}>
               <TouchableOpacity
                 style={styles.storySectionOption}
-
-                onPress={() => navigation.navigate("Search")}
+                onPress={() => handleStorySectionSubmit("team")} // Update this line
               >
                 <View style={styles.teamIconsContainer}>
                   <View style={[styles.teamIcon, { backgroundColor: "#e0e0e0" }]} />
@@ -1223,10 +1244,17 @@ const styles = StyleSheet.create({
   sectionImage: { width: "100%", height: 200, borderRadius: 8, resizeMode: "cover", marginVertical: 2 },
   sectionContent: { fontSize: 14, color: "#666", lineHeight: 20, paddingHorizontal: 15 },
   placeholderText: { fontSize: 14, color: "#999", paddingHorizontal: 15 },
-  storiesContainer: { paddingVertical: 2, flexDirection: "row", alignItems: "center", paddingHorizontal: 15 },
+  storiesContainer: {
+    paddingVertical: 2,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 15,
+    paddingRight: 30, // Extra padding for the "Add Team" button
+  },
+
   storyItemContainer: {
-    position: 'relative',
-    alignItems: 'center',
+    position: "relative",
+    alignItems: "center",
     width: 72,
     marginHorizontal: 6,
     paddingVertical: 4,
@@ -1338,16 +1366,16 @@ const styles = StyleSheet.create({
   startupSingleText: { fontSize: 14, fontWeight: "600", color: "#333", marginTop: 5 },
   startupSingleDesc: { fontSize: 12, color: "#666", textAlign: "center", marginTop: 2 },
   deleteButton: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
+    position: "absolute",
+    top: -5, // Move above the icon to avoid overlap
+    right: -5,
     zIndex: 1,
     padding: 5,
   },
   deleteIcon: {
     width: 20,
     height: 20,
-    tintColor: '#ff4444',
+    tintColor: "#ff4444",
   },
 });
 
