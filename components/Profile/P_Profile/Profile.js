@@ -100,10 +100,15 @@ const StoryItem = React.memo(({ story, onPress, isAddButton, onDelete }) => {
 
 const Stories = React.memo(({ stories, onStoryPress, onAddStory, title, sectionId, fetchWithAuth }) => {
   const addStoryItem = { id: "add", username: "Add Story", has_story: false, viewed: false };
-  const filteredStories = stories.filter((story) => story.section === sectionId);
+  // Filter stories by section_id instead of section
+  const filteredStories = stories.filter((story) => story.section_id === sectionId);
 
   const handleDeleteStory = async (storyId) => {
     await fetchWithAuth(`/stories/${storyId}`, "DELETE");
+    // Refresh stories after deletion
+    const updatedStories = stories.filter((story) => story.story_id !== storyId);
+    setStories(updatedStories);
+    await AsyncStorage.setItem("stories", JSON.stringify(updatedStories));
   };
 
   return (
@@ -345,17 +350,21 @@ const Profile = ({ route, isBusinessProfile = false }) => {
   const fetchStories = async () => {
     const storiesData = await fetchWithAuth("/stories");
     if (storiesData) {
-      const validStories = storiesData.map((story) => ({
-        story_id: story.story_id,
-        image_url: story.image_url.startsWith("http")
-          ? story.image_url
-          : `${NGROK_URL}${story.image_url}`,
-        has_story: story.has_story === 1 || true,
-        viewed: story.viewed === 1,
-        username: story.username || userData?.username || "User",
-        profile_picture: userData?.profile_picture || null,
-        section: story.section || "milestones",
-      }));
+      const validStories = storiesData.map((story) => {
+        console.log("Processing story:", story); // Add logging
+        return {
+          story_id: story.story_id,
+          image_url: story.image_url.startsWith("http")
+            ? story.image_url
+            : `${NGROK_URL}${story.image_url}`,
+          has_story: story.has_story === 1 || true,
+          viewed: story.viewed === 1,
+          username: story.username || userData?.username || "User",
+          profile_picture: story.profile_picture || null, // Use backend-provided profile_picture
+          section: story.section || "milestones",
+          section_id: story.section_id, // Include section_id
+        };
+      });
       setStories(validStories);
       await AsyncStorage.setItem("stories", JSON.stringify(validStories));
     }
@@ -365,6 +374,7 @@ const Profile = ({ route, isBusinessProfile = false }) => {
     const sectionsData = await fetchWithAuth("/sections");
     if (sectionsData) {
       const parsedSections = sectionsData.map((section) => {
+        console.log("Parsed section with section_id:", section.section_id); // Add logging
         if (section.type === "story" && section.title === "Team" && section.content) {
           try {
             const parsedContent = JSON.parse(section.content);
@@ -417,30 +427,28 @@ const Profile = ({ route, isBusinessProfile = false }) => {
     }
     if (route.params?.selectedTeamMember) {
       console.log("Received Team Member:", route.params.selectedTeamMember);
-      const newTeamSection = {
-        section_id: `team_${Date.now()}`,
+      const sectionData = {
         type: "story",
         title: "Team",
-        section: "milestones",
+        section: "team",
         teamMember: route.params.selectedTeamMember,
       };
-      setSections((prev) => {
-        const teamExists = prev.some((section) => section.title === "Team" && section.type === "story");
-        const newSections = teamExists
-          ? prev.map((section) =>
-            section.title === "Team" && section.type === "story"
-              ? { ...section, teamMember: route.params.selectedTeamMember }
-              : section
-          )
-          : [...prev, newTeamSection];
-        console.log("Updated sections:", newSections);
-        return newSections;
+      console.log("Sending POST /sections request with payload:", sectionData);
+      fetchWithAuth("/sections", "POST", sectionData).then((response) => {
+        if (response) {
+          console.log("POST /sections response:", response);
+          fetchSections(); // Refresh sections to get the updated section with teamMember
+        } else {
+          console.error("Failed to add Team section: No response received");
+        }
+      }).catch((error) => {
+        console.error("Error in POST /sections request:", error);
       });
-      setActiveTab("stories"); // Ensure the "stories" tab is active
+      setActiveTab("stories");
       navigation.setParams({ selectedTeamMember: null });
     }
   }, [route.params?.updatedUser, route.params?.selectedTeamMember, refreshProfileData, navigation]);
-
+  
   useFocusEffect(
     useCallback(() => {
       if (!userData) {
@@ -468,16 +476,17 @@ const Profile = ({ route, isBusinessProfile = false }) => {
             has_story: true,
             viewed: false,
             username: userData?.username || "User",
-            profile_picture: userData?.profile_picture || null,
+            profile_picture: newStory.profile_picture || null,
             section: newStory.section || sectionId,
+            section_id: newStory.section_id, // Include section_id
           },
         ]);
         fetchStories();
+        fetchSections(); // Refresh sections to get updated section_id
       },
       section: sectionId,
     });
   };
-
   const handleAddSection = () => {
     setStorySectionModalVisible(true);
   };
@@ -655,7 +664,7 @@ const Profile = ({ route, isBusinessProfile = false }) => {
     return (
       <View style={{ width: "100%" }}>
         {sections.map((section) => {
-          console.log("Processing section:", section); // Log each section
+          console.log("Processing section:", section);
           switch (section.type) {
             case "story":
               if (section.title === "Team" && section.teamMember) {
@@ -695,12 +704,12 @@ const Profile = ({ route, isBusinessProfile = false }) => {
                 <Stories
                   key={section.section_id}
                   title={section.title}
-                  sectionId={sectionMap[section.title] || section.title.toLowerCase().replace(/ /g, "_")}
+                  sectionId={section.section_id} // Use section.section_id directly
                   stories={stories}
                   onAddStory={handleAddStory}
                   onStoryPress={(story, index) =>
                     navigation.navigate("ViewStory", {
-                      stories: stories.filter((s) => s.section === (sectionMap[section.title] || section.title.toLowerCase().replace(/ /g, "_"))),
+                      stories: stories.filter((s) => s.section_id === section.section_id),
                       initialIndex: index,
                     })
                   }
