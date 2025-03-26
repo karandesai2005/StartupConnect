@@ -61,76 +61,55 @@ const profileController = {
   // Follow a user
   followUser: async (req, res) => {
     try {
-      console.log('=== Follow User Debug ===');
+      console.log('=== Follow/Unfollow User Debug ===');
       const followerId = req.user?.userId || req.user?.id;
       const { username } = req.body;
-      console.log('Follower ID:', followerId, '| Username to follow:', username);
+      console.log('Follower ID:', followerId, '| Username:', username, '| Method:', req.method);
 
       if (!followerId) {
         return res.status(400).json({ error: 'User ID is required.' });
       }
 
       if (!username) {
-        return res.status(400).json({ error: 'Username to follow is required.' });
+        return res.status(400).json({ error: 'Username is required.' });
       }
 
       const followee = await User.getUserByUsername(username);
       if (!followee) {
-        return res.status(404).json({ error: 'User to follow not found.' });
+        return res.status(404).json({ error: 'User not found.' });
       }
 
       if (followerId === followee.user_id) {
-        return res.status(400).json({ error: 'You cannot follow yourself.' });
+        return res.status(400).json({ error: 'You cannot follow/unfollow yourself.' });
       }
 
-      const isAlreadyFollowing = await User.isFollowing(followerId, followee.user_id);
-      if (isAlreadyFollowing) {
-        return res.status(400).json({ error: 'You are already following this user.' });
-      }
+      const isCurrentlyFollowing = await User.isFollowing(followerId, followee.user_id);
 
-      await User.followUser(followerId, followee.user_id);
-      console.log(`User ${followerId} followed user ${followee.user_id}`);
-      res.status(200).json({ message: 'Successfully followed user.' });
+      if (req.method === 'POST') {
+        // Follow logic
+        if (isCurrentlyFollowing) {
+          return res.status(400).json({ error: 'You are already following this user.' });
+        }
+        await User.followUser(followerId, followee.user_id);
+        console.log(`User ${followerId} followed user ${followee.user_id}`);
+        res.status(200).json({ message: 'Successfully followed user.' });
+      } else if (req.method === 'DELETE') {
+        // Unfollow logic
+        if (!isCurrentlyFollowing) {
+          return res.status(400).json({ error: 'You are not following this user.' });
+        }
+        await User.unfollowUser(followerId, followee.user_id);
+        console.log(`User ${followerId} unfollowed user ${followee.user_id}`);
+        res.status(200).json({ message: 'Successfully unfollowed user.' });
+      } else {
+        return res.status(405).json({ error: 'Method not allowed.' });
+      }
     } catch (error) {
       console.error('Error in followUser:', error);
       res.status(500).json({ error: 'Server error', details: error.message });
     }
   },
 
-  // Unfollow a user
-  unfollowUser: async (req, res) => {
-    try {
-      console.log('=== Unfollow User Debug ===');
-      const followerId = req.user?.userId || req.user?.id;
-      const { username } = req.body;
-      console.log('Follower ID:', followerId, '| Username to unfollow:', username);
-
-      if (!followerId) {
-        return res.status(400).json({ error: 'User ID is required.' });
-      }
-
-      if (!username) {
-        return res.status(400).json({ error: 'Username to unfollow is required.' });
-      }
-
-      const followee = await User.getUserByUsername(username);
-      if (!followee) {
-        return res.status(404).json({ error: 'User to unfollow not found.' });
-      }
-
-      const isFollowing = await User.isFollowing(followerId, followee.user_id);
-      if (!isFollowing) {
-        return res.status(400).json({ error: 'You are not following this user.' });
-      }
-
-      await User.unfollowUser(followerId, followee.user_id);
-      console.log(`User ${followerId} unfollowed user ${followee.user_id}`);
-      res.status(200).json({ message: 'Successfully unfollowed user.' });
-    } catch (error) {
-      console.error('Error in unfollowUser:', error);
-      res.status(500).json({ error: 'Server error', details: error.message });
-    }
-  },
 
   // Get authenticated user's stories
   getStories: async (req, res) => {

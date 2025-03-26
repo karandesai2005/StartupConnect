@@ -1,4 +1,3 @@
-// components/SearchScreen.js
 import React, { useState, useCallback } from 'react';
 import {
   View,
@@ -53,22 +52,16 @@ const SearchScreen = () => {
     searchUsers(text);
   };
 
-  const handleUserPress = (item) => {
-    console.log("Selected Team Member:", item); // Add this to debug
+  const handleUserPress = (username) => {
     setSearchQuery('');
     setSearchResults([]);
-    navigation.navigate('Profile', {
-      selectedTeamMember: {
-        username: item.username,
-        profile_picture: item.profile_picture,
-      },
-    });
+    navigation.navigate('Profile', { username, isOtherUser: true });
   };
 
   const renderSearchResult = ({ item }) => (
     <TouchableOpacity
       style={styles.searchResultItem}
-      onPress={() => handleUserPress(item)} // Pass the full item object, not just item.username
+      onPress={() => handleUserPress(item.username)}
     >
       <Image
         source={

@@ -25,7 +25,8 @@ router.post('/graphs', authMiddleware, profileController.addGraph);
 router.delete('/graphs/:graphId', authMiddleware, profileController.deleteGraph); // New DELETE route
 
 // Follow/Unfollow
-router.post('/follow', authMiddleware, profileController.followUser);
-router.post('/unfollow', authMiddleware, profileController.unfollowUser);
+router.route('/follow')
+  .post(authMiddleware, profileController.followUser)    // POST to follow
+  .delete(authMiddleware, profileController.followUser); // DELETE to unfollow
 
 module.exports = router;
