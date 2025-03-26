@@ -26,7 +26,7 @@ const profileController = {
       console.log('Profile fetched:', user);
       res.json(user);
     } catch (error) {
-      console.error('Error in getProfile:', error.message, error.stack);
+      console.error('Error in getProfile:', error);
       res.status(500).json({ error: 'Server error', details: error.message });
     }
   },
@@ -53,7 +53,7 @@ const profileController = {
       console.log('User profile fetched:', user);
       res.json({ ...user, isFollowing });
     } catch (error) {
-      console.error('Error in getUserProfile:', error.message, error.stack);
+      console.error('Error in getUserProfile:', error);
       res.status(500).json({ error: 'Server error', details: error.message });
     }
   },
@@ -61,76 +61,55 @@ const profileController = {
   // Follow a user
   followUser: async (req, res) => {
     try {
-      console.log('=== Follow User Debug ===');
+      console.log('=== Follow/Unfollow User Debug ===');
       const followerId = req.user?.userId || req.user?.id;
       const { username } = req.body;
-      console.log('Follower ID:', followerId, '| Username to follow:', username);
+      console.log('Follower ID:', followerId, '| Username:', username, '| Method:', req.method);
 
       if (!followerId) {
         return res.status(400).json({ error: 'User ID is required.' });
       }
 
       if (!username) {
-        return res.status(400).json({ error: 'Username to follow is required.' });
+        return res.status(400).json({ error: 'Username is required.' });
       }
 
       const followee = await User.getUserByUsername(username);
       if (!followee) {
-        return res.status(404).json({ error: 'User to follow not found.' });
+        return res.status(404).json({ error: 'User not found.' });
       }
 
       if (followerId === followee.user_id) {
-        return res.status(400).json({ error: 'You cannot follow yourself.' });
+        return res.status(400).json({ error: 'You cannot follow/unfollow yourself.' });
       }
 
-      const isAlreadyFollowing = await User.isFollowing(followerId, followee.user_id);
-      if (isAlreadyFollowing) {
-        return res.status(400).json({ error: 'You are already following this user.' });
-      }
+      const isCurrentlyFollowing = await User.isFollowing(followerId, followee.user_id);
 
-      await User.followUser(followerId, followee.user_id);
-      console.log(`User ${followerId} followed user ${followee.user_id}`);
-      res.status(200).json({ message: 'Successfully followed user.' });
+      if (req.method === 'POST') {
+        // Follow logic
+        if (isCurrentlyFollowing) {
+          return res.status(400).json({ error: 'You are already following this user.' });
+        }
+        await User.followUser(followerId, followee.user_id);
+        console.log(`User ${followerId} followed user ${followee.user_id}`);
+        res.status(200).json({ message: 'Successfully followed user.' });
+      } else if (req.method === 'DELETE') {
+        // Unfollow logic
+        if (!isCurrentlyFollowing) {
+          return res.status(400).json({ error: 'You are not following this user.' });
+        }
+        await User.unfollowUser(followerId, followee.user_id);
+        console.log(`User ${followerId} unfollowed user ${followee.user_id}`);
+        res.status(200).json({ message: 'Successfully unfollowed user.' });
+      } else {
+        return res.status(405).json({ error: 'Method not allowed.' });
+      }
     } catch (error) {
-      console.error('Error in followUser:', error.message, error.stack);
+      console.error('Error in followUser:', error);
       res.status(500).json({ error: 'Server error', details: error.message });
     }
   },
 
-  // Unfollow a user
-  unfollowUser: async (req, res) => {
-    try {
-      console.log('=== Unfollow User Debug ===');
-      const followerId = req.user?.userId || req.user?.id;
-      const { username } = req.body;
-      console.log('Follower ID:', followerId, '| Username to unfollow:', username);
-
-      if (!followerId) {
-        return res.status(400).json({ error: 'User ID is required.' });
-      }
-
-      if (!username) {
-        return res.status(400).json({ error: 'Username to unfollow is required.' });
-      }
-
-      const followee = await User.getUserByUsername(username);
-      if (!followee) {
-        return res.status(404).json({ error: 'User to unfollow not found.' });
-      }
-
-      const isFollowing = await User.isFollowing(followerId, followee.user_id);
-      if (!isFollowing) {
-        return res.status(400).json({ error: 'You are not following this user.' });
-      }
-
-      await User.unfollowUser(followerId, followee.user_id);
-      console.log(`User ${followerId} unfollowed user ${followee.user_id}`);
-      res.status(200).json({ message: 'Successfully unfollowed user.' });
-    } catch (error) {
-      console.error('Error in unfollowUser:', error.message, error.stack);
-      res.status(500).json({ error: 'Server error', details: error.message });
-    }
-  },
 
   // Get authenticated user's stories
   getStories: async (req, res) => {
@@ -145,7 +124,7 @@ const profileController = {
       console.log('Stories fetched:', stories.length);
       res.json(stories);
     } catch (error) {
-      console.error('Error in getStories:', error.message, error.stack);
+      console.error('Error in getStories:', error);
       res.status(500).json({ error: 'Server error', details: error.message });
     }
   },
@@ -166,7 +145,7 @@ const profileController = {
       console.log('User stories fetched:', stories.length);
       res.json(stories);
     } catch (error) {
-      console.error('Error in getUserStories:', error.message, error.stack);
+      console.error('Error in getUserStories:', error);
       res.status(500).json({ error: 'Server error', details: error.message });
     }
   },
@@ -181,51 +160,22 @@ const profileController = {
 
         const userId = req.user?.userId || req.user?.id;
         const username = req.user.username;
-        const sectionName = req.body.section || 'default';
+        const section = req.body.section || 'default';
 
         if (!userId) return res.status(400).json({ error: 'User ID is required.' });
         if (!req.file) return res.status(400).json({ error: 'Media file is required.' });
 
         const imageUrl = `/uploads/posts/${req.file.filename}`;
-        const hasStory = 1;
+        const has_story = 1;
         const viewed = 0;
 
-        // Find or create the section
-        let section = await Section.findByUserIdAndSection(userId, sectionName);
-        if (!section) {
-          const sectionId = await Section.create(userId, 'story', sectionName, null, null, sectionName);
-          section = { section_id: sectionId };
-        }
-
-        // Get user's profile picture
-        const user = await User.getUserById(userId);
-        const profilePicture = user.profile_picture || null;
-
-        console.log('Creating story:', {
-          userId,
-          username,
-          imageUrl,
-          hasStory,
-          viewed,
-          sectionName,
-          sectionId: section.section_id,
-          profilePicture,
-        });
-        const storyId = await Story.create(
-          userId,
-          username,
-          imageUrl,
-          hasStory,
-          viewed,
-          sectionName,
-          section.section_id, // Link to section
-          profilePicture // Set profile picture
-        );
+        console.log('Creating story:', { userId, username, imageUrl, has_story, viewed, section });
+        const storyId = await Story.create(userId, username, imageUrl, has_story, viewed, section);
         console.log('Story created with ID:', storyId);
 
-        res.status(201).json({ story_id: storyId, image_url: imageUrl, section: sectionName });
+        res.status(201).json({ story_id: storyId, image_url: imageUrl, section });
       } catch (error) {
-        console.error('Error in addStory:', error.message, error.stack);
+        console.error('Error in addStory:', error);
         res.status(500).json({ error: 'Server error', details: error.message });
       }
     },
@@ -249,7 +199,7 @@ const profileController = {
       console.log('Story deleted successfully');
       res.status(200).json({ message: 'Story deleted successfully.' });
     } catch (error) {
-      console.error('Error in deleteStory:', error.message, error.stack);
+      console.error('Error in deleteStory:', error);
       res.status(500).json({ error: 'Server error', details: error.message });
     }
   },
@@ -265,7 +215,7 @@ const profileController = {
       console.log('Sections fetched:', sections.length);
       res.json(sections);
     } catch (error) {
-      console.error('Error in getSections:', error.message, error.stack);
+      console.error('Error in getSections:', error);
       res.status(500).json({ error: 'Server error', details: error.message });
     }
   },
@@ -286,61 +236,60 @@ const profileController = {
       console.log('User sections fetched:', sections.length);
       res.json(sections);
     } catch (error) {
-      console.error('Error in getUserSections:', error.message, error.stack);
+      console.error('Error in getUserSections:', error);
       res.status(500).json({ error: 'Server error', details: error.message });
     }
   },
 
   // Add a section (authenticated user only)
-  // In profileController.js
-addSection: async (req, res) => {
-  try {
-    console.log('=== Add Section Debug ===');
-    console.log('User:', req.user, '| Body:', req.body);
+  addSection: async (req, res) => {
+    try {
+      console.log('=== Add Section Debug ===');
+      console.log('User:', req.user, '| Body:', req.body);
 
-    const userId = req.user?.userId || req.user?.id;
-    const { type, title, content, image_uri, section, teamMember } = req.body;
+      const userId = req.user?.userId || req.user?.id;
+      const { type, title, content, image_uri, section, teamMember } = req.body; // Add teamMember to destructuring
 
-    if (!userId) return res.status(400).json({ error: 'User ID is required.' });
-    if (!type || !title) return res.status(400).json({ error: 'Type and title are required.' });
+      if (!userId) return res.status(400).json({ error: 'User ID is required.' });
+      if (!type || !title) return res.status(400).json({ error: 'Type and title are required.' });
 
-    if (type === 'story' && title === 'Team' && teamMember) {
-      let teamSection = await Section.findByUserIdAndSection(userId, 'team');
+      if (type === 'story' && title === 'Team' && teamMember) {
+        // Handle Team section with teamMember
+        let teamSection = await Section.findByUserIdAndSection(userId, 'team');
 
-      if (!teamSection) {
-        // Create a new "Team" section with an array of team members
-        const sectionId = await Section.create(
-          userId,
-          type,
-          title,
-          JSON.stringify({ teamMembers: [teamMember] }),
-          null,
-          'team'
-        );
-        console.log('Team section created with ID:', sectionId);
-        res.status(201).json({ section_id: sectionId });
+        if (!teamSection) {
+          // Create a new "Team" section if it doesn’t exist
+          const sectionId = await Section.create(
+            userId,
+            type,
+            title,
+            JSON.stringify({ teamMember }), // Store teamMember as JSON in content
+            null,
+            'team'
+          );
+          teamSection = { section_id: sectionId };
+        } else {
+          // Update existing "Team" section with new teamMember (append or replace based on your needs)
+          const existingContent = teamSection.content ? JSON.parse(teamSection.content) : {};
+          const updatedContent = { ...existingContent, teamMember };
+          await Section.update(teamSection.section_id, { content: JSON.stringify(updatedContent) });
+        }
+
+        console.log('Team section created/updated with ID:', teamSection.section_id);
+        res.status(201).json({ section_id: teamSection.section_id });
       } else {
-        // Update existing "Team" section by appending the new team member
-        const existingContent = teamSection.content ? JSON.parse(teamSection.content) : { teamMembers: [] };
-        const updatedTeamMembers = [...existingContent.teamMembers, teamMember];
-        await Section.update(teamSection.section_id, {
-          content: JSON.stringify({ teamMembers: updatedTeamMembers }),
-        });
-        console.log('Team section updated with ID:', teamSection.section_id);
-        res.status(200).json({ section_id: teamSection.section_id });
+        // Handle other section types (text, image, etc.)
+        console.log('Creating section:', { userId, type, title, content, image_uri, section });
+        const sectionId = await Section.create(userId, type, title, content, image_uri, section);
+        console.log('Section created with ID:', sectionId);
+        res.status(201).json({ section_id: sectionId });
       }
-    } else {
-      // Handle other section types
-      console.log('Creating section:', { userId, type, title, content, image_uri, section });
-      const sectionId = await Section.create(userId, type, title, content, image_uri, section);
-      console.log('Section created with ID:', sectionId);
-      res.status(201).json({ section_id: sectionId });
+    } catch (error) {
+      console.error('Error in addSection:', error);
+      res.status(500).json({ error: 'Server error', details: error.message });
     }
-  } catch (error) {
-    console.error('Error in addSection:', error);
-    res.status(500).json({ error: 'Server error', details: error.message });
-  }
-},
+  },
+
   deleteSection: async (req, res) => {
     try {
       console.log('=== Deleting Section ===');
@@ -359,7 +308,7 @@ addSection: async (req, res) => {
       console.log('Section deleted successfully');
       res.status(200).json({ message: 'Section deleted successfully.' });
     } catch (error) {
-      console.error('Error in deleteSection:', error.message, error.stack);
+      console.error('Error in deleteSection:', error);
       res.status(500).json({ error: 'Server error', details: error.message });
     }
   },
@@ -375,7 +324,7 @@ addSection: async (req, res) => {
       console.log('Graphs fetched:', graphs.length);
       res.json(graphs);
     } catch (error) {
-      console.error('Error in getGraphs:', error.message, error.stack);
+      console.error('Error in getGraphs:', error);
       res.status(500).json({ error: 'Server error', details: error.message });
     }
   },
@@ -396,7 +345,7 @@ addSection: async (req, res) => {
       console.log('User graphs fetched:', graphs.length);
       res.json(graphs);
     } catch (error) {
-      console.error('Error in getUserGraphs:', error.message, error.stack);
+      console.error('Error in getUserGraphs:', error);
       res.status(500).json({ error: 'Server error', details: error.message });
     }
   },
@@ -418,38 +367,10 @@ addSection: async (req, res) => {
       console.log('Graph created with ID:', graphId);
       res.status(201).json({ graph_id: graphId });
     } catch (error) {
-      console.error('Error in addGraph:', error.message, error.stack);
+      console.error('Error in addGraph:', error);
       res.status(500).json({ error: 'Server error', details: error.message });
     }
   },
-
-  // In profileController.js
-deleteTeamMember: async (req, res) => {
-  try {
-    const userId = req.user?.userId || req.user?.id;
-    const { sectionId, username } = req.params;
-
-    if (!userId) return res.status(400).json({ error: 'User ID is required.' });
-    if (!sectionId || !username) return res.status(400).json({ error: 'Section ID and username are required.' });
-
-    const section = await Section.findByUserIdAndSection(userId, 'team');
-    if (!section || section.section_id !== parseInt(sectionId)) {
-      return res.status(404).json({ error: 'Team section not found.' });
-    }
-
-    const content = JSON.parse(section.content);
-    const updatedTeamMembers = content.teamMembers.filter(member => member.username !== username);
-    await Section.update(section.section_id, {
-      content: JSON.stringify({ teamMembers: updatedTeamMembers }),
-    });
-
-    console.log(`Team member ${username} deleted from section ${sectionId}`);
-    res.status(200).json({ message: 'Team member deleted successfully.' });
-  } catch (error) {
-    console.error('Error in deleteTeamMember:', error);
-    res.status(500).json({ error: 'Server error', details: error.message });
-  }
-},
 
   deleteGraph: async (req, res) => {
     try {
@@ -469,7 +390,7 @@ deleteTeamMember: async (req, res) => {
       console.log('Graph deleted successfully');
       res.status(200).json({ message: 'Graph deleted successfully.' });
     } catch (error) {
-      console.error('Error in deleteGraph:', error.message, error.stack);
+      console.error('Error in deleteGraph:', error);
       res.status(500).json({ error: 'Server error', details: error.message });
     }
   },
