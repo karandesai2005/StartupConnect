@@ -547,17 +547,18 @@ const styles = StyleSheet.create({
   },
   playIconContainer: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    top: 5,           // Move to top
+    right: 5,         // Move to right
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    backgroundColor: 'rgba(0,0,0,0.5)', // Slightly darker for visibility
+    borderRadius: 12, // Optional: make it circular
+    width: 24,        // Fixed size for the button
+    height: 24,
   },
   playIcon: {
     color: 'white',
-    fontSize: 24,
+    fontSize: 16,     // Slightly smaller for the smaller container
   },
 });
 
