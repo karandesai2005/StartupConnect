@@ -17,6 +17,7 @@ import {
   SafeAreaView,
   KeyboardAvoidingView,
   StatusBar,
+  Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import axios from 'axios';
@@ -40,8 +41,15 @@ const formatTimestamp = (timestamp) => {
   const diffInDays = Math.floor(diffInHours / 24);
   if (diffInDays < 7) return `${diffInDays}d ago`;
   return postDate.toLocaleDateString();
+  
 };
-
+const handleChatPress = () => {
+    Alert.alert(
+      "Feature Unavailable",
+      "Sorry, this feature is not available currently.",
+      [{ text: "OK" }]
+    );
+  };
 // Memoized Post Card Component
 const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, navigation }) => {
   const [imageHeight, setImageHeight] = useState(width);
@@ -58,6 +66,10 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
   const [isLikeLoading, setIsLikeLoading] = useState(false);
   const debouncedHandleLike = useCallback(debounce(async () => handleLike(), 300), [handleLike]);
   const isUserPost = item.hasOwnProperty('caption') || item.hasOwnProperty('content');
+  const [shouldShowMore, setShouldShowMore] = useState(false);
+  const [isMeasured, setIsMeasured] = useState(false);
+  const [fullTextHeight, setFullTextHeight] = useState(0);
+  const [lastTap, setLastTap] = useState(null);
 
   useEffect(() => {
     fetchLikeStatus();
@@ -102,7 +114,7 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
     }
     return () => {
       if (isVideo && videoRef.current) {
-        videoRef.current.pauseAsync().catch(() => { });
+        videoRef.current.pauseAsync().catch(() => {});
       }
     };
   }, [isVisible, isVideo]);
@@ -201,12 +213,24 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
     }
   };
 
+  const handleDoubleTap = () => {
+    const now = Date.now();
+    const DOUBLE_PRESS_DELAY = 300; // milliseconds
+    if (lastTap && (now - lastTap) < DOUBLE_PRESS_DELAY) {
+      if (!isLiked && !isLikeLoading) {
+        handleLike();
+      }
+    } else {
+      setLastTap(now);
+    }
+  };
+
   const handleProfilePress = () => {
     const username = isUserPost
       ? item.username
       : item.name
-        ? `${item.name.first} ${item.name.last}`
-        : 'User';
+      ? `${item.name.first} ${item.name.last}`
+      : 'User';
     navigation.navigate('Profile', { username, isOtherUser: true });
   };
 
@@ -277,6 +301,15 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
     }
   };
 
+  const handleTextLayout = (event) => {
+    if (!isMeasured) {
+      const { height } = event.nativeEvent.layout;
+      setFullTextHeight(height);
+      setShouldShowMore(height > 40 && (item.content || item.caption));
+      setIsMeasured(true);
+    }
+  };
+
   return (
     <Animated.View style={[styles.card, { transform: [{ scale: animatedScale }] }]}>
       <TouchableOpacity onPress={handleProfilePress} activeOpacity={0.7}>
@@ -302,15 +335,20 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
           <TouchableOpacity
             style={styles.moreButton}
             onPress={(e) => {
-              e.stopPropagation(); // Prevents profile navigation
-              console.log('More button pressed for post:', item.post_id); // Placeholder for future action
+              e.stopPropagation();
+              console.log('More button pressed for post:', item.post_id);
             }}
           >
             <Text style={styles.moreButtonText}>•••</Text>
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
-      <TouchableOpacity activeOpacity={0.95} onPressIn={handlePressIn} onPressOut={handlePressOut}>
+      <TouchableOpacity 
+        activeOpacity={0.95} 
+        onPressIn={handlePressIn} 
+        onPressOut={handlePressOut}
+        onPress={handleDoubleTap}
+      >
         <View style={[styles.imageContainer, { height: imageHeight }]}>
           {isLoading && (
             <View style={styles.imageLoader}>
@@ -338,8 +376,8 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
                 typeof item.image_url === 'string' && item.image_url.startsWith('http')
                   ? { uri: item.image_url }
                   : typeof item.media_url === 'string' && item.media_url.startsWith('http')
-                    ? { uri: item.media_url }
-                    : require('../assets/PITCH.png')
+                  ? { uri: item.media_url }
+                  : require('../assets/PITCH.png')
               }
               style={[styles.postImage, { height: imageHeight }]}
               onLoad={() => setIsLoading(false)}
@@ -365,28 +403,48 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
         >
           <Image
             source={require('../assets/icon-like.png')}
-            style={[styles.navIcon, isLiked && { tintColor: '#1f219c' }, isLikeLoading && { opacity: 0.5 }]}
+            style={[
+              styles.navIcon,
+              { tintColor: isLiked ? '#1f219c' : '#000000' },
+              isLikeLoading && { opacity: 0.5 }
+            ]}
           />
-          {isLikeLoading && <ActivityIndicator size="small" color="#1f219c" style={styles.likeLoader} />}
+          {/* Removed ActivityIndicator */}
         </TouchableOpacity>
         <TouchableOpacity style={styles.actionButton} onPress={toggleCommentModal}>
           <Image source={require('../assets/comment6.png')} style={styles.navIcon} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.actionButton}>
+        <TouchableOpacity style={styles.actionButton} onPress={handleChatPress}>
           <Image source={require('../assets/share.png')} style={styles.navIcon} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.actionButton}>
+        <TouchableOpacity style={styles.actionButton} onPress={handleChatPress}>
           <Image source={require('../assets/save.png')} style={styles.navIcon} />
         </TouchableOpacity>
       </View>
       <View style={styles.captionContainer}>
-        <Text style={styles.caption} numberOfLines={expandedItems[index] ? undefined : 2}>
-          <Text style={styles.username}>
-            {isUserPost ? item.username : item.name ? item.name.first : 'User'}{' '}
+        {!isMeasured && (
+          <Text
+            style={[styles.caption, styles.measureText]}
+            onLayout={handleTextLayout}
+          >
+            <Text style={styles.username}>
+              {isUserPost ? item.username : item.name ? item.name.first : 'User'}{' '}
+            </Text>
+            {item.content || item.caption}
           </Text>
-          {item.content || item.caption}
-        </Text>
-        {(item.content || item.caption) && (
+        )}
+        {isMeasured && (
+          <Text
+            style={styles.caption}
+            numberOfLines={shouldShowMore && !expandedItems[index] ? 2 : undefined}
+          >
+            <Text style={styles.username}>
+              {isUserPost ? item.username : item.name ? item.name.first : 'User'}{' '}
+            </Text>
+            {item.content || item.caption}
+          </Text>
+        )}
+        {shouldShowMore && (
           <TouchableOpacity onPress={() => toggleExpand(index)}>
             <Text style={styles.showMoreText}>{expandedItems[index] ? 'Show less' : 'Show more'}</Text>
           </TouchableOpacity>
@@ -465,6 +523,7 @@ export default function Home() {
   const navigation = useNavigation();
   const [postsError, setPostsError] = useState(null);
   const [isFieldsModalVisible, setFieldsModalVisible] = useState(false);
+  const [tempSelectedFields, setTempSelectedFields] = useState([]);
   const [selectedFields, setSelectedFields] = useState([]);
   const [viewableItems, setViewableItems] = useState([]);
 
@@ -487,7 +546,7 @@ export default function Home() {
     'Health',
     'Education',
     'Gaming',
-    'Robotics',
+    'Rob-linkotics',
     'Marketing',
     'Blockchain',
     'Design',
@@ -621,10 +680,20 @@ export default function Home() {
     return `item-${index}`;
   }, []);
 
-  const toggleField = (field) => {
-    setSelectedFields((current) =>
+  const toggleTempField = (field) => {
+    setTempSelectedFields((current) =>
       current.includes(field) ? current.filter((item) => item !== field) : [...current, field]
     );
+  };
+
+  const handleFieldsDone = () => {
+    setSelectedFields(tempSelectedFields);
+    setFieldsModalVisible(false);
+  };
+
+  const handleFieldsClose = () => {
+    setTempSelectedFields(selectedFields);
+    setFieldsModalVisible(false);
   };
 
   const handleSearchFocus = () => {
@@ -646,6 +715,8 @@ export default function Home() {
       navigation.navigate('Profile', { username, isOtherUser: false });
     }
   };
+
+  
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -673,13 +744,16 @@ export default function Home() {
         </View>
 
         <View style={styles.iconsContainer}>
-          <TouchableOpacity onPress={() => navigation.navigate('Chat')}>
+          <TouchableOpacity onPress={handleChatPress}>
             <Image source={require('../assets/Arrow.png')} style={styles.chatIcon} />
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.iconSpacing}
-            onPress={() => setFieldsModalVisible(true)}
+            onPress={() => {
+              setTempSelectedFields(selectedFields);
+              setFieldsModalVisible(true);
+            }}
           >
             <Image source={require('../assets/options.png')} style={styles.filterIcon} />
           </TouchableOpacity>
@@ -717,7 +791,7 @@ export default function Home() {
 
       <Modal
         isVisible={isFieldsModalVisible}
-        onBackdropPress={() => setFieldsModalVisible(false)}
+        onBackdropPress={handleFieldsClose}
         style={styles.modal}
       >
         <View style={styles.modalContent}>
@@ -728,20 +802,28 @@ export default function Home() {
                 key={field}
                 style={[
                   styles.fieldBubble,
-                  selectedFields.includes(field) && styles.selectedFieldBubble,
+                  tempSelectedFields.includes(field) && styles.selectedFieldBubble,
                 ]}
-                onPress={() => toggleField(field)}
+                onPress={() => toggleTempField(field)}
               >
                 <Text style={styles.fieldBubbleText}>{field}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
-          <TouchableOpacity
-            style={styles.closeButton}
-            onPress={() => setFieldsModalVisible(false)}
-          >
-            <Text style={styles.closeButtonText}>Close</Text>
-          </TouchableOpacity>
+          <View style={styles.modalActionButtons}>
+            <TouchableOpacity
+              style={styles.modalCloseButton}
+              onPress={handleFieldsClose}
+            >
+              <Text style={styles.modalCloseButtonText}>Close</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.modalDoneButton}
+              onPress={handleFieldsDone}
+            >
+              <Text style={styles.modalDoneButtonText}>Done</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Modal>
     </SafeAreaView>
@@ -890,6 +972,15 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     marginBottom: Platform.OS === 'ios' ? 3 : 0,
+    tintColor: '#000000', // Default black for all icons
+  },
+  playButtonOverlay: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: [{ translateX: -30 }, { translateY: -30 }],
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   captionContainer: {
     paddingHorizontal: 12,
@@ -915,16 +1006,7 @@ const styles = StyleSheet.create({
   loaderContainer: {
     paddingVertical: 20,
   },
-  playButtonOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.2)',
-  },
+
   playButton: {
     width: 60,
     height: 60,
@@ -934,12 +1016,7 @@ const styles = StyleSheet.create({
     width: width,
     backgroundColor: 'black',
   },
-  likeLoader: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    transform: [{ translateX: -12 }, { translateY: -12 }],
-  },
+
   modal: {
     justifyContent: 'center',
     margin: 0,
@@ -981,17 +1058,37 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#000',
   },
-  closeButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 30,
-    borderWidth: 1,
-    borderColor: '#007bff',
-    borderRadius: 8,
+  modalActionButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginTop: 10,
   },
-  closeButtonText: {
-    fontSize: 16,
-    color: '#007bff',
-    fontWeight: '600',
+  modalCloseButton: {
+    borderWidth: 1,
+    borderColor: '#E9ECEF',
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: 'center',
+    flex: 0.48,
+    backgroundColor: '#fff',
+  },
+  modalCloseButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#000',
+  },
+  modalDoneButton: {
+    backgroundColor: '#a3a4eb',
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: 'center',
+    flex: 0.48,
+  },
+  modalDoneButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1f219c',
   },
   commentModal: {
     justifyContent: 'flex-end',
@@ -1004,6 +1101,11 @@ const styles = StyleSheet.create({
     padding: 15,
     flex: 1,
     maxHeight: '90%',
+  },
+  measureText: {
+    position: 'absolute',
+    opacity: 0, // Make it invisible while measuring
+    width: width - 24, // Match captionContainer paddingHorizontal: 12 on each side
   },
   commentModalHeader: {
     flexDirection: 'row',
