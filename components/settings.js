@@ -272,9 +272,7 @@ export default function SettingsScreen() {
         <SafeAreaView style={styles.safeArea}>
             <StatusBar barStyle="dark-content" backgroundColor="white" />
             <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Image source={require('../assets/Arrow.png')} style={styles.backIcon} />
-                </TouchableOpacity>
+                
                 <Text style={styles.headerTitle}>Settings</Text>
                 <View style={styles.placeholder} />
             </View>
@@ -793,24 +791,18 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 10,
-        paddingVertical: 8,
+        paddingHorizontal: 20,
+        paddingVertical: 15,
         borderBottomWidth: 1,
         borderBottomColor: '#E9ECEF',
         backgroundColor: 'white',
     },
-    backButton: {
-        padding: 5,
-    },
-    backIcon: {
-        width: 20,
-        height: 20,
-        tintColor: '#000',
-    },
+
     headerTitle: {
         fontSize: 22,
-        fontWeight: '600',
-        color: '#000',
+        fontWeight: '700',
+        color: '#1a1a1a',
+    fontFamily: 'AvenirNextCyr',
     },
     placeholder: {
         width: 20,
