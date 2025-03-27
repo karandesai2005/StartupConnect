@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   StatusBar,
+  SafeAreaView,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import axios from 'axios';
@@ -76,14 +77,12 @@ const SearchScreen = () => {
   );
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
       <View style={styles.topBar}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Image
-            source={require('../assets/Arrow.png')} // Replace with your back arrow icon
+            source={require('../assets/Arrow.png')}
             style={styles.backIcon}
           />
         </TouchableOpacity>
@@ -96,26 +95,29 @@ const SearchScreen = () => {
           autoFocus={true}
         />
       </View>
-      <FlatList
-        data={searchResults}
-        renderItem={renderSearchResult}
-        keyExtractor={(item) => item.user_id.toString()}
-        style={styles.searchResultsList}
-        keyboardShouldPersistTaps="handled"
-      />
-    </KeyboardAvoidingView>
-    
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoid}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <FlatList
+          data={searchResults}
+          renderItem={renderSearchResult}
+          keyExtractor={(item) => item.user_id.toString()}
+          style={styles.searchResultsList}
+          keyboardShouldPersistTaps="handled"
+        />
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
   topBar: {
     flexDirection: 'row',
-    marginTop: Platform.OS === 'ios' ? 37 : 0,
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
@@ -124,7 +126,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#E9ECEF',
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight + 8 : 8,
   },
   backIcon: {
     width: 24,
@@ -132,12 +133,14 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   searchBar: {
-    //flex: 1,
     paddingHorizontal: 15,
     backgroundColor: '#eee',
     borderRadius: 20,
     height: 40,
     width: 270,
+  },
+  keyboardAvoid: {
+    flex: 1,
   },
   searchResultsList: {
     flex: 1,

@@ -10,6 +10,8 @@ import {
   RefreshControl,
   Alert,
   Dimensions,
+  SafeAreaView,
+  StatusBar,
 } from "react-native";
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -27,6 +29,15 @@ const ProfileHeader = React.memo(({ userData, lastUpdate, navigation, isOwnProfi
     overflow: "hidden",
   }), [isBusinessProfile]);
 
+  // Construct full URL for profile picture
+  const profilePictureUrl = userData?.profile_picture
+    ? userData.profile_picture.startsWith('http')
+      ? `${userData.profile_picture}?timestamp=${lastUpdate}`
+      : `${NGROK_URL}/uploads/${userData.profile_picture}?timestamp=${lastUpdate}`
+    : null;
+
+  console.log('Profile picture URL:', profilePictureUrl);
+
   return (
     <View style={styles.profile}>
       <View style={styles.profileSection}>
@@ -40,13 +51,10 @@ const ProfileHeader = React.memo(({ userData, lastUpdate, navigation, isOwnProfi
         <View style={styles.avatarMultiVariants}>
           <View style={avatarStyle}>
             <Image
-              source={
-                userData?.profile_picture
-                  ? { uri: `${userData.profile_picture}?timestamp=${lastUpdate}` }
-                  : require('../../../assets/del.png')
-              }
+              source={profilePictureUrl ? { uri: profilePictureUrl } : require('../../../assets/del.png')}
               style={styles.profileImage}
               resizeMode="cover"
+              onError={(e) => console.log('Profile picture load error:', e.nativeEvent.error, profilePictureUrl)}
             />
           </View>
         </View>
@@ -132,10 +140,8 @@ const Profile = ({ route }) => {
 
       const username = route.params?.username;
       const endpoint = username && !isOwnProfile
-        ? `${NGROK_URL}/api/posts/user/${username}`  // Corrected endpoint
+        ? `${NGROK_URL}/api/posts/user/${username}`
         : `${NGROK_URL}/api/posts/myposts`;
-
-      console.log('Fetching posts from:', endpoint);
 
       const response = await fetch(endpoint, {
         method: "GET",
@@ -145,46 +151,41 @@ const Profile = ({ route }) => {
         },
       });
 
-      console.log('Response status:', response.status);
-
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status} for endpoint: ${endpoint}`);
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
-      console.log('Raw posts data:', data);
-
       if (!Array.isArray(data)) {
-        console.log('Posts data is not an array:', data);
         setUserPosts([]);
         return;
       }
 
-      const mappedPosts = data.map(post => {
-        console.log('Processing post:', post);
-        return {
-          _id: post.post_id || post.id,
-          username: post.username,
-          profile_picture: post.profile_picture,
-          image_url: post.media_url,
-          content: post.content,
-          created_at: post.created_at,
-          likes: post.like_count || 0,
-          comments: post.comment_count || 0,
-          caption: post.content,
-          media_type: post.media_type || (post.media_url?.includes('.mp4') ? 'video' : 'image')
-        };
-      });
+      const mappedPosts = data.map(post => ({
+        _id: post.post_id || post.id,
+        username: post.username,
+        profile_picture: post.profile_picture
+          ? post.profile_picture.startsWith('http')
+            ? post.profile_picture
+            : `${NGROK_URL}/uploads/${post.profile_picture}`
+          : null,
+        image_url: post.media_url
+          ? post.media_url.startsWith('http')
+            ? post.media_url
+            : `${NGROK_URL}/uploads/${post.media_url}`
+          : null,
+        content: post.content,
+        created_at: post.created_at,
+        likes: post.like_count || 0,
+        comments: post.comment_count || 0,
+        caption: post.content,
+        media_type: post.media_type || (post.media_url?.includes('.mp4') ? 'video' : 'image')
+      }));
 
       const validPosts = mappedPosts
-        .filter(post => {
-          const isValid = post.image_url && !post.image_url.includes('undefined');
-          if (!isValid) console.log('Invalid post filtered out:', post);
-          return isValid;
-        })
+        .filter(post => post.image_url && !post.image_url.includes('undefined'))
         .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
-      console.log('Final mapped posts:', validPosts);
       setUserPosts(validPosts);
     } catch (error) {
       console.error("Posts fetch error:", error);
@@ -203,10 +204,8 @@ const Profile = ({ route }) => {
 
       const username = route.params?.username;
       const endpoint = username && !isOwnProfile
-        ? `${NGROK_URL}/api/profile/user/${username}`  // Matches your profile route
+        ? `${NGROK_URL}/api/profile/user/${username}`
         : `${NGROK_URL}/api/profile`;
-
-      console.log('Fetching user data from:', endpoint);
 
       const response = await fetch(endpoint, {
         method: "GET",
@@ -223,12 +222,22 @@ const Profile = ({ route }) => {
       }
 
       const data = await response.json();
-      console.log('User data:', data);
+      console.log('Raw profile_picture:', data.profile_picture);
 
-      setUserData(data);
+      // Ensure profile_picture is a full URL
+      const formattedData = {
+        ...data,
+        profile_picture: data.profile_picture
+          ? data.profile_picture.startsWith('http')
+            ? data.profile_picture
+            : `${NGROK_URL}/uploads/${data.profile_picture}`
+          : null,
+      };
+
+      setUserData(formattedData);
       setLastUpdate(Date.now());
       if (isOwnProfile) {
-        await AsyncStorage.setItem('userData', JSON.stringify(data));
+        await AsyncStorage.setItem('userData', JSON.stringify(formattedData));
       }
     } catch (error) {
       console.error("Profile fetch error:", error);
@@ -306,16 +315,10 @@ const Profile = ({ route }) => {
           </View>
         ) : (
           <Image
-            source={
-              item?.image_url
-                ? { uri: item.image_url }
-                : item?.media_url
-                  ? { uri: item.media_url }
-                  : require('../../../assets/del.png')
-            }
+            source={item.image_url ? { uri: item.image_url } : require('../../../assets/del.png')}
             style={styles.gridImage}
             resizeMode="cover"
-            onError={(e) => console.log('Image load error:', e.nativeEvent.error, item.image_url)}
+            onError={(e) => console.log('Grid image load error:', e.nativeEvent.error, item.image_url)}
           />
         )}
       </TouchableOpacity>
@@ -327,8 +330,11 @@ const Profile = ({ route }) => {
       setUserData(prevData => ({
         ...prevData,
         ...route.params.updatedUser,
-        profile_picture: route.params.updatedUser.profile_picture,
-        bio: route.params.updatedUser.bio
+        profile_picture: route.params.updatedUser.profile_picture
+          ? route.params.updatedUser.profile_picture.startsWith('http')
+            ? route.params.updatedUser.profile_picture
+            : `${NGROK_URL}/uploads/${route.params.updatedUser.profile_picture}`
+          : null,
       }));
       setLastUpdate(Date.now());
       if (route.params.forceRefresh) {
@@ -339,7 +345,6 @@ const Profile = ({ route }) => {
 
   useFocusEffect(
     useCallback(() => {
-      console.log('Profile focused, username:', route.params?.username);
       setIsLoading(true);
       fetchUserData();
       fetchUserPosts();
@@ -348,14 +353,15 @@ const Profile = ({ route }) => {
 
   if (isLoading) {
     return (
-      <View style={styles.container}>
+      <SafeAreaView style={styles.safeArea}>
         <ActivityIndicator size="large" color="#007BFF" />
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.contentContainer}>
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
       <FlatList
         ListHeaderComponent={
           <>
@@ -388,24 +394,18 @@ const Profile = ({ route }) => {
           />
         }
       />
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  contentContainer: {
-    flex: 1,
-    width: '100%',
+    backgroundColor: '#fff',
   },
   flatListContent: {
     paddingHorizontal: 16,
     paddingBottom: 20,
-    marginTop: 20,
   },
   profile: {
     width: "100%",
@@ -413,7 +413,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 14,
     gap: 14,
-    marginTop: 30,
   },
   profileSection: {
     flexDirection: 'row',
@@ -547,18 +546,18 @@ const styles = StyleSheet.create({
   },
   playIconContainer: {
     position: 'absolute',
-    top: 5,           // Move to top
-    right: 5,         // Move to right
+    top: 5,
+    right: 5,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)', // Slightly darker for visibility
-    borderRadius: 12, // Optional: make it circular
-    width: 24,        // Fixed size for the button
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 12,
+    width: 24,
     height: 24,
   },
   playIcon: {
     color: 'white',
-    fontSize: 16,     // Slightly smaller for the smaller container
+    fontSize: 16,
   },
 });
 

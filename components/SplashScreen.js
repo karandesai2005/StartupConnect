@@ -4,22 +4,39 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const SplashScreen = ({ navigation }) => {
   useEffect(() => {
-    const checkLoginStatus = async () => {
+    const checkUserStatus = async () => {
       try {
+        // Check if this is the first install
+        const isFirstInstall = await AsyncStorage.getItem('isFirstInstall');
         const token = await AsyncStorage.getItem('token');
-        // Navigate based on whether token exists
-        const destination = token ? 'Main' : 'Login';
+
+        console.log('isFirstInstall:', isFirstInstall);
+        console.log('token:', token);
+
+        let destination;
+
+        if (isFirstInstall === null || isFirstInstall === 'true') {
+          // First-time user: always go to Login
+          destination = 'Login';
+          // Mark that the app has been opened at least once
+          await AsyncStorage.setItem('isFirstInstall', 'false');
+        } else {
+          // Returning user: check token
+          destination = token ? 'Main' : 'Login';
+        }
+
         const timer = setTimeout(() => {
           navigation.replace(destination);
         }, 3000);
+
         return () => clearTimeout(timer);
       } catch (error) {
-        console.error('Error checking login status:', error);
+        console.error('Error checking user status:', error);
         navigation.replace('Login'); // Fallback to Login on error
       }
     };
 
-    checkLoginStatus();
+    checkUserStatus();
   }, [navigation]);
 
   return (

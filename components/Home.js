@@ -1,4 +1,3 @@
-// components/Home.js
 import React, { useEffect, useState, useCallback, memo, useMemo } from 'react';
 import {
   View,
@@ -103,7 +102,7 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
     }
     return () => {
       if (isVideo && videoRef.current) {
-        videoRef.current.pauseAsync().catch(() => {});
+        videoRef.current.pauseAsync().catch(() => { });
       }
     };
   }, [isVisible, isVideo]);
@@ -206,8 +205,8 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
     const username = isUserPost
       ? item.username
       : item.name
-      ? `${item.name.first} ${item.name.last}`
-      : 'User';
+        ? `${item.name.first} ${item.name.last}`
+        : 'User';
     navigation.navigate('Profile', { username, isOtherUser: true });
   };
 
@@ -280,29 +279,37 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
 
   return (
     <Animated.View style={[styles.card, { transform: [{ scale: animatedScale }] }]}>
-      <View style={styles.cardHeader}>
-        <View style={styles.userInfo}>
-          <TouchableOpacity onPress={handleProfilePress}>
-            <Image
-              source={
-                typeof item.profile_picture === 'string' && item.profile_picture.startsWith('http')
-                  ? { uri: item.profile_picture }
-                  : require('../assets/del.png')
-              }
-              style={styles.avatar}
-            />
-          </TouchableOpacity>
-          <View>
-            <Text style={styles.name}>
-              {isUserPost ? item.username : item.name ? item.name.first : 'User'}
-            </Text>
-            <Text style={styles.timeStamp}>{formatTimestamp(item.created_at)}</Text>
+      <TouchableOpacity onPress={handleProfilePress} activeOpacity={0.7}>
+        <View style={styles.cardHeader}>
+          <View style={styles.userInfo}>
+            <TouchableOpacity onPress={handleProfilePress}>
+              <Image
+                source={
+                  typeof item.profile_picture === 'string' && item.profile_picture.startsWith('http')
+                    ? { uri: item.profile_picture }
+                    : require('../assets/del.png')
+                }
+                style={styles.avatar}
+              />
+            </TouchableOpacity>
+            <View>
+              <Text style={styles.name}>
+                {isUserPost ? item.username : item.name ? item.name.first : 'User'}
+              </Text>
+              <Text style={styles.timeStamp}>{formatTimestamp(item.created_at)}</Text>
+            </View>
           </View>
+          <TouchableOpacity
+            style={styles.moreButton}
+            onPress={(e) => {
+              e.stopPropagation(); // Prevents profile navigation
+              console.log('More button pressed for post:', item.post_id); // Placeholder for future action
+            }}
+          >
+            <Text style={styles.moreButtonText}>•••</Text>
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity style={styles.moreButton}>
-          <Text style={styles.moreButtonText}>•••</Text>
-        </TouchableOpacity>
-      </View>
+      </TouchableOpacity>
       <TouchableOpacity activeOpacity={0.95} onPressIn={handlePressIn} onPressOut={handlePressOut}>
         <View style={[styles.imageContainer, { height: imageHeight }]}>
           {isLoading && (
@@ -331,8 +338,8 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
                 typeof item.image_url === 'string' && item.image_url.startsWith('http')
                   ? { uri: item.image_url }
                   : typeof item.media_url === 'string' && item.media_url.startsWith('http')
-                  ? { uri: item.media_url }
-                  : require('../assets/PITCH.png')
+                    ? { uri: item.media_url }
+                    : require('../assets/PITCH.png')
               }
               style={[styles.postImage, { height: imageHeight }]}
               onLoad={() => setIsLoading(false)}
@@ -590,7 +597,7 @@ export default function Home() {
       });
       if (response.ok) {
         const data = await response.json();
-        console.log('User data fetched:', data); // Log to verify is_business/is_personal
+        console.log('User data fetched:', data);
         setUserData(data);
       }
     } catch (error) {
@@ -624,14 +631,13 @@ export default function Home() {
     navigation.navigate('Search');
   };
 
-  // Updated function to handle profile navigation based on user type
   const handleProfilePress = () => {
     if (!userData) {
       console.log('User data not loaded yet');
       return;
     }
 
-    const isBusinessUser = userData.is_business; // Directly use boolean value
+    const isBusinessUser = userData.is_business;
     const username = userData.username;
 
     if (isBusinessUser) {
@@ -642,7 +648,8 @@ export default function Home() {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
       <View style={styles.topBar}>
         <TouchableOpacity onPress={handleProfilePress}>
           <Image
@@ -679,7 +686,10 @@ export default function Home() {
         </View>
       </View>
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoid}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
         <FlatList
           data={combinedData}
           extraData={combinedData}
@@ -734,18 +744,20 @@ export default function Home() {
           </TouchableOpacity>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
+  keyboardAvoid: {
+    flex: 1,
+  },
   topBar: {
     flexDirection: 'row',
-    marginTop: Platform.OS === 'ios' ? 37 : 0,
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
@@ -753,7 +765,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#E9ECEF',
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight + 8 : 8,
   },
   iconsContainer: {
     flexDirection: 'row',

@@ -143,7 +143,7 @@ export default function CreatePostScreen() {
   };
 
   return (
-    <View style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.keyboardAvoid}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.cancelButton}>
@@ -211,13 +211,15 @@ export default function CreatePostScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#fff', paddingTop: 50 },
-  keyboardAvoid: { flex: 1 },
+  safeArea: { 
+    flex: 1, 
+    backgroundColor: '#fff' // Remove paddingTop: 50
+  },  keyboardAvoid: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, height: 44, borderBottomWidth: 0.5, borderBottomColor: '#dbdbdb' },
   cancelButton: { padding: 8 },
   headerText: { fontSize: 17, fontWeight: '600' },

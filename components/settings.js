@@ -12,7 +12,9 @@ import {
     Alert,
     Dimensions,
     Modal,
-    TextInput
+    TextInput,
+    SafeAreaView,
+    StatusBar,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -267,14 +269,13 @@ export default function SettingsScreen() {
     );
 
     return (
-        <View style={[styles.container, { backgroundColor: 'white' }]}>
-            <View style={[styles.statusBarBackground, { backgroundColor: 'white' }]} />
-
-            <View style={[styles.header, { backgroundColor: 'white', borderBottomColor: '#E9ECEF' }]}>
+        <SafeAreaView style={styles.safeArea}>
+            <StatusBar barStyle="dark-content" backgroundColor="white" />
+            <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Image source={require('../assets/Arrow.png')} style={[styles.backIcon, { tintColor: '#000' }]} />
+                    <Image source={require('../assets/Arrow.png')} style={styles.backIcon} />
                 </TouchableOpacity>
-                <Text style={[styles.headerTitle, { color: '#000' }]}>Settings</Text>
+                <Text style={styles.headerTitle}>Settings</Text>
                 <View style={styles.placeholder} />
             </View>
 
@@ -287,7 +288,7 @@ export default function SettingsScreen() {
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={styles.scrollContent}
                 >
-                    <View style={[styles.profileSection, { backgroundColor: '#fff', borderBottomColor: '#E9ECEF' }]}>
+                    <View style={styles.profileSection}>
                         <View style={styles.profileRow}>
                             <TouchableOpacity onPress={handleProfilePictureUpdate} disabled={loading}>
                                 <View style={styles.profileImageContainer}>
@@ -302,14 +303,14 @@ export default function SettingsScreen() {
                                         }
                                         style={styles.profileImage}
                                     />
-                                    <View style={[styles.editIconContainer, { borderColor: '#fff' }]}>
+                                    <View style={styles.editIconContainer}>
                                         <Text style={styles.editIconText}>+</Text>
                                     </View>
                                 </View>
                             </TouchableOpacity>
                             <View style={styles.profileInfo}>
-                                <Text style={[styles.userName, { color: '#000' }]}>{userData?.username || 'Your Name'}</Text>
-                                <Text style={[styles.userEmail, { color: '#666' }]}>{userData?.email || 'email@example.com'}</Text>
+                                <Text style={styles.userName}>{userData?.username || 'Your Name'}</Text>
+                                <Text style={styles.userEmail}>{userData?.email || 'email@example.com'}</Text>
                                 <TouchableOpacity
                                     style={styles.editProfileButton}
                                     onPress={() => navigation.navigate('EditProfile', { userData })}
@@ -321,37 +322,37 @@ export default function SettingsScreen() {
                     </View>
 
                     <View style={styles.settingsContainer}>
-                        <View style={[styles.section, { backgroundColor: '#fff' }]}>
-                            <Text style={[styles.sectionTitle, { color: '#000', borderBottomColor: '#E9ECEF' }]}>Account</Text>
+                        <View style={styles.section}>
+                            <Text style={styles.sectionTitle}>Account</Text>
                             <TouchableOpacity
-                                style={[styles.settingItem, { borderBottomColor: '#E9ECEF' }]}
+                                style={styles.settingItem}
                                 onPress={() => setAccountModalVisible(true)}
                             >
-                                <Text style={[styles.settingText, { color: '#000' }]}>Account Details</Text>
-                                <Text style={[styles.arrowText, { color: '#666' }]}>›</Text>
+                                <Text style={styles.settingText}>Account Details</Text>
+                                <Text style={styles.arrowText}>›</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity
-                                style={[styles.settingItem, { borderBottomColor: '#E9ECEF' }]}
+                                style={styles.settingItem}
                                 onPress={() => setPrivacyModalVisible(true)}
                             >
-                                <Text style={[styles.settingText, { color: '#000' }]}>Privacy</Text>
-                                <Text style={[styles.arrowText, { color: '#666' }]}>›</Text>
+                                <Text style={styles.settingText}>Privacy</Text>
+                                <Text style={styles.arrowText}>›</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity
                                 style={[styles.settingItem, styles.lastItem]}
                                 onPress={() => setSecurityModalVisible(true)}
                             >
-                                <Text style={[styles.settingText, { color: '#000' }]}>Security</Text>
-                                <Text style={[styles.arrowText, { color: '#666' }]}>›</Text>
+                                <Text style={styles.settingText}>Security</Text>
+                                <Text style={styles.arrowText}>›</Text>
                             </TouchableOpacity>
                         </View>
 
-                        <View style={[styles.section, { backgroundColor: '#fff' }]}>
-                            <Text style={[styles.sectionTitle, { color: '#000', borderBottomColor: '#E9ECEF' }]}>Preferences</Text>
-                            <View style={[styles.settingItem, { borderBottomColor: '#E9ECEF' }]}>
-                                <Text style={[styles.settingText, { color: '#000' }]}>Push Notifications</Text>
+                        <View style={styles.section}>
+                            <Text style={styles.sectionTitle}>Preferences</Text>
+                            <View style={styles.settingItem}>
+                                <Text style={styles.settingText}>Push Notifications</Text>
                                 <Switch
                                     trackColor={{ false: '#E9ECEF', true: '#a3a4eb' }}
                                     thumbColor={notificationsEnabled ? '#1f219c' : 'white'}
@@ -363,15 +364,15 @@ export default function SettingsScreen() {
                             </View>
 
                             <TouchableOpacity
-                                style={[styles.settingItem, { borderBottomColor: '#E9ECEF' }]}
+                                style={styles.settingItem}
                                 onPress={() => setVisibilityModalVisible(true)}
                             >
-                                <Text style={[styles.settingText, { color: '#000' }]}>Profile Visibility</Text>
-                                <Text style={[styles.arrowText, { color: '#666' }]}>›</Text>
+                                <Text style={styles.settingText}>Profile Visibility</Text>
+                                <Text style={styles.arrowText}>›</Text>
                             </TouchableOpacity>
 
                             <View style={[styles.settingItem, styles.lastItem]}>
-                                <Text style={[styles.settingText, { color: '#000' }]}>Email Notifications</Text>
+                                <Text style={styles.settingText}>Email Notifications</Text>
                                 <Switch
                                     trackColor={{ false: '#E9ECEF', true: '#a3a4eb' }}
                                     thumbColor={emailNotifications ? '#1f219c' : 'white'}
@@ -383,82 +384,82 @@ export default function SettingsScreen() {
                             </View>
                         </View>
 
-                        <View style={[styles.section, { backgroundColor: '#fff', height: Platform.OS === 'android' ? 200 : 'auto' }]}>
-                            <Text style={[styles.sectionTitle, { color: '#000', borderBottomColor: '#E9ECEF' }]}>Support</Text>
+                        <View style={styles.section}>
+                            <Text style={styles.sectionTitle}>Support</Text>
                             <TouchableOpacity
-                                style={[styles.settingItem, { borderBottomColor: '#E9ECEF' }]}
+                                style={styles.settingItem}
                                 onPress={() => setHelpModalVisible(true)}
                             >
-                                <Text style={[styles.settingText, { color: '#000' }]}>Help Center</Text>
-                                <Text style={[styles.arrowText, { color: '#666' }]}>›</Text>
+                                <Text style={styles.settingText}>Help Center</Text>
+                                <Text style={styles.arrowText}>›</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity
-                                style={[styles.settingItem, { borderBottomColor: '#E9ECEF' }]}
+                                style={styles.settingItem}
                                 onPress={() => setTermsModalVisible(true)}
                             >
-                                <Text style={[styles.settingText, { color: '#000' }]}>Terms & Conditions</Text>
-                                <Text style={[styles.arrowText, { color: '#666' }]}>›</Text>
+                                <Text style={styles.settingText}>Terms & Conditions</Text>
+                                <Text style={styles.arrowText}>›</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity
-                                style={[styles.settingItem, { borderBottomColor: '#E9ECEF' }]}
+                                style={styles.settingItem}
                                 onPress={() => setPolicyModalVisible(true)}
                             >
-                                <Text style={[styles.settingText, { color: '#000' }]}>Privacy Policy</Text>
-                                <Text style={[styles.arrowText, { color: '#666' }]}>›</Text>
+                                <Text style={styles.settingText}>Privacy Policy</Text>
+                                <Text style={styles.arrowText}>›</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity
                                 style={[styles.settingItem, styles.lastItem]}
                                 onPress={() => setFeedbackModalVisible(true)}
                             >
-                                <Text style={[styles.settingText, { color: '#000' }]}>Feedback</Text>
-                                <Text style={[styles.arrowText, { color: '#666' }]}>›</Text>
+                                <Text style={styles.settingText}>Feedback</Text>
+                                <Text style={styles.arrowText}>›</Text>
                             </TouchableOpacity>
                         </View>
 
                         <View style={styles.accountActions}>
                             <View style={styles.actionButtonsRow}>
                                 <TouchableOpacity
-                                    style={[styles.logoutButton, { backgroundColor: '#fff', borderColor: '#E9ECEF' }]}
+                                    style={styles.logoutButton}
                                     onPress={handleLogout}
                                 >
-                                    <Text style={[styles.logoutText, { color: '#000' }]}>Logout</Text>
+                                    <Text style={styles.logoutText}>Logout</Text>
                                 </TouchableOpacity>
 
                                 <TouchableOpacity
                                     style={styles.deleteAccountButton}
                                     onPress={handleDeleteAccount}
                                 >
-                                    <Text style={[styles.deleteAccountText, { color: '#FF3B30' }]}>Delete Account</Text>
+                                    <Text style={styles.deleteAccountText}>Delete Account</Text>
                                 </TouchableOpacity>
                             </View>
                         </View>
 
                         <View style={styles.versionContainer}>
-                            <Text style={[styles.versionText, { color: '#666' }]}>Version 1.0.0</Text>
+                            <Text style={styles.versionText}>Version 1.0.0</Text>
                         </View>
                     </View>
                 </ScrollView>
             )}
 
-            <View style={[styles.bottomNav, { borderTopColor: '#E9ECEF' }]}>
+            <View style={styles.bottomNav}>
                 <TouchableOpacity onPress={() => navigation.navigate('Home')}>
-                    <Image source={require('../assets/film.png')} style={[styles.navIcon]} />
+                    <Image source={require('../assets/film.png')} style={styles.navIcon} />
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => navigation.navigate('CreatePost')}>
-                    <Image source={require('../assets/plus3.png')} style={[styles.navIcon]} />
+                    <Image source={require('../assets/plus3.png')} style={styles.navIcon} />
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => navigation.navigate('Reel')}>
-                    <Image source={require('../assets/bell.png')} style={[styles.navIcon]} />
+                    <Image source={require('../assets/bell.png')} style={styles.navIcon} />
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
-                    <Image source={require('../assets/settings.png')} style={[styles.navIcon]} />
+                    <Image source={require('../assets/settings.png')} style={styles.navIcon} />
                 </TouchableOpacity>
             </View>
 
-            {/* Account Details Modal */}
+            {/* Modals remain unchanged */}
             <Modal
                 animationType="slide"
                 transparent={true}
@@ -466,9 +467,9 @@ export default function SettingsScreen() {
                 onRequestClose={() => setAccountModalVisible(false)}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={[styles.modalContainer, { backgroundColor: '#fff' }]}>
-                        <Text style={[styles.modalTitle, { color: '#000' }]}>Account Details</Text>
-                        <Text style={[styles.modalText, { color: '#666' }]}>
+                    <View style={styles.modalContainer}>
+                        <Text style={styles.modalTitle}>Account Details</Text>
+                        <Text style={styles.modalText}>
                             Manage your PITCH account details below:
                             {"\n\n"}• Username: {userData?.username || 'Not set'}
                             {"\n"}• Email: {userData?.email || 'Not set'}
@@ -477,13 +478,13 @@ export default function SettingsScreen() {
                         </Text>
                         <View style={styles.modalButtons}>
                             <TouchableOpacity
-                                style={[styles.modalButton, { backgroundColor: '#fff', borderColor: '#E9ECEF' }]}
+                                style={styles.modalButton}
                                 onPress={() => setAccountModalVisible(false)}
                             >
-                                <Text style={[styles.modalButtonText, { color: '#000' }]}>Close</Text>
+                                <Text style={styles.modalButtonText}>Close</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
-                                style={[styles.modalButton, { backgroundColor: '#1f219c' }]}
+                                style={[styles.modalButton, { backgroundColor: '#1f219c', borderColor: '#1f219c' }]}
                                 onPress={() => {
                                     setAccountModalVisible(false);
                                     navigation.navigate('EditProfile', { userData });
@@ -496,7 +497,6 @@ export default function SettingsScreen() {
                 </View>
             </Modal>
 
-            {/* Privacy Modal */}
             <Modal
                 animationType="slide"
                 transparent={true}
@@ -504,9 +504,9 @@ export default function SettingsScreen() {
                 onRequestClose={() => setPrivacyModalVisible(false)}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={[styles.modalContainer, { backgroundColor: '#fff' }]}>
-                        <Text style={[styles.modalTitle, { color: '#000' }]}>Privacy</Text>
-                        <Text style={[styles.modalText, { color: '#666' }]}>
+                    <View style={styles.modalContainer}>
+                        <Text style={styles.modalTitle}>Privacy</Text>
+                        <Text style={styles.modalText}>
                             Your privacy settings control who can see your PITCH profile and content:
                             {"\n\n"}• Profile Visibility: Choose who can view your profile (Public, Investors Only, Private)
                             {"\n"}• Pitch Visibility: Control who can see your startup pitches
@@ -515,13 +515,13 @@ export default function SettingsScreen() {
                         </Text>
                         <View style={styles.modalButtons}>
                             <TouchableOpacity
-                                style={[styles.modalButton, { backgroundColor: '#fff', borderColor: '#E9ECEF' }]}
+                                style={styles.modalButton}
                                 onPress={() => setPrivacyModalVisible(false)}
                             >
-                                <Text style={[styles.modalButtonText, { color: '#000' }]}>Close</Text>
+                                <Text style={styles.modalButtonText}>Close</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
-                                style={[styles.modalButton, { backgroundColor: '#1f219c' }]}
+                                style={[styles.modalButton, { backgroundColor: '#1f219c', borderColor: '#1f219c' }]}
                                 onPress={() => {
                                     setPrivacyModalVisible(false);
                                     navigation.navigate('PrivacySettings');
@@ -534,7 +534,6 @@ export default function SettingsScreen() {
                 </View>
             </Modal>
 
-            {/* Security Modal */}
             <Modal
                 animationType="slide"
                 transparent={true}
@@ -542,9 +541,9 @@ export default function SettingsScreen() {
                 onRequestClose={() => setSecurityModalVisible(false)}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={[styles.modalContainer, { backgroundColor: '#fff' }]}>
-                        <Text style={[styles.modalTitle, { color: '#000' }]}>Security</Text>
-                        <Text style={[styles.modalText, { color: '#666' }]}>
+                    <View style={styles.modalContainer}>
+                        <Text style={styles.modalTitle}>Security</Text>
+                        <Text style={styles.modalText}>
                             Keep your PITCH account secure:
                             {"\n\n"}• Password: Update your password regularly
                             {"\n"}• Two-Factor Authentication: Add an extra layer of security
@@ -553,13 +552,13 @@ export default function SettingsScreen() {
                         </Text>
                         <View style={styles.modalButtons}>
                             <TouchableOpacity
-                                style={[styles.modalButton, { backgroundColor: '#fff', borderColor: '#E9ECEF' }]}
+                                style={styles.modalButton}
                                 onPress={() => setSecurityModalVisible(false)}
                             >
-                                <Text style={[styles.modalButtonText, { color: '#000' }]}>Close</Text>
+                                <Text style={styles.modalButtonText}>Close</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
-                                style={[styles.modalButton, { backgroundColor: '#1f219c' }]}
+                                style={[styles.modalButton, { backgroundColor: '#1f219c', borderColor: '#1f219c' }]}
                                 onPress={() => {
                                     setSecurityModalVisible(false);
                                     navigation.navigate('SecuritySettings');
@@ -572,7 +571,6 @@ export default function SettingsScreen() {
                 </View>
             </Modal>
 
-            {/* Profile Visibility Modal */}
             <Modal
                 animationType="slide"
                 transparent={true}
@@ -580,9 +578,9 @@ export default function SettingsScreen() {
                 onRequestClose={() => setVisibilityModalVisible(false)}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={[styles.modalContainer, { backgroundColor: '#fff' }]}>
-                        <Text style={[styles.modalTitle, { color: '#000' }]}>Profile Visibility</Text>
-                        <Text style={[styles.modalText, { color: '#666' }]}>
+                    <View style={styles.modalContainer}>
+                        <Text style={styles.modalTitle}>Profile Visibility</Text>
+                        <Text style={styles.modalText}>
                             Control who can see your PITCH profile:
                             {"\n\n"}• Public: Visible to all users
                             {"\n"}• Investors Only: Visible only to verified investors
@@ -590,13 +588,13 @@ export default function SettingsScreen() {
                         </Text>
                         <View style={styles.modalButtons}>
                             <TouchableOpacity
-                                style={[styles.modalButton, { backgroundColor: '#fff', borderColor: '#E9ECEF' }]}
+                                style={styles.modalButton}
                                 onPress={() => setVisibilityModalVisible(false)}
                             >
-                                <Text style={[styles.modalButtonText, { color: '#000' }]}>Close</Text>
+                                <Text style={styles.modalButtonText}>Close</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
-                                style={[styles.modalButton, { backgroundColor: '#1f219c' }]}
+                                style={[styles.modalButton, { backgroundColor: '#1f219c', borderColor: '#1f219c' }]}
                                 onPress={() => {
                                     setVisibilityModalVisible(false);
                                     navigation.navigate('VisibilitySettings');
@@ -609,7 +607,6 @@ export default function SettingsScreen() {
                 </View>
             </Modal>
 
-            {/* Help Center Modal */}
             <Modal
                 animationType="slide"
                 transparent={true}
@@ -617,9 +614,9 @@ export default function SettingsScreen() {
                 onRequestClose={() => setHelpModalVisible(false)}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={[styles.modalContainer, { backgroundColor: '#fff' }]}>
-                        <Text style={[styles.modalTitle, { color: '#000' }]}>Help Center</Text>
-                        <Text style={[styles.modalText, { color: '#666' }]}>
+                    <View style={styles.modalContainer}>
+                        <Text style={styles.modalTitle}>Help Center</Text>
+                        <Text style={styles.modalText}>
                             Get assistance with PITCH:
                             {"\n\n"}• FAQ: Common questions about profiles and pitches
                             {"\n"}• Contact Us: support@pitchapp.com
@@ -628,13 +625,13 @@ export default function SettingsScreen() {
                         </Text>
                         <View style={styles.modalButtons}>
                             <TouchableOpacity
-                                style={[styles.modalButton, { backgroundColor: '#fff', borderColor: '#E9ECEF' }]}
+                                style={styles.modalButton}
                                 onPress={() => setHelpModalVisible(false)}
                             >
-                                <Text style={[styles.modalButtonText, { color: '#000' }]}>Close</Text>
+                                <Text style={styles.modalButtonText}>Close</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
-                                style={[styles.modalButton, { backgroundColor: '#1f219c' }]}
+                                style={[styles.modalButton, { backgroundColor: '#1f219c', borderColor: '#1f219c' }]}
                                 onPress={() => {
                                     setHelpModalVisible(false);
                                     navigation.navigate('HelpCenter');
@@ -647,7 +644,6 @@ export default function SettingsScreen() {
                 </View>
             </Modal>
 
-            {/* Terms & Conditions Modal */}
             <Modal
                 animationType="slide"
                 transparent={true}
@@ -655,10 +651,10 @@ export default function SettingsScreen() {
                 onRequestClose={() => setTermsModalVisible(false)}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={[styles.modalContainer, { backgroundColor: '#fff' }]}>
-                        <Text style={[styles.modalTitle, { color: '#000' }]}>Terms & Conditions</Text>
+                    <View style={styles.modalContainer}>
+                        <Text style={styles.modalTitle}>Terms & Conditions</Text>
                         <ScrollView style={styles.modalScroll}>
-                            <Text style={[styles.modalText, { color: '#666' }]}>
+                            <Text style={styles.modalText}>
                                 Welcome to PITCH! By using our app, you agree to these Terms & Conditions:
                                 {"\n\n"}1. Use of Service
                                 {"\n"}• PITCH is a platform for startup founders to connect with investors and audiences
@@ -679,17 +675,14 @@ export default function SettingsScreen() {
                         </ScrollView>
                         <View style={styles.modalButtons}>
                             <TouchableOpacity
-                                style={[styles.modalButton, { backgroundColor: '#fff', borderColor: '#E9ECEF' }]}
+                                style={styles.modalButton}
                                 onPress={() => setTermsModalVisible(false)}
                             >
-                                <Text style={[styles.modalButtonText, { color: '#000' }]}>Close</Text>
+                                <Text style={styles.modalButtonText}>Close</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
-                                style={[styles.modalButton, { backgroundColor: '#1f219c' }]}
-                                onPress={() => {
-                                    setTermsModalVisible(false);
-                                    // Add link to full terms if needed
-                                }}
+                                style={[styles.modalButton, { backgroundColor: '#1f219c', borderColor: '#1f219c' }]}
+                                onPress={() => setTermsModalVisible(false)}
                             >
                                 <Text style={[styles.modalButtonText, { color: '#fff' }]}>Accept</Text>
                             </TouchableOpacity>
@@ -698,7 +691,6 @@ export default function SettingsScreen() {
                 </View>
             </Modal>
 
-            {/* Privacy Policy Modal */}
             <Modal
                 animationType="slide"
                 transparent={true}
@@ -706,10 +698,10 @@ export default function SettingsScreen() {
                 onRequestClose={() => setPolicyModalVisible(false)}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={[styles.modalContainer, { backgroundColor: '#fff' }]}>
-                        <Text style={[styles.modalTitle, { color: '#000' }]}>Privacy Policy</Text>
+                    <View style={styles.modalContainer}>
+                        <Text style={styles.modalTitle}>Privacy Policy</Text>
                         <ScrollView style={styles.modalScroll}>
-                            <Text style={[styles.modalText, { color: '#666' }]}>
+                            <Text style={styles.modalText}>
                                 PITCH values your privacy. Here’s how we handle your data:
                                 {"\n\n"}1. Data Collection
                                 {"\n"}• We collect profile info (name, email, company details)
@@ -731,13 +723,13 @@ export default function SettingsScreen() {
                         </ScrollView>
                         <View style={styles.modalButtons}>
                             <TouchableOpacity
-                                style={[styles.modalButton, { backgroundColor: '#fff', borderColor: '#E9ECEF' }]}
+                                style={styles.modalButton}
                                 onPress={() => setPolicyModalVisible(false)}
                             >
-                                <Text style={[styles.modalButtonText, { color: '#000' }]}>Close</Text>
+                                <Text style={styles.modalButtonText}>Close</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
-                                style={[styles.modalButton, { backgroundColor: '#1f219c' }]}
+                                style={[styles.modalButton, { backgroundColor: '#1f219c', borderColor: '#1f219c' }]}
                                 onPress={() => setPolicyModalVisible(false)}
                             >
                                 <Text style={[styles.modalButtonText, { color: '#fff' }]}>Understood</Text>
@@ -747,7 +739,6 @@ export default function SettingsScreen() {
                 </View>
             </Modal>
 
-            {/* Feedback Modal */}
             <Modal
                 animationType="slide"
                 transparent={true}
@@ -755,14 +746,10 @@ export default function SettingsScreen() {
                 onRequestClose={() => setFeedbackModalVisible(false)}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={[styles.modalContainer, { backgroundColor: '#fff' }]}>
-                        <Text style={[styles.modalTitle, { color: '#000' }]}>Submit Feedback</Text>
+                    <View style={styles.modalContainer}>
+                        <Text style={styles.modalTitle}>Submit Feedback</Text>
                         <TextInput
-                            style={[styles.feedbackInput, {
-                                color: '#000',
-                                borderColor: '#E9ECEF',
-                                backgroundColor: '#F8F9FA'
-                            }]}
+                            style={styles.feedbackInput}
                             multiline
                             numberOfLines={4}
                             placeholder="Tell us what you think about PITCH..."
@@ -772,14 +759,14 @@ export default function SettingsScreen() {
                         />
                         <View style={styles.modalButtons}>
                             <TouchableOpacity
-                                style={[styles.modalButton, { backgroundColor: '#fff', borderColor: '#E9ECEF' }]}
+                                style={styles.modalButton}
                                 onPress={() => setFeedbackModalVisible(false)}
                                 disabled={feedbackSubmitting}
                             >
-                                <Text style={[styles.modalButtonText, { color: '#000' }]}>Cancel</Text>
+                                <Text style={styles.modalButtonText}>Cancel</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
-                                style={[styles.modalButton, { backgroundColor: '#1f219c' }]}
+                                style={[styles.modalButton, { backgroundColor: '#1f219c', borderColor: '#1f219c' }]}
                                 onPress={handleFeedbackSubmit}
                                 disabled={feedbackSubmitting}
                             >
@@ -793,17 +780,14 @@ export default function SettingsScreen() {
                     </View>
                 </View>
             </Modal>
-        </View>
+        </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
+    safeArea: {
         flex: 1,
-        marginTop: Platform.OS === 'ios' ? 20 : 0,
-    },
-    statusBarBackground: {
-        height: Platform.OS === 'ios' ? 30 : 10,
+        backgroundColor: 'white',
     },
     header: {
         flexDirection: 'row',
@@ -812,10 +796,8 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10,
         paddingVertical: 8,
         borderBottomWidth: 1,
-        marginTop: Platform.select({
-            ios: 25,
-            android: 25
-        })
+        borderBottomColor: '#E9ECEF',
+        backgroundColor: 'white',
     },
     backButton: {
         padding: 5,
@@ -823,11 +805,12 @@ const styles = StyleSheet.create({
     backIcon: {
         width: 20,
         height: 20,
-        transform: [{ rotate: '0deg' }]
+        tintColor: '#000',
     },
     headerTitle: {
         fontSize: 22,
         fontWeight: '600',
+        color: '#000',
     },
     placeholder: {
         width: 20,
@@ -844,6 +827,8 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
         marginBottom: 12,
         borderBottomWidth: 1,
+        borderBottomColor: '#E9ECEF',
+        backgroundColor: '#fff',
     },
     profileRow: {
         flexDirection: 'row',
@@ -872,6 +857,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 2,
+        borderColor: '#fff',
     },
     editIconText: {
         color: '#fff',
@@ -890,10 +876,12 @@ const styles = StyleSheet.create({
     userName: {
         fontSize: 16,
         fontWeight: '600',
+        color: '#000',
         marginBottom: 2,
     },
     userEmail: {
         fontSize: 12,
+        color: '#666',
         marginBottom: 8,
     },
     editProfileButton: {
@@ -916,38 +904,42 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
         paddingHorizontal: 15,
         borderRadius: 8,
+        backgroundColor: '#fff',
     },
     sectionTitle: {
         fontSize: 14,
         fontWeight: '600',
+        color: '#000',
         marginBottom: 10,
         paddingBottom: 5,
         borderBottomWidth: 1,
+        borderBottomColor: '#E9ECEF',
     },
     settingItem: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingVertical: Platform.OS === 'android' ? 8 : 12,
+        paddingVertical: 12,
         borderBottomWidth: 1,
-        height: Platform.OS === 'android' ? 36 : 'auto',
+        borderBottomColor: '#E9ECEF',
     },
     lastItem: {
         borderBottomWidth: 0,
     },
     settingText: {
         fontSize: 13,
+        color: '#000',
     },
     arrowText: {
         fontSize: 18,
         fontWeight: '300',
+        color: '#666',
     },
     switch: {
         transform: Platform.OS === 'ios'
             ? [{ scaleX: 0.8 }, { scaleY: 0.8 }]
             : [{ scaleX: 0.7 }, { scaleY: 0.7 }],
         marginLeft: 5,
-        marginRight: Platform.OS === 'android' ? -8 : 0,
     },
     accountActions: {
         paddingVertical: 8,
@@ -960,14 +952,17 @@ const styles = StyleSheet.create({
     },
     logoutButton: {
         borderWidth: 1,
+        borderColor: '#E9ECEF',
         borderRadius: 8,
         paddingVertical: 10,
         alignItems: 'center',
         flex: 0.48,
+        backgroundColor: '#fff',
     },
     logoutText: {
         fontSize: 14,
         fontWeight: '500',
+        color: '#000',
     },
     deleteAccountButton: {
         backgroundColor: '#FEE9E9',
@@ -979,6 +974,7 @@ const styles = StyleSheet.create({
     deleteAccountText: {
         fontSize: 14,
         fontWeight: '500',
+        color: '#FF3B30',
     },
     versionContainer: {
         alignItems: 'center',
@@ -986,20 +982,21 @@ const styles = StyleSheet.create({
     },
     versionText: {
         fontSize: 12,
+        color: '#666',
     },
     bottomNav: {
         flexDirection: 'row',
         justifyContent: 'space-around',
         alignItems: 'center',
-        paddingVertical: Platform.OS === 'ios' ? 12 : 8,
+        paddingVertical: 8,
         paddingBottom: Platform.OS === 'ios' ? 24 : 8,
         borderTopWidth: 1,
-        height: Platform.OS === 'ios' ? 70 : 48,
+        borderTopColor: '#E9ECEF',
+        backgroundColor: 'white',
     },
     navIcon: {
         width: 22,
         height: 22,
-        marginBottom: Platform.OS === 'ios' ? 3 : 0,
     },
     modalOverlay: {
         flex: 1,
@@ -1011,15 +1008,17 @@ const styles = StyleSheet.create({
         width: width * 0.9,
         padding: 20,
         borderRadius: 10,
-        alignItems: 'center',
+        backgroundColor: '#fff',
     },
     modalTitle: {
         fontSize: 18,
         fontWeight: '600',
+        color: '#000',
         marginBottom: 15,
     },
     modalText: {
         fontSize: 14,
+        color: '#666',
         textAlign: 'left',
         width: '100%',
     },
@@ -1031,10 +1030,13 @@ const styles = StyleSheet.create({
         width: '100%',
         height: 100,
         borderWidth: 1,
+        borderColor: '#E9ECEF',
         borderRadius: 8,
         padding: 10,
         marginBottom: 20,
         textAlignVertical: 'top',
+        color: '#000',
+        backgroundColor: '#F8F9FA',
     },
     modalButtons: {
         flexDirection: 'row',
@@ -1048,9 +1050,12 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         alignItems: 'center',
         borderWidth: 1,
+        borderColor: '#E9ECEF',
+        backgroundColor: '#fff',
     },
     modalButtonText: {
         fontSize: 14,
         fontWeight: '500',
+        color: '#000',
     },
 });

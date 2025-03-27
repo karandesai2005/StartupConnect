@@ -11,6 +11,8 @@ import {
   Platform,
   Keyboard,
   TouchableWithoutFeedback,
+  SafeAreaView,
+  StatusBar,
 } from "react-native";
 import { FontAwesome } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -65,17 +67,15 @@ const LoginScreen = () => {
         body: JSON.stringify(payload),
       });
 
-      // Log raw response before parsing
       const rawResponse = await response.text();
       console.log("Raw server response:", rawResponse);
 
-      // Attempt to parse as JSON
       let result;
       try {
         result = JSON.parse(rawResponse);
       } catch (jsonError) {
         console.error("JSON parsing error:", jsonError);
-        throw new Error("Server response is not valid JSON: " + rawResponse.substring(0, 100)); // Show first 100 chars
+        throw new Error("Server response is not valid JSON: " + rawResponse.substring(0, 100));
       }
 
       console.log("Parsed response:", { status: response.status, result });
@@ -105,99 +105,105 @@ const LoginScreen = () => {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "NULL" : "height"}
-      style={{ flex: 1 }}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 60 : 0}
-    >
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <ScrollView
-          contentContainerStyle={styles.container}
-          keyboardShouldPersistTaps="handled"
-        >
-          {isPopupVisible && (
-            <Popup
-              message={popupMessage}
-              onClose={() => setIsPopupVisible(false)}
-            />
-          )}
-
-          <Text style={styles.title}>Pitch</Text>
-          <Text style={styles.subtitle}>Login or sign up for free.</Text>
-
-          <TextInput
-            placeholder="Email or Username"
-            style={styles.input}
-            placeholderTextColor="#aaa"
-            value={usernameOrEmail}
-            onChangeText={setUsernameOrEmail}
-          />
-          <TextInput
-            placeholder="Password"
-            style={styles.input}
-            placeholderTextColor="#aaa"
-            secureTextEntry
-            value={password}
-            onChangeText={setPassword}
-          />
-
-          {serverError ? (
-            <Text style={styles.errorText}>{serverError}</Text>
-          ) : null}
-
-          <TouchableOpacity
-            style={[
-              styles.continueButton,
-              isLoading ? styles.buttonDisabled : null,
-            ]}
-            onPress={handleLogin}
-            disabled={isLoading}
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.keyboardAvoid}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <ScrollView
+            contentContainerStyle={styles.container}
+            keyboardShouldPersistTaps="handled"
           >
-            {isLoading ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <Text style={styles.continueButtonText}>CONTINUE</Text>
+            {isPopupVisible && (
+              <Popup
+                message={popupMessage}
+                onClose={() => setIsPopupVisible(false)}
+              />
             )}
-          </TouchableOpacity>
 
-          <Text style={styles.orText}>or use</Text>
+            <Text style={styles.title}>Pitch</Text>
+            <Text style={styles.subtitle}>Login or sign up for free.</Text>
 
-          <TouchableOpacity
-            style={styles.googleButton}
-            onPress={openGoogleLogin}
-          >
-            <FontAwesome name="google" size={20} color="#ffffff" />
-            <Text style={styles.googleButtonText}>Sign in with Google</Text>
-          </TouchableOpacity>
+            <TextInput
+              placeholder="Email or Username"
+              style={styles.input}
+              placeholderTextColor="#aaa"
+              value={usernameOrEmail}
+              onChangeText={setUsernameOrEmail}
+            />
+            <TextInput
+              placeholder="Password"
+              style={styles.input}
+              placeholderTextColor="#aaa"
+              secureTextEntry
+              value={password}
+              onChangeText={setPassword}
+            />
 
-          <TouchableOpacity style={styles.appleButton} onPress={openAppleLogin}>
-            <FontAwesome name="apple" size={20} color="#ffffff" />
-            <Text style={styles.appleButtonText}>Sign in with Apple</Text>
-          </TouchableOpacity>
+            {serverError ? (
+              <Text style={styles.errorText}>{serverError}</Text>
+            ) : null}
 
-          <TouchableOpacity
-            style={styles.registerLink}
-            onPress={() => navigation.navigate("Register1")}
-          >
-            <Text style={styles.registerLinkText}>New user? Register here</Text>
-          </TouchableOpacity>
-        </ScrollView>
-      </TouchableWithoutFeedback>
-    </KeyboardAvoidingView>
+            <TouchableOpacity
+              style={[
+                styles.continueButton,
+                isLoading ? styles.buttonDisabled : null,
+              ]}
+              onPress={handleLogin}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Text style={styles.continueButtonText}>CONTINUE</Text>
+              )}
+            </TouchableOpacity>
+
+            <Text style={styles.orText}>or use</Text>
+
+            <TouchableOpacity
+              style={styles.googleButton}
+              onPress={openGoogleLogin}
+            >
+              <FontAwesome name="google" size={20} color="#ffffff" />
+              <Text style={styles.googleButtonText}>Sign in with Google</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.appleButton} onPress={openAppleLogin}>
+              <FontAwesome name="apple" size={20} color="#ffffff" />
+              <Text style={styles.appleButtonText}>Sign in with Apple</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.registerLink}
+              onPress={() => navigation.navigate("Register1")}
+            >
+              <Text style={styles.registerLinkText}>New user? Register here</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: "#fff",
+  },
+  keyboardAvoid: {
+    flex: 1,
+  },
   container: {
     flexGrow: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#fff",
     paddingHorizontal: 20,
-    paddingVertical: Platform.select({
-      ios: null,
-      android: 210
-    })
+    paddingVertical: 20, // Consistent padding, SafeAreaView handles top/bottom insets
   },
   title: {
     fontSize: 32,
@@ -266,7 +272,7 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 50,
     borderWidth: 1,
-    borderColor: "#fffff",
+    borderColor: "#ffffff", // Fixed typo from "#fffff"
     borderRadius: 5,
     marginBottom: 20,
     backgroundColor: "#000000",
