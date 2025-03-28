@@ -54,6 +54,7 @@ const PostItem = memo(({ item, index, toggleExpand, expandedItems, navigation, i
   const videoRef = useRef(null);
 
   useEffect(() => {
+    console.log('Post item data:', JSON.stringify(item)); // Debug post structure
     fetchLikeStatus();
     const mediaUrl = item.image_url || item.media_url;
     if (typeof mediaUrl === 'string') {
@@ -95,11 +96,16 @@ const PostItem = memo(({ item, index, toggleExpand, expandedItems, navigation, i
     };
   }, [isVisible, isVideo]);
 
+  const getPostId = () => {
+    return item.post_id || item._id || item.id; // Try different possible field names
+  };
+
   const fetchLikeStatus = async () => {
     try {
       const token = await AsyncStorage.getItem('token');
-      if (!token || !item.post_id) return;
-      const response = await axios.get(`${NGROK_URL}/api/posts/${item.post_id}/likes`, {
+      const postId = getPostId();
+      if (!token || !postId) return;
+      const response = await axios.get(`${NGROK_URL}/api/posts/${postId}/likes`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (response.data) {
@@ -115,8 +121,9 @@ const PostItem = memo(({ item, index, toggleExpand, expandedItems, navigation, i
     try {
       setIsCommentsLoading(true);
       const token = await AsyncStorage.getItem('token');
-      if (!token || !item.post_id) return;
-      const response = await axios.get(`${NGROK_URL}/api/posts/${item.post_id}/comments`, {
+      const postId = getPostId();
+      if (!token || !postId) return;
+      const response = await axios.get(`${NGROK_URL}/api/posts/${postId}/comments`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setComments(response.data || []);
@@ -131,12 +138,13 @@ const PostItem = memo(({ item, index, toggleExpand, expandedItems, navigation, i
   const handleLike = async () => {
     try {
       const token = await AsyncStorage.getItem('token');
-      if (!token || !item.post_id) return;
+      const postId = getPostId();
+      if (!token || !postId) return;
       setIsLikeLoading(true);
       setIsLiked((prev) => !prev);
       setLikeCount((prev) => (isLiked ? prev - 1 : prev + 1));
       const response = await axios.post(
-        `${NGROK_URL}/api/posts/${item.post_id}/toggle-like`,
+        `${NGROK_URL}/api/posts/${postId}/toggle-like`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -157,9 +165,10 @@ const PostItem = memo(({ item, index, toggleExpand, expandedItems, navigation, i
     if (!newComment.trim()) return;
     try {
       const token = await AsyncStorage.getItem('token');
-      if (!token || !item.post_id) return;
+      const postId = getPostId();
+      if (!token || !postId) return;
       await axios.post(
-        `${NGROK_URL}/api/posts/${item.post_id}/comments`,
+        `${NGROK_URL}/api/posts/${postId}/comments`,
         { content: newComment },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -171,19 +180,36 @@ const PostItem = memo(({ item, index, toggleExpand, expandedItems, navigation, i
   };
 
   const handleDeletePost = async () => {
+    setIsDeleting(true);
     try {
-      setIsDeleting(true);
       const token = await AsyncStorage.getItem('token');
-      if (!token || !item.post_id) return;
+      const postId = getPostId();
       
-      await axios.delete(`${NGROK_URL}/api/posts/${item.post_id}`, {
-        headers: { Authorization: `Bearer ${token}` }
+      console.log('Attempting to delete - Token:', token ? 'Yes' : 'No', 'Post ID:', postId);
+
+      if (!token) {
+        throw new Error('No authentication token found. Please log in again.');
+      }
+      if (!postId) {
+        throw new Error('Post ID is missing from the item data: ' + JSON.stringify(item));
+      }
+
+      const response = await axios.delete(`${NGROK_URL}/api/posts/${postId}`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
-      
-      setIsOptionsModalVisible(false);
-      onDelete(index); // Notify parent to remove this post from the list
+
+      console.log('Delete response:', response.status, response.data);
+
+      if (response.status === 200) {
+        setIsOptionsModalVisible(false);
+        onDelete(postId);
+        console.log(`Post ${postId} deleted successfully`);
+      } else {
+        throw new Error('Unexpected response status: ' + response.status);
+      }
     } catch (error) {
-      console.error('Error deleting post:', error);
+      console.error('Error deleting post:', error.message, error.response?.data);
+      alert(`Failed to delete post: ${error.message || 'Unknown error'}`);
     } finally {
       setIsDeleting(false);
     }
@@ -400,13 +426,20 @@ const PostViewScreen = ({ route }) => {
     }));
   }, []);
 
-  const handleDelete = useCallback((index) => {
+  const handleDelete = useCallback((postId) => {
     setPosts((prevPosts) => {
-      const newPosts = [...prevPosts];
-      newPosts.splice(index, 1);
+      const newPosts = prevPosts.filter(post => {
+        const id = post.post_id || post._id || post.id;
+        return id !== postId;
+      });
+      console.log(`Post ${postId} removed. New post count: ${newPosts.length}`);
       return newPosts;
     });
-  }, []);
+    setCurrentIndex((prevIndex) => {
+      const newIndex = prevIndex > 0 && prevIndex >= posts.length - 1 ? prevIndex - 1 : prevIndex;
+      return newIndex;
+    });
+  }, [posts.length]);
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
@@ -417,6 +450,8 @@ const PostViewScreen = ({ route }) => {
   }, [initialPosts, initialIndex]);
 
   useEffect(() => {
+    console.log('Initial posts:', initialPosts.length);
+    console.log('Sample post data:', JSON.stringify(initialPosts[0])); // Debug first post
     if (posts.length > 0 && initialIndex >= 0 && flatListRef.current) {
       setTimeout(() => {
         flatListRef.current.scrollToIndex({ index: initialIndex, animated: false });
@@ -490,7 +525,7 @@ const PostViewScreen = ({ route }) => {
               onDelete={handleDelete}
             />
           )}
-          keyExtractor={(item) => item._id || item.post_id}
+          keyExtractor={(item) => (item.post_id || item._id || item.id || index).toString()}
           showsVerticalScrollIndicator={false}
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
