@@ -394,6 +394,7 @@ const getUserProfile = async (req, res) => {
 };
 
 // Update current user's profile
+// Update current user's profile
 const updateProfile = async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -412,7 +413,8 @@ const updateProfile = async (req, res) => {
     }
 
     if (profilePicture) {
-      const profilePicturePath = `${req.protocol}://${req.get("host")}/uploads/profile_pictures/${profilePicture.filename}`;
+      // Always use HTTPS for the URL
+      const profilePicturePath = `https://pitch-backend-avb7geahhvfteqf9.centralindia-01.azurewebsites.net/uploads/profile_pictures/${profilePicture.filename}`;
       updates.push("profile_picture = @param2");
       values.push(profilePicturePath);
     }
@@ -440,8 +442,23 @@ const updateProfile = async (req, res) => {
     console.error("Update error:", err);
     return res.status(500).json({ message: "Internal server error", error: err.message });
   }
-};
+};  
 
+
+const fixProfilePictureURLs = async (req, res) => {
+  try {
+    const query = `
+      UPDATE users
+      SET profile_picture = REPLACE(profile_picture, 'http://pitch-backend-avb7geahhvfteqf9.centralindia-01.azurewebsites.net', 'https://pitch-backend-avb7geahhvfteqf9.centralindia-01.azurewebsites.net')
+      WHERE profile_picture LIKE 'http://pitch-backend-avb7geahhvfteqf9.centralindia-01.azurewebsites.net%';
+    `;
+    await queryDB(query, []);
+    res.status(200).json({ message: "Profile picture URLs updated to HTTPS" });
+  } catch (err) {
+    console.error("Error updating profile picture URLs:", err);
+    res.status(500).json({ message: "Internal server error", error: err.message });
+  }
+};
 // New endpoint: Get user profile by username
 const getUserProfileByUsername = async (req, res) => {
   try {
@@ -539,5 +556,6 @@ module.exports = {
   getUserProfileByUsername,
   getUserPostsByUsername,
   searchUsers,
-  checkTokenBlacklist // Middleware for token blacklist checking
+  checkTokenBlacklist, // Middleware for token blacklist checking
+  fixProfilePictureURLs
 };

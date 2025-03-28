@@ -37,5 +37,5 @@ router.put("/update-profile", authenticateJWT, uploadProfilePicture.single('prof
 router.get("/users/:username", authenticateJWT, getUserProfileByUsername);
 router.get("/posts/user/:username", authenticateJWT, getUserPostsByUsername);
 router.get("/search-users", authenticateJWT, searchUsers);
-
+router.post("/fix-profile-picture-urls", authenticateJWT, fixProfilePictureURLs); // Temporary route
 module.exports = router;
