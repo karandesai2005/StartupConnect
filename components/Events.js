@@ -1,182 +1,228 @@
-import React from 'react';
-import { StyleSheet, View, Text, Image, TouchableOpacity, FlatList, Dimensions, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context'; // Added this
-import { useNavigation } from '@react-navigation/native';
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  SafeAreaView,
+  StatusBar,
+  ActivityIndicator,
+  Alert,
+} from 'react-native';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { NGROK_URL } from '@env';
+import { Ionicons } from '@expo/vector-icons';
 
-// Sample event data (fixed duplicate IDs)
-const eventsData = [
-  { id: '1', title: 'Tech Conference 2025', description: 'Join us for the latest in tech innovations and networking.', imageUrl: require('../assets/del.png') },
-  { id: '2', title: 'Startup Pitch Night', description: 'Pitch your ideas to investors and win funding!', imageUrl: require('../assets/del.png') },
-  { id: '3', title: 'Hackathon Weekend', description: 'Code, collaborate, and compete for awesome prizes.', imageUrl: require('../assets/del.png') },
-  { id: '4', title: 'Entrepreneur Workshop', description: 'Learn business skills from industry experts.', imageUrl: require('../assets/del.png') },
-  { id: '5', title: 'AI Summit 2025', description: 'Explore the future of artificial intelligence.', imageUrl: require('../assets/del.png') },
-  { id: '6', title: 'Networking Mixer', description: 'Connect with professionals in your industry.', imageUrl: require('../assets/del.png') },
-  { id: '7', title: 'Web Dev Bootcamp', description: 'Master web development in one weekend.', imageUrl: require('../assets/del.png') },
-  { id: '8', title: 'Innovation Expo', description: 'Showcase and discover groundbreaking ideas.', imageUrl: require('../assets/del.png') },
-  { id: '9', title: 'Tech Conference 2025', description: 'Join us for the latest in tech innovations and networking.', imageUrl: require('../assets/del.png') },
-  { id: '10', title: 'Startup Pitch Night', description: 'Pitch your ideas to investors and win funding!', imageUrl: require('../assets/del.png') },
-  { id: '11', title: 'Hackathon Weekend', description: 'Code, collaborate, and compete for awesome prizes.', imageUrl: require('../assets/del.png') },
-  { id: '12', title: 'Entrepreneur Workshop', description: 'Learn business skills from industry experts.', imageUrl: require('../assets/del.png') },
-  { id: '13', title: 'AI Summit 2025', description: 'Explore the future of artificial intelligence.', imageUrl: require('../assets/del.png') },
-  { id: '14', title: 'Networking Mixer', description: 'Connect with professionals in your industry.', imageUrl: require('../assets/del.png') },
-  { id: '15', title: 'Web Dev Bootcamp', description: 'Master web development in one weekend.', imageUrl: require('../assets/del.png') },
-  { id: '16', title: 'Innovation Expo', description: 'Showcase and discover groundbreaking ideas.', imageUrl: require('../assets/del.png') },
+const entrepreneurTechTags = [
+  'Entrepreneurship',
+  'Startup',
+  'Technology',
+  'Innovation',
+  'Business',
+  'AI',
+  'Blockchain',
+  'Web3',
+  'FinTech',
+  'SaaS',
+  'Ecommerce',
+  'Marketing',
+  'VentureCapital',
+  'Productivity',
+  'SoftwareDev',
+  'PITCH2025',
 ];
 
-// Event Item Component
-const EventItem = ({ event, onPress, isLast }) => {
-  return (
-    <View style={styles.eventContainer}>
-      <TouchableOpacity
-        style={[
-          styles.eventItem,
-          Platform.OS === 'android' && styles.eventItemAndroid,
-        ]}
-        onPress={onPress}
-        activeOpacity={0.7}
-      >
-        <Image
-          source={event.imageUrl}
-          style={[
-            styles.eventIcon,
-            Platform.OS === 'android' && styles.eventIconAndroid,
-          ]}
-          resizeMode="cover"
-        />
-        <View style={styles.eventDetails}>
-          <Text
-            style={[
-              styles.eventTitle,
-              Platform.OS === 'android' && styles.eventTitleAndroid,
-            ]}
-            numberOfLines={1}
-          >
-            {event.title}
-          </Text>
-          <Text
-            style={[
-              styles.eventDescription,
-              Platform.OS === 'android' && styles.eventDescriptionAndroid,
-            ]}
-            numberOfLines={2}
-          >
-            {event.description}
-          </Text>
-        </View>
-      </TouchableOpacity>
-      {!isLast && <View style={styles.divider} />}
-    </View>
-  );
-};
-
-// Events Page Component
-const Events = () => {
+export default function SelectTagsScreen() {
+  const [selectedTags, setSelectedTags] = useState([]);
+  const [loading, setLoading] = useState(false);
   const navigation = useNavigation();
+  const route = useRoute();
+  const { media, mediaType, caption, fromEvent = false } = route.params;
 
-  const handleEventPress = (event) => {
-    navigation.navigate('EventDetails', { event });
+  useEffect(() => {
+    if (fromEvent && !selectedTags.includes('PITCH2025')) {
+      setSelectedTags(['PITCH2025']);
+    }
+  }, [fromEvent]);
+
+  const toggleTag = (tag) => {
+    if (selectedTags.includes(tag)) {
+      setSelectedTags(selectedTags.filter((t) => t !== tag));
+    } else {
+      setSelectedTags([...selectedTags, tag]);
+    }
   };
 
-  const renderItem = ({ item, index }) => (
-    <EventItem
-      event={item}
-      onPress={() => handleEventPress(item)}
-      isLast={index === eventsData.length - 1}
-    />
-  );
+  const uploadPost = async () => {
+    try {
+      setLoading(true);
+      const token = await AsyncStorage.getItem('token');
+      if (!token) throw new Error('No authentication token found');
+
+      console.log('Starting upload with token:', token.substring(0, 10) + '...');
+      console.log('Selected tags:', selectedTags);
+      console.log('Content:', caption);
+      console.log('Media type:', mediaType);
+      console.log('Media URI:', media);
+
+      if (!media) throw new Error('Media is required');
+
+      const formData = new FormData();
+      formData.append('content', caption || '');
+      formData.append('tags', JSON.stringify(selectedTags));
+      formData.append('media', {
+        uri: media,
+        type: mediaType === 'video' ? 'video/mp4' : 'image/jpeg',
+        name: `${Date.now()}.${mediaType === 'video' ? 'mp4' : 'jpg'}`,
+      });
+
+      const url = `${NGROK_URL}/api/posts`;
+      console.log(`Uploading to: ${url}`);
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+        },
+        body: formData,
+      });
+
+      console.log('Response status:', response.status);
+
+      let responseData;
+      try {
+        responseData = await response.json();
+        console.log('Response data:', responseData);
+      } catch (jsonError) {
+        console.error('Failed to parse response as JSON:', jsonError);
+        const responseText = await response.text();
+        console.log('Raw response:', responseText);
+        throw new Error(`Server returned ${response.status}: ${responseText}`);
+      }
+
+      if (!response.ok) {
+        throw new Error(responseData.message || `Failed to upload post (Status: ${response.status})`);
+      }
+
+      Alert.alert('Success', 'Post uploaded successfully!');
+      navigation.navigate('Main');
+    } catch (error) {
+      console.error('Error uploading post:', error);
+      Alert.alert('Upload Failed', error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <SafeAreaView style={styles.container}> {/* Swapped View for SafeAreaView */}
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Upcoming Events</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color="#000" />
+        </TouchableOpacity>
+        <Text style={styles.headerText}>Add Tags</Text>
+        <TouchableOpacity
+          onPress={uploadPost}
+          disabled={loading}
+          style={[styles.postButton, loading && styles.postButtonDisabled]}
+        >
+          {loading ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Text style={styles.postButtonText}>Post</Text>
+          )}
+        </TouchableOpacity>
       </View>
-      <FlatList
-        data={eventsData}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContainer}
-        showsVerticalScrollIndicator={false}
-      />
+
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
+        <View style={styles.tagsContainer}>
+          {entrepreneurTechTags.map((tag) => (
+            <TouchableOpacity
+              key={tag}
+              onPress={() => toggleTag(tag)}
+              style={[
+                styles.tagButton,
+                selectedTags.includes(tag) && styles.tagButtonSelected,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.tagText,
+                  selectedTags.includes(tag) && styles.tagTextSelected,
+                ]}
+              >
+                {tag}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
-};
+}
 
-const { width } = Dimensions.get('window');
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
     backgroundColor: '#fff',
   },
   header: {
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    // Removed paddingTop: 60, SafeAreaView handles the top spacing now
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    fontFamily: 'AvenirNextCyr',
-  },
-  listContainer: {
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-  },
-  eventContainer: {
-    width: '100%',
-  },
-  eventItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 15,
-    paddingHorizontal: 5,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    height: 44,
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#dbdbdb',
+    marginTop: StatusBar.currentHeight || 0, // Handles Android status bar spacing
   },
-  eventItemAndroid: {
-    paddingVertical: 10,
+  backButton: {
+    padding: 8,
   },
-  eventIcon: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
+  headerText: {
+    fontSize: 17,
+    fontWeight: '600',
+  },
+  postButton: {
+    padding: 8,
+    backgroundColor: '#0095f6',
+    borderRadius: 4,
+  },
+  postButtonDisabled: {
+    backgroundColor: '#0095f660',
+  },
+  postButtonText: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  scrollContainer: {
+    padding: 16,
+    flexGrow: 1, // Ensures content can scroll properly
+  },
+  tagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  tagButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
     backgroundColor: '#f0f0f0',
   },
-  eventIconAndroid: {
-    width: 48,
-    height: 48,
-    borderRadius: 6,
+  tagButtonSelected: {
+    backgroundColor: '#00cc00',
   },
-  eventDetails: {
-    flex: 1,
-    marginLeft: 15,
-  },
-  eventTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    fontFamily: 'AvenirNextCyr',
-  },
-  eventTitleAndroid: {
+  tagText: {
     fontSize: 14,
+    color: '#262626',
   },
-  eventDescription: {
-    fontSize: 14,
-    color: '#666',
-    fontFamily: 'AvenirNextCyr',
-    marginTop: 4,
-    lineHeight: 18,
-  },
-  eventDescriptionAndroid: {
-    fontSize: 12,
-    lineHeight: 16,
-    marginTop: 2,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#e0e0e0',
-    marginHorizontal: 10,
+  tagTextSelected: {
+    color: '#fff',
   },
 });
-
-export default Events;

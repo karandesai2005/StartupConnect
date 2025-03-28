@@ -37,17 +37,19 @@ const formatTimestamp = (timestamp) => {
   return postDate.toLocaleDateString();
 };
 
-const PostItem = memo(({ item, index, toggleExpand, expandedItems, navigation, isVisible }) => {
-  const [imageHeight, setImageHeight] = useState(width); // Default height
+const PostItem = memo(({ item, index, toggleExpand, expandedItems, navigation, isVisible, onDelete }) => {
+  const [imageHeight, setImageHeight] = useState(width);
   const [isLoading, setIsLoading] = useState(true);
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(item.likes || 0);
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
   const [isCommentModalVisible, setIsCommentModalVisible] = useState(false);
+  const [isOptionsModalVisible, setIsOptionsModalVisible] = useState(false);
   const [isCommentsLoading, setIsCommentsLoading] = useState(false);
   const [isVideo, setIsVideo] = useState(false);
   const [isLikeLoading, setIsLikeLoading] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const animatedScale = useRef(new Animated.Value(1)).current;
   const videoRef = useRef(null);
 
@@ -65,7 +67,6 @@ const PostItem = memo(({ item, index, toggleExpand, expandedItems, navigation, i
           (imgWidth, imgHeight) => {
             setImageHeight(width / (imgWidth / imgHeight));
             setIsLoading(false);
-            console.log(`Post ${index} height set: ${width / (imgWidth / imgHeight)}`);
           },
           (error) => {
             console.log('Error getting image size:', error);
@@ -169,6 +170,25 @@ const PostItem = memo(({ item, index, toggleExpand, expandedItems, navigation, i
     }
   };
 
+  const handleDeletePost = async () => {
+    try {
+      setIsDeleting(true);
+      const token = await AsyncStorage.getItem('token');
+      if (!token || !item.post_id) return;
+      
+      await axios.delete(`${NGROK_URL}/api/posts/${item.post_id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      setIsOptionsModalVisible(false);
+      onDelete(index); // Notify parent to remove this post from the list
+    } catch (error) {
+      console.error('Error deleting post:', error);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const handlePressIn = () => {
     Animated.spring(animatedScale, { toValue: 0.98, useNativeDriver: true }).start();
   };
@@ -193,7 +213,10 @@ const PostItem = memo(({ item, index, toggleExpand, expandedItems, navigation, i
             <Text style={styles.name}>{item.username || 'Unknown User'}</Text>
           </View>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.moreButton}>
+        <TouchableOpacity 
+          style={styles.moreButton}
+          onPress={() => setIsOptionsModalVisible(true)}
+        >
           <Text style={styles.moreButtonText}>•••</Text>
         </TouchableOpacity>
       </View>
@@ -333,6 +356,28 @@ const PostItem = memo(({ item, index, toggleExpand, expandedItems, navigation, i
           </View>
         </View>
       </Modal>
+
+      <Modal
+        isVisible={isOptionsModalVisible}
+        onBackdropPress={() => setIsOptionsModalVisible(false)}
+        onSwipeComplete={() => setIsOptionsModalVisible(false)}
+        swipeDirection="up"
+        backdropOpacity={0.3}
+        style={styles.optionsModal}
+        animationIn="slideInUp"
+        animationOut="slideOutDown"
+      >
+        <View style={styles.optionsModalContent}>
+          <TouchableOpacity 
+            style={styles.optionButton}
+            onPress={handleDeletePost}
+            disabled={isDeleting}
+          >
+            <Text style={styles.optionText}>Delete Post</Text>
+            {isDeleting && <ActivityIndicator size="small" color="#FF0000" />}
+          </TouchableOpacity>
+        </View>
+      </Modal>
     </Animated.View>
   );
 });
@@ -355,6 +400,14 @@ const PostViewScreen = ({ route }) => {
     }));
   }, []);
 
+  const handleDelete = useCallback((index) => {
+    setPosts((prevPosts) => {
+      const newPosts = [...prevPosts];
+      newPosts.splice(index, 1);
+      return newPosts;
+    });
+  }, []);
+
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
     setPosts(initialPosts);
@@ -364,14 +417,11 @@ const PostViewScreen = ({ route }) => {
   }, [initialPosts, initialIndex]);
 
   useEffect(() => {
-    console.log('Posts received:', posts.length, 'items');
-    console.log('Initial index:', initialIndex);
     if (posts.length > 0 && initialIndex >= 0 && flatListRef.current) {
       setTimeout(() => {
-        console.log('Forcing scroll to index:', initialIndex);
         flatListRef.current.scrollToIndex({ index: initialIndex, animated: false });
         setIsInitialScrollDone(true);
-      }, 1500); // Increased delay for rendering
+      }, 1500);
     }
   }, [posts, initialIndex]);
 
@@ -379,7 +429,6 @@ const PostViewScreen = ({ route }) => {
     ({ viewableItems }) => {
       if (viewableItems.length > 0 && isInitialScrollDone) {
         const topItem = viewableItems[0];
-        console.log('Viewable changed to index:', topItem.index, 'from', currentIndex);
         setCurrentIndex(topItem.index);
         setViewableItems(viewableItems.map((item) => item.index));
       }
@@ -392,33 +441,26 @@ const PostViewScreen = ({ route }) => {
   };
 
   const getItemLayout = (data, index) => ({
-    length: width * 1.5, // Fallback height: adjust based on avg post height
+    length: width * 1.5,
     offset: (width * 1.5) * index,
     index,
   });
 
   const onScrollToIndexFailed = (info) => {
-    console.log('Scroll to index failed:', info);
     const retryScroll = (attempt = 1) => {
       if (attempt > 3) {
-        console.log('Max retries reached, falling back to offset');
-        const estimatedOffset = info.index * (width * 1.5); // Match getItemLayout
+        const estimatedOffset = info.index * (width * 1.5);
         flatListRef.current.scrollToOffset({ offset: estimatedOffset, animated: false });
         setIsInitialScrollDone(true);
         return;
       }
       setTimeout(() => {
         if (flatListRef.current && posts.length > info.index) {
-          console.log(`Retry attempt ${attempt} for index:`, info.index);
           flatListRef.current.scrollToIndex({ index: info.index, animated: false });
         }
       }, 1000 * attempt);
     };
     retryScroll();
-  };
-
-  const handleLayout = () => {
-    console.log('FlatList laid out with', posts.length, 'items');
   };
 
   return (
@@ -445,6 +487,7 @@ const PostViewScreen = ({ route }) => {
               expandedItems={expandedItems}
               navigation={navigation}
               isVisible={viewableItems.includes(index)}
+              onDelete={handleDelete}
             />
           )}
           keyExtractor={(item) => item._id || item.post_id}
@@ -455,9 +498,8 @@ const PostViewScreen = ({ route }) => {
           onRefresh={handleRefresh}
           getItemLayout={getItemLayout}
           onScrollToIndexFailed={onScrollToIndexFailed}
-          onLayout={handleLayout}
-          initialNumToRender={4} // All posts for small list
-          maxToRenderPerBatch={4} // Ensure smooth batch rendering
+          initialNumToRender={4}
+          maxToRenderPerBatch={4}
           initialScrollIndex={initialIndex}
         />
       ) : (
@@ -700,6 +742,30 @@ const styles = StyleSheet.create({
     top: '50%',
     left: '50%',
     transform: [{ translateX: -12 }, { translateY: -12 }],
+  },
+  optionsModal: {
+    justifyContent: 'flex-end',
+    margin: 0,
+  },
+  optionsModalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 15,
+    borderTopRightRadius: 15,
+    padding: 20,
+    paddingBottom: 40,
+  },
+  optionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  optionText: {
+    fontSize: 16,
+    color: '#FF0000',
+    fontWeight: '500',
+    flex: 1,
   },
 });
 

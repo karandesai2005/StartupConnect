@@ -80,11 +80,8 @@ const SearchScreen = () => {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
       <View style={styles.topBar}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Image
-            source={require('../assets/Arrow.png')}
-            style={styles.backIcon}
-          />
+        <TouchableOpacity onPress={() => navigation.goBack('Home')} style={styles.backButton}>
+          <Text style={styles.backButtonText}>←</Text>
         </TouchableOpacity>
         <TextInput
           style={styles.searchBar}
@@ -141,6 +138,10 @@ const styles = StyleSheet.create({
   },
   keyboardAvoid: {
     flex: 1,
+  },
+  backButtonText: {
+    fontSize: 32,
+    color: "#000",
   },
   searchResultsList: {
     flex: 1,

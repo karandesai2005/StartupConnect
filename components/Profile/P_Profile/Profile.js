@@ -20,9 +20,7 @@ import { Video } from 'expo-av';
 
 const ProfileHeader = React.memo(({ userData, lastUpdate, navigation, isOwnProfile, onFollow }) => {
   const isBusinessProfile = userData?.account_type === "business";
-  const [isImageLoading, setIsImageLoading] = useState(true);
-  const [imageError, setImageError] = useState(null);
-  const [retryCount, setRetryCount] = useState(0);
+  const [imageError, setImageError] = useState(false);
 
   const avatarStyle = useMemo(() => ({
     height: "100%",
@@ -32,101 +30,39 @@ const ProfileHeader = React.memo(({ userData, lastUpdate, navigation, isOwnProfi
     overflow: "hidden",
   }), [isBusinessProfile]);
 
-  const profilePictureUrl = userData?.profile_picture
-    ? userData.profile_picture.startsWith('https')
-      ? `${userData.profile_picture}?cache_bust=${lastUpdate}-${Math.random()}`
-      : `${NGROK_URL}/uploads/${userData.profile_picture}?cache_bust=${lastUpdate}-${Math.random()}`
-    : null;
-
-  // Test the URL directly with a timeout
-  useEffect(() => {
-    if (profilePictureUrl && retryCount < 3) {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-      AsyncStorage.getItem("token").then(token => {
-        fetch(profilePictureUrl, {
-          method: 'HEAD',
-          signal: controller.signal,
-          headers: { "Authorization": `Bearer ${token}` }
-        })
-          .then(res => {
-            if (!res.ok) {
-              setImageError(`HTTP ${res.status}`);
-              setRetryCount(prev => prev + 1); // Retry on failure
-            }
-          })
-          .catch(err => {
-            setImageError(err.message);
-            setRetryCount(prev => prev + 1); // Retry on error
-          })
-          .finally(() => clearTimeout(timeoutId));
-      });
-    }
-  }, [profilePictureUrl, retryCount]);
-
-  // Timeout for Image loading
-  useEffect(() => {
-    if (isImageLoading) {
-      const timeoutId = setTimeout(() => {
-        if (isImageLoading) {
-          setIsImageLoading(false);
-          setImageError('Load timeout');
-          setRetryCount(prev => prev + 1); // Retry on timeout
-        }
-      }, 10000);
-      return () => clearTimeout(timeoutId);
-    }
-  }, [isImageLoading]);
+  const profilePictureUrl = useMemo(() => {
+    if (!userData?.profile_picture) return null;
+    return userData.profile_picture.startsWith('https')
+      ? `${userData.profile_picture}?cache_bust=${lastUpdate}`
+      : `${NGROK_URL}/uploads/${userData.profile_picture}?cache_bust=${lastUpdate}`;
+  }, [userData?.profile_picture, lastUpdate]);
 
   return (
     <View style={styles.profile}>
       <View style={styles.profileSection}>
         <View style={styles.statsContainer}>
-          <View style={styles.statsItem}>
-            <Text style={styles.statsNumber}>{userData?.followers || "0"}</Text>
-            <Text style={styles.statsLabel}>Followers</Text>
-          </View>
+          <Text style={styles.statsNumber}>{userData?.followers || "0"}</Text>
+          <Text style={styles.statsLabel}>Followers</Text>
         </View>
 
         <View style={styles.avatarMultiVariants}>
           <View style={avatarStyle}>
-            {isImageLoading && !imageError && (
-              <ActivityIndicator size="small" color="#007BFF" style={styles.imageLoader} />
-            )}
             <Image
-              key={`${profilePictureUrl}-${retryCount}`} // Prevent flickering
               source={
                 imageError || !profilePictureUrl
                   ? require('../../../assets/del.png')
-                  : { uri: profilePictureUrl, headers: { "Authorization": `Bearer ${AsyncStorage.getItem("token")}` } }
+                  : { uri: profilePictureUrl }
               }
               style={styles.profileImage}
               resizeMode="cover"
-              onLoadStart={() => {
-                setIsImageLoading(true);
-                setImageError(null);
-              }}
-              onLoad={() => {
-                setIsImageLoading(false);
-              }}
-              onError={(e) => {
-                setIsImageLoading(false);
-                setImageError(e.nativeEvent.error);
-                setRetryCount(prev => prev + 1); // Retry on error
-              }}
+              onError={() => setImageError(true)}
             />
-            {imageError && (
-              <Text style={styles.errorText}>{imageError}</Text>
-            )}
           </View>
         </View>
 
         <View style={styles.statsContainer}>
-          <View style={styles.statsItem}>
-            <Text style={styles.statsNumber}>{userData?.following || "0"}</Text>
-            <Text style={styles.statsLabel}>Following</Text>
-          </View>
+          <Text style={styles.statsNumber}>{userData?.following || "0"}</Text>
+          <Text style={styles.statsLabel}>Following</Text>
         </View>
       </View>
 
@@ -168,32 +104,31 @@ const Profile = ({ route }) => {
   const [userData, setUserData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [lastUpdate, setLastUpdate] = useState(0);
   const [userPosts, setUserPosts] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
 
-  const screenWidth = Dimensions.get('window').width;
-  const spacing = 2;
-  const itemSize = useMemo(() => (screenWidth - 32 - spacing * 2) / 3, [screenWidth]);
+  const { width: screenWidth } = Dimensions.get('window');
+  const itemSize = useMemo(() => (screenWidth - 32 - 4) / 3, [screenWidth]);
 
   useEffect(() => {
-    const getCurrentUser = async () => {
-      try {
-        const userDataStr = await AsyncStorage.getItem('userData');
-        if (userDataStr) {
+    let mounted = true;
+    AsyncStorage.getItem('userData')
+      .then(userDataStr => {
+        if (mounted && userDataStr) {
           setCurrentUser(JSON.parse(userDataStr));
         }
-      } catch (error) {
-        console.error('Error getting current user:', error);
-      }
-    };
-    getCurrentUser();
+      })
+      .catch(error => console.error('Error getting current user:', error));
+    return () => { mounted = false; };
   }, []);
 
-  const isOwnProfile = !route.params?.username ||
-    (currentUser && route.params?.username === currentUser.username);
+  const isOwnProfile = useMemo(() => 
+    !route.params?.username || 
+    (currentUser && route.params?.username === currentUser.username),
+    [route.params?.username, currentUser]
+  );
 
-  const fetchUserPosts = useCallback(async () => {
+  const fetchUserDataAndPosts = useCallback(async () => {
     try {
       const token = await AsyncStorage.getItem("token");
       if (!token) {
@@ -202,30 +137,50 @@ const Profile = ({ route }) => {
       }
 
       const username = route.params?.username;
-      const endpoint = username && !isOwnProfile
-        ? `${NGROK_URL}/api/posts/user/${username}`
-        : `${NGROK_URL}/api/posts/myposts`;
+      const headers = {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json",
+        "Cache-Control": "no-cache",
+      };
 
-      const response = await fetch(endpoint, {
-        method: "GET",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json",
-          "Cache-Control": "no-cache",
-        },
-      });
+      const [profileResponse, postsResponse] = await Promise.all([
+        fetch(
+          username && !isOwnProfile
+            ? `${NGROK_URL}/api/profile/user/${username}`
+            : `${NGROK_URL}/api/profile`,
+          { method: "GET", headers }
+        ),
+        fetch(
+          username && !isOwnProfile
+            ? `${NGROK_URL}/api/posts/user/${username}`
+            : `${NGROK_URL}/api/posts/myposts`,
+          { method: "GET", headers }
+        )
+      ]);
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      if (!profileResponse.ok || !postsResponse.ok) {
+        throw new Error('Network response was not ok');
       }
 
-      const data = await response.json();
-      if (!Array.isArray(data)) {
-        setUserPosts([]);
-        return;
+      const [profileData, postsData] = await Promise.all([
+        profileResponse.json(),
+        postsResponse.json()
+      ]);
+
+      const formattedUserData = {
+        ...profileData,
+        profile_picture: profileData.profile_picture
+          ? profileData.profile_picture.startsWith('https')
+            ? profileData.profile_picture
+            : `${NGROK_URL}/uploads/${profileData.profile_picture}`
+          : null,
+      };
+      setUserData(formattedUserData);
+      if (isOwnProfile) {
+        await AsyncStorage.setItem('userData', JSON.stringify(formattedUserData));
       }
 
-      const mappedPosts = data.map(post => ({
+      const mappedPosts = Array.isArray(postsData) ? postsData.map(post => ({
         _id: post.post_id || post.id,
         username: post.username,
         profile_picture: post.profile_picture
@@ -242,178 +197,62 @@ const Profile = ({ route }) => {
         created_at: post.created_at,
         likes: post.like_count || 0,
         comments: post.comment_count || 0,
-        caption: post.content,
         media_type: post.media_type || (post.media_url?.includes('.mp4') ? 'video' : 'image')
-      }));
+      })).filter(post => post.image_url && !post.image_url.includes('undefined'))
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at)) : [];
 
-      const validPosts = mappedPosts
-        .filter(post => post.image_url && !post.image_url.includes('undefined'))
-        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-
-      setUserPosts(validPosts);
+      setUserPosts(mappedPosts);
     } catch (error) {
-      console.error("Posts fetch error:", error);
+      console.error("Fetch error:", error);
       setUserPosts([]);
-      Alert.alert('Error', `Failed to fetch posts: ${error.message}`);
-    }
-  }, [navigation, route.params?.username, isOwnProfile]);
-
-  const fetchUserData = useCallback(async () => {
-    try {
-      const token = await AsyncStorage.getItem("token");
-      if (!token) {
-        navigation.navigate('Login');
-        return;
-      }
-
-      const username = route.params?.username;
-      const endpoint = username && !isOwnProfile
-        ? `${NGROK_URL}/api/profile/user/${username}`
-        : `${NGROK_URL}/api/profile`;
-
-      const response = await fetch(endpoint, {
-        method: "GET",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json",
-          "Cache-Control": "no-cache",
-          "Pragma": "no-cache",
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log('Raw profile_picture:', data.profile_picture);
-
-      const formattedData = {
-        ...data,
-        profile_picture: data.profile_picture
-          ? data.profile_picture.startsWith('https')
-            ? data.profile_picture
-            : `${NGROK_URL}/uploads/${data.profile_picture}`
-          : null,
-      };
-
-      setUserData(formattedData);
-      setLastUpdate(Date.now());
-      if (isOwnProfile) {
-        await AsyncStorage.setItem('userData', JSON.stringify(formattedData));
-      }
-    } catch (error) {
-      console.error("Profile fetch error:", error);
-      Alert.alert('Error', `Failed to fetch profile data: ${error.message}`);
+      Alert.alert('Error', `Failed to fetch data: ${error.message}`);
     } finally {
       setIsLoading(false);
       setRefreshing(false);
     }
   }, [navigation, route.params?.username, isOwnProfile]);
 
-  const handleFollow = async () => {
-    try {
-      const token = await AsyncStorage.getItem("token");
-      if (!token) {
-        navigation.navigate("Login");
-        return;
-      }
-
-      const isCurrentlyFollowing = userData?.isFollowing;
-      const method = isCurrentlyFollowing ? "DELETE" : "POST";
-      const endpoint = `${NGROK_URL}/api/profile/follow`;
-
-      const response = await fetch(endpoint, {
-        method: method,
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ username: userData.username }),
-      });
-
-      if (response.ok) {
-        setUserData(prev => ({
-          ...prev,
-          isFollowing: !isCurrentlyFollowing,
-          followers: (prev.followers || 0) + (isCurrentlyFollowing ? -1 : 1)
-        }));
-      } else {
-        const errorData = await response.json();
-        throw new Error(errorData.message || `Failed to ${isCurrentlyFollowing ? 'unfollow' : 'follow'} user`);
-      }
-    } catch (error) {
-      console.error(`${isCurrentlyFollowing ? 'Unfollow' : 'Follow'} error:`, error);
-      Alert.alert('Error', `Failed to ${isCurrentlyFollowing ? 'unfollow' : 'follow'} user: ${error.message}`);
-    }
-  };
-
-  const handleRefresh = useCallback(async () => {
+  const handleRefresh = useCallback(() => {
     setRefreshing(true);
-    await Promise.all([fetchUserData(), fetchUserPosts()]);
-    setRefreshing(false);
-  }, [fetchUserData, fetchUserPosts]);
+    fetchUserDataAndPosts();
+  }, [fetchUserDataAndPosts]);
 
-  const renderGridItem = useCallback(({ item, index }) => {
-    const isVideo = item.media_type === 'video' || item.image_url?.includes('.mp4');
-
-    return (
-      <TouchableOpacity
-        style={[styles.gridItem, { width: itemSize, height: itemSize, marginBottom: 2 }]}
-        onPress={() => navigation.navigate('PostView', { posts: userPosts, initialIndex: index })}
-      >
-        {isVideo ? (
-          <View style={styles.videoContainer}>
-            <Video
-              source={{ uri: item.image_url }}
-              style={styles.gridImage}
-              resizeMode="cover"
-              shouldPlay={false}
-              isMuted={true}
-              useNativeControls={false}
-            />
-            <View style={styles.playIconContainer}>
-              <Text style={styles.playIcon}>▶</Text>
-            </View>
-          </View>
-        ) : (
-          <Image
-            source={item.image_url ? { uri: item.image_url } : require('../../../assets/del.png')}
+  const renderGridItem = useCallback(({ item, index }) => (
+    <TouchableOpacity
+      style={[styles.gridItem, { width: itemSize, height: itemSize }]}
+      onPress={() => navigation.navigate('PostView', { posts: userPosts, initialIndex: index })}
+    >
+      {item.media_type === 'video' || item.image_url?.includes('.mp4') ? (
+        <View style={styles.videoContainer}>
+          <Video
+            source={{ uri: item.image_url }}
             style={styles.gridImage}
             resizeMode="cover"
-            onError={(e) => console.log('Grid image load error:', e.nativeEvent.error, item.image_url)}
+            shouldPlay={false}
+            isMuted={true}
+            useNativeControls={false}
           />
-        )}
-      </TouchableOpacity>
-    );
-  }, [itemSize, navigation, userPosts]);
-
-  useEffect(() => {
-    if (route.params?.updatedUser && isOwnProfile) {
-      setUserData(prevData => ({
-        ...prevData,
-        ...route.params.updatedUser,
-        profile_picture: route.params.updatedUser.profile_picture
-          ? route.params.updatedUser.profile_picture.startsWith('https')
-            ? route.params.updatedUser.profile_picture
-            : `${NGROK_URL}/uploads/${route.params.updatedUser.profile_picture}`
-          : null,
-      }));
-      setLastUpdate(Date.now());
-      if (route.params.forceRefresh) {
-        fetchUserData();
-      }
-    }
-  }, [route.params?.updatedUser, fetchUserData, isOwnProfile]);
+          <View style={styles.playIconContainer}>
+            <Text style={styles.playIcon}>▶</Text>
+          </View>
+        </View>
+      ) : (
+        <Image
+          source={item.image_url ? { uri: item.image_url } : require('../../../assets/del.png')}
+          style={styles.gridImage}
+          resizeMode="cover"
+        />
+      )}
+    </TouchableOpacity>
+  ), [itemSize, navigation, userPosts]);
 
   useFocusEffect(
     useCallback(() => {
       if (!userData || !userPosts.length) {
         setIsLoading(true);
-        fetchUserData();
-        fetchUserPosts();
+        fetchUserDataAndPosts();
       }
-    }, [fetchUserData, fetchUserPosts, route.params?.username, userData, userPosts])
+    }, [fetchUserDataAndPosts, userData, userPosts])
   );
 
   if (isLoading) {
@@ -435,10 +274,35 @@ const Profile = ({ route }) => {
             </TouchableOpacity>
             <ProfileHeader
               userData={userData}
-              lastUpdate={lastUpdate}
+              lastUpdate={Date.now()}
               navigation={navigation}
               isOwnProfile={isOwnProfile}
-              onFollow={handleFollow}
+              onFollow={async () => {
+                const token = await AsyncStorage.getItem("token");
+                if (!token) return navigation.navigate("Login");
+                
+                const method = userData?.isFollowing ? "DELETE" : "POST";
+                try {
+                  const response = await fetch(`${NGROK_URL}/api/profile/follow`, {
+                    method,
+                    headers: {
+                      "Authorization": `Bearer ${token}`,
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ username: userData.username }),
+                  });
+                  
+                  if (response.ok) {
+                    setUserData(prev => ({
+                      ...prev,
+                      isFollowing: !prev.isFollowing,
+                      followers: (prev.followers || 0) + (prev.isFollowing ? -1 : 1)
+                    }));
+                  }
+                } catch (error) {
+                  Alert.alert('Error', `Failed to ${userData?.isFollowing ? 'unfollow' : 'follow'}: ${error.message}`);
+                }
+              }}
             />
             <Text style={styles.postsHeading}>Posts ({userPosts.length})</Text>
             {userPosts.length === 0 && (
@@ -451,13 +315,10 @@ const Profile = ({ route }) => {
         keyExtractor={(item) => item._id}
         numColumns={3}
         contentContainerStyle={styles.flatListContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            tintColor="#000000"
-          />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+        initialNumToRender={9}
+        maxToRenderPerBatch={12}
+        windowSize={5}
       />
     </SafeAreaView>
   );
@@ -478,6 +339,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 14,
     gap: 14,
+    
   },
   profileSection: {
     flexDirection: 'row',
@@ -485,39 +347,23 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     width: '100%',
     paddingHorizontal: 20,
+    marginTop: 25,
+    
   },
   avatarMultiVariants: {
     width: 96,
     height: 96,
     marginHorizontal: 20,
+    
   },
   profileImage: {
     width: "100%",
     height: "100%",
     borderRadius: 48,
   },
-  imageLoader: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    transform: [{ translateX: -12 }, { translateY: -12 }],
-  },
-  errorText: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    transform: [{ translateX: -48 }, { translateY: 12 }],
-    color: 'red',
-    fontSize: 12,
-    width: 96,
-    textAlign: 'center',
-  },
   statsContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  statsItem: {
-    alignItems: 'center',
   },
   statsNumber: {
     fontSize: 18,
@@ -589,13 +435,14 @@ const styles = StyleSheet.create({
   },
   backButton: {
     position: "absolute",
-    left: 28,
-    top: 20,
+    left: 5,
+    top: 5,
     zIndex: 1,
   },
   backButtonText: {
     fontSize: 32,
     color: "#000",
+    marginRight: 9,
   },
   postsHeading: {
     fontSize: 18,
