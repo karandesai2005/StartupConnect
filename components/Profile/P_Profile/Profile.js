@@ -20,6 +20,9 @@ import { Video } from 'expo-av';
 
 const ProfileHeader = React.memo(({ userData, lastUpdate, navigation, isOwnProfile, onFollow }) => {
   const isBusinessProfile = userData?.account_type === "business";
+  const [isImageLoading, setIsImageLoading] = useState(true);
+  const [imageError, setImageError] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   const avatarStyle = useMemo(() => ({
     height: "100%",
@@ -29,14 +32,52 @@ const ProfileHeader = React.memo(({ userData, lastUpdate, navigation, isOwnProfi
     overflow: "hidden",
   }), [isBusinessProfile]);
 
-  // Construct full URL for profile picture
   const profilePictureUrl = userData?.profile_picture
-    ? userData.profile_picture.startsWith('http')
-      ? `${userData.profile_picture}?timestamp=${lastUpdate}`
-      : `${NGROK_URL}/uploads/${userData.profile_picture}?timestamp=${lastUpdate}`
+    ? userData.profile_picture.startsWith('https')
+      ? `${userData.profile_picture}?cache_bust=${lastUpdate}-${Math.random()}`
+      : `${NGROK_URL}/uploads/${userData.profile_picture}?cache_bust=${lastUpdate}-${Math.random()}`
     : null;
 
-  console.log('Profile picture URL:', profilePictureUrl);
+  // Test the URL directly with a timeout
+  useEffect(() => {
+    if (profilePictureUrl && retryCount < 3) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      AsyncStorage.getItem("token").then(token => {
+        fetch(profilePictureUrl, {
+          method: 'HEAD',
+          signal: controller.signal,
+          headers: { "Authorization": `Bearer ${token}` }
+        })
+          .then(res => {
+            if (!res.ok) {
+              setImageError(`HTTP ${res.status}`);
+              setRetryCount(prev => prev + 1); // Retry on failure
+            }
+          })
+          .catch(err => {
+            setImageError(err.message);
+            setRetryCount(prev => prev + 1); // Retry on error
+          })
+          .finally(() => clearTimeout(timeoutId));
+      });
+    }
+  }, [profilePictureUrl, retryCount]);
+
+  // Timeout for Image loading
+  useEffect(() => {
+    if (isImageLoading) {
+      const timeoutId = setTimeout(() => {
+        if (isImageLoading) {
+          setIsImageLoading(false);
+          setImageError('Load timeout');
+          setRetryCount(prev => prev + 1); // Retry on timeout
+        }
+      }, 10000);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [isImageLoading]);
 
   return (
     <View style={styles.profile}>
@@ -50,12 +91,34 @@ const ProfileHeader = React.memo(({ userData, lastUpdate, navigation, isOwnProfi
 
         <View style={styles.avatarMultiVariants}>
           <View style={avatarStyle}>
+            {isImageLoading && !imageError && (
+              <ActivityIndicator size="small" color="#007BFF" style={styles.imageLoader} />
+            )}
             <Image
-              source={profilePictureUrl ? { uri: profilePictureUrl } : require('../../../assets/del.png')}
+              key={`${profilePictureUrl}-${retryCount}`} // Prevent flickering
+              source={
+                imageError || !profilePictureUrl
+                  ? require('../../../assets/del.png')
+                  : { uri: profilePictureUrl, headers: { "Authorization": `Bearer ${AsyncStorage.getItem("token")}` } }
+              }
               style={styles.profileImage}
               resizeMode="cover"
-              onError={(e) => console.log('Profile picture load error:', e.nativeEvent.error, profilePictureUrl)}
+              onLoadStart={() => {
+                setIsImageLoading(true);
+                setImageError(null);
+              }}
+              onLoad={() => {
+                setIsImageLoading(false);
+              }}
+              onError={(e) => {
+                setIsImageLoading(false);
+                setImageError(e.nativeEvent.error);
+                setRetryCount(prev => prev + 1); // Retry on error
+              }}
             />
+            {imageError && (
+              <Text style={styles.errorText}>{imageError}</Text>
+            )}
           </View>
         </View>
 
@@ -148,6 +211,7 @@ const Profile = ({ route }) => {
         headers: {
           "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json",
+          "Cache-Control": "no-cache",
         },
       });
 
@@ -165,12 +229,12 @@ const Profile = ({ route }) => {
         _id: post.post_id || post.id,
         username: post.username,
         profile_picture: post.profile_picture
-          ? post.profile_picture.startsWith('http')
+          ? post.profile_picture.startsWith('https')
             ? post.profile_picture
             : `${NGROK_URL}/uploads/${post.profile_picture}`
           : null,
         image_url: post.media_url
-          ? post.media_url.startsWith('http')
+          ? post.media_url.startsWith('https')
             ? post.media_url
             : `${NGROK_URL}/uploads/${post.media_url}`
           : null,
@@ -224,11 +288,10 @@ const Profile = ({ route }) => {
       const data = await response.json();
       console.log('Raw profile_picture:', data.profile_picture);
 
-      // Ensure profile_picture is a full URL
       const formattedData = {
         ...data,
         profile_picture: data.profile_picture
-          ? data.profile_picture.startsWith('http')
+          ? data.profile_picture.startsWith('https')
             ? data.profile_picture
             : `${NGROK_URL}/uploads/${data.profile_picture}`
           : null,
@@ -331,7 +394,7 @@ const Profile = ({ route }) => {
         ...prevData,
         ...route.params.updatedUser,
         profile_picture: route.params.updatedUser.profile_picture
-          ? route.params.updatedUser.profile_picture.startsWith('http')
+          ? route.params.updatedUser.profile_picture.startsWith('https')
             ? route.params.updatedUser.profile_picture
             : `${NGROK_URL}/uploads/${route.params.updatedUser.profile_picture}`
           : null,
@@ -345,10 +408,12 @@ const Profile = ({ route }) => {
 
   useFocusEffect(
     useCallback(() => {
-      setIsLoading(true);
-      fetchUserData();
-      fetchUserPosts();
-    }, [fetchUserData, fetchUserPosts, route.params?.username])
+      if (!userData || !userPosts.length) {
+        setIsLoading(true);
+        fetchUserData();
+        fetchUserPosts();
+      }
+    }, [fetchUserData, fetchUserPosts, route.params?.username, userData, userPosts])
   );
 
   if (isLoading) {
@@ -430,6 +495,22 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
     borderRadius: 48,
+  },
+  imageLoader: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: [{ translateX: -12 }, { translateY: -12 }],
+  },
+  errorText: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: [{ translateX: -48 }, { translateY: 12 }],
+    color: 'red',
+    fontSize: 12,
+    width: 96,
+    textAlign: 'center',
   },
   statsContainer: {
     alignItems: 'center',

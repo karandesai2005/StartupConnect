@@ -37,8 +37,8 @@ const formatTimestamp = (timestamp) => {
   return postDate.toLocaleDateString();
 };
 
-const PostItem = memo(({ item, index, toggleExpand, expandedItems, navigation, onHeightCalculated }) => {
-  const [imageHeight, setImageHeight] = useState(width);
+const PostItem = memo(({ item, index, toggleExpand, expandedItems, navigation, isVisible }) => {
+  const [imageHeight, setImageHeight] = useState(width); // Default height
   const [isLoading, setIsLoading] = useState(true);
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(item.likes || 0);
@@ -65,6 +65,7 @@ const PostItem = memo(({ item, index, toggleExpand, expandedItems, navigation, o
           (imgWidth, imgHeight) => {
             setImageHeight(width / (imgWidth / imgHeight));
             setIsLoading(false);
+            console.log(`Post ${index} height set: ${width / (imgWidth / imgHeight)}`);
           },
           (error) => {
             console.log('Error getting image size:', error);
@@ -76,13 +77,28 @@ const PostItem = memo(({ item, index, toggleExpand, expandedItems, navigation, o
         setIsLoading(false);
       }
     }
-  }, [item]);
+  }, [item, index]);
+
+  useEffect(() => {
+    if (isVideo && videoRef.current) {
+      if (isVisible) {
+        videoRef.current.playAsync().catch((error) => console.error('Play error:', error));
+      } else {
+        videoRef.current.pauseAsync().catch((error) => console.error('Pause error:', error));
+      }
+    }
+    return () => {
+      if (isVideo && videoRef.current) {
+        videoRef.current.pauseAsync().catch(() => {});
+      }
+    };
+  }, [isVisible, isVideo]);
 
   const fetchLikeStatus = async () => {
     try {
       const token = await AsyncStorage.getItem('token');
-      if (!token || !item._id) return;
-      const response = await axios.get(`${NGROK_URL}/api/posts/${item._id}/likes`, {
+      if (!token || !item.post_id) return;
+      const response = await axios.get(`${NGROK_URL}/api/posts/${item.post_id}/likes`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (response.data) {
@@ -98,8 +114,8 @@ const PostItem = memo(({ item, index, toggleExpand, expandedItems, navigation, o
     try {
       setIsCommentsLoading(true);
       const token = await AsyncStorage.getItem('token');
-      if (!token || !item._id) return;
-      const response = await axios.get(`${NGROK_URL}/api/posts/${item._id}/comments`, {
+      if (!token || !item.post_id) return;
+      const response = await axios.get(`${NGROK_URL}/api/posts/${item.post_id}/comments`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setComments(response.data || []);
@@ -114,12 +130,12 @@ const PostItem = memo(({ item, index, toggleExpand, expandedItems, navigation, o
   const handleLike = async () => {
     try {
       const token = await AsyncStorage.getItem('token');
-      if (!token || !item._id) return;
+      if (!token || !item.post_id) return;
       setIsLikeLoading(true);
       setIsLiked((prev) => !prev);
       setLikeCount((prev) => (isLiked ? prev - 1 : prev + 1));
       const response = await axios.post(
-        `${NGROK_URL}/api/posts/${item._id}/toggle-like`,
+        `${NGROK_URL}/api/posts/${item.post_id}/toggle-like`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -140,9 +156,9 @@ const PostItem = memo(({ item, index, toggleExpand, expandedItems, navigation, o
     if (!newComment.trim()) return;
     try {
       const token = await AsyncStorage.getItem('token');
-      if (!token || !item._id) return;
+      if (!token || !item.post_id) return;
       await axios.post(
-        `${NGROK_URL}/api/posts/${item._id}/comments`,
+        `${NGROK_URL}/api/posts/${item.post_id}/comments`,
         { content: newComment },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -161,13 +177,8 @@ const PostItem = memo(({ item, index, toggleExpand, expandedItems, navigation, o
     Animated.spring(animatedScale, { toValue: 1, useNativeDriver: true }).start();
   };
 
-  const onLayout = (event) => {
-    const { height } = event.nativeEvent.layout;
-    onHeightCalculated(index, height); // Report height to parent
-  };
-
   return (
-    <Animated.View style={[styles.card, { transform: [{ scale: animatedScale }] }]} onLayout={onLayout}>
+    <Animated.View style={[styles.card, { transform: [{ scale: animatedScale }] }]}>
       <View style={styles.cardHeader}>
         <TouchableOpacity
           onPress={() =>
@@ -176,7 +187,7 @@ const PostItem = memo(({ item, index, toggleExpand, expandedItems, navigation, o
         >
           <View style={styles.userInfo}>
             <Image
-              source={item?.profile_picture ? { uri: item.profile_picture } : require('../assets/del.png')}
+              source={item.profile_picture ? { uri: item.profile_picture } : require('../assets/del.png')}
               style={styles.avatar}
             />
             <Text style={styles.name}>{item.username || 'Unknown User'}</Text>
@@ -334,8 +345,8 @@ const PostViewScreen = ({ route }) => {
   const [expandedItems, setExpandedItems] = useState({});
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [posts, setPosts] = useState(initialPosts);
-  const [isListReady, setIsListReady] = useState(false);
-  const [itemHeights, setItemHeights] = useState({});
+  const [viewableItems, setViewableItems] = useState([]);
+  const [isInitialScrollDone, setIsInitialScrollDone] = useState(false);
 
   const toggleExpand = useCallback((index) => {
     setExpandedItems((prev) => ({
@@ -346,39 +357,68 @@ const PostViewScreen = ({ route }) => {
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
-    setPosts(initialPosts); // Reset to initial posts
+    setPosts(initialPosts);
+    setCurrentIndex(initialIndex);
     setIsRefreshing(false);
-  }, [initialPosts]);
-
-  const handleHeightCalculated = useCallback((index, height) => {
-    setItemHeights((prev) => ({
-      ...prev,
-      [index]: height,
-    }));
-  }, []);
+    setIsInitialScrollDone(false);
+  }, [initialPosts, initialIndex]);
 
   useEffect(() => {
-    if (isListReady && posts.length > 0 && initialIndex >= 0 && Object.keys(itemHeights).length > initialIndex) {
-      const offset = Object.keys(itemHeights)
-        .sort((a, b) => a - b)
-        .slice(0, initialIndex)
-        .reduce((sum, key) => sum + (itemHeights[key] || 0), 0);
-      flatListRef.current?.scrollToOffset({
-        offset,
-        animated: false,
-      });
+    console.log('Posts received:', posts.length, 'items');
+    console.log('Initial index:', initialIndex);
+    if (posts.length > 0 && initialIndex >= 0 && flatListRef.current) {
+      setTimeout(() => {
+        console.log('Forcing scroll to index:', initialIndex);
+        flatListRef.current.scrollToIndex({ index: initialIndex, animated: false });
+        setIsInitialScrollDone(true);
+      }, 1500); // Increased delay for rendering
     }
-  }, [isListReady, initialIndex, posts, itemHeights]);
+  }, [posts, initialIndex]);
 
-  const onViewableItemsChanged = useCallback(({ viewableItems }) => {
-    if (viewableItems.length > 0) {
-      const topItem = viewableItems[0];
-      setCurrentIndex(topItem.index);
-    }
-  }, []);
+  const onViewableItemsChanged = useCallback(
+    ({ viewableItems }) => {
+      if (viewableItems.length > 0 && isInitialScrollDone) {
+        const topItem = viewableItems[0];
+        console.log('Viewable changed to index:', topItem.index, 'from', currentIndex);
+        setCurrentIndex(topItem.index);
+        setViewableItems(viewableItems.map((item) => item.index));
+      }
+    },
+    [isInitialScrollDone]
+  );
 
   const viewabilityConfig = {
     itemVisiblePercentThreshold: 50,
+  };
+
+  const getItemLayout = (data, index) => ({
+    length: width * 1.5, // Fallback height: adjust based on avg post height
+    offset: (width * 1.5) * index,
+    index,
+  });
+
+  const onScrollToIndexFailed = (info) => {
+    console.log('Scroll to index failed:', info);
+    const retryScroll = (attempt = 1) => {
+      if (attempt > 3) {
+        console.log('Max retries reached, falling back to offset');
+        const estimatedOffset = info.index * (width * 1.5); // Match getItemLayout
+        flatListRef.current.scrollToOffset({ offset: estimatedOffset, animated: false });
+        setIsInitialScrollDone(true);
+        return;
+      }
+      setTimeout(() => {
+        if (flatListRef.current && posts.length > info.index) {
+          console.log(`Retry attempt ${attempt} for index:`, info.index);
+          flatListRef.current.scrollToIndex({ index: info.index, animated: false });
+        }
+      }, 1000 * attempt);
+    };
+    retryScroll();
+  };
+
+  const handleLayout = () => {
+    console.log('FlatList laid out with', posts.length, 'items');
   };
 
   return (
@@ -404,17 +444,21 @@ const PostViewScreen = ({ route }) => {
               toggleExpand={toggleExpand}
               expandedItems={expandedItems}
               navigation={navigation}
-              onHeightCalculated={handleHeightCalculated}
+              isVisible={viewableItems.includes(index)}
             />
           )}
-          keyExtractor={(item) => item._id}
+          keyExtractor={(item) => item._id || item.post_id}
           showsVerticalScrollIndicator={false}
-          onLayout={() => setIsListReady(true)}
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
           refreshing={isRefreshing}
           onRefresh={handleRefresh}
-          initialNumToRender={posts.length} // Render all at once to calculate heights
+          getItemLayout={getItemLayout}
+          onScrollToIndexFailed={onScrollToIndexFailed}
+          onLayout={handleLayout}
+          initialNumToRender={4} // All posts for small list
+          maxToRenderPerBatch={4} // Ensure smooth batch rendering
+          initialScrollIndex={initialIndex}
         />
       ) : (
         <Text style={{ textAlign: 'center', padding: 20 }}>No posts available</Text>
