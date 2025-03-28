@@ -1,4 +1,3 @@
-const express = require("express");
 const {
   register,
   login,
@@ -10,14 +9,12 @@ const {
   updateProfile,
   getUserProfileByUsername,
   getUserPostsByUsername,
-  searchUsers
+  searchUsers,
+  fixProfilePictureURLs // Add this here
 } = require("../controllers/authController");
 
-const {
-  validateUsernameInput,
-  validateSaveUserDetailsInput
-} = require("../middleware/validator");
-
+const express = require("express");
+const { validateUsernameInput, validateSaveUserDetailsInput } = require("../middleware/validator");
 const authenticateJWT = require("../middleware/authenticateJWT");
 const { uploadProfilePicture } = require("../config/multerConfig");
 
@@ -37,5 +34,6 @@ router.put("/update-profile", authenticateJWT, uploadProfilePicture.single('prof
 router.get("/users/:username", authenticateJWT, getUserProfileByUsername);
 router.get("/posts/user/:username", authenticateJWT, getUserPostsByUsername);
 router.get("/search-users", authenticateJWT, searchUsers);
-router.post("/fix-profile-picture-urls", authenticateJWT, fixProfilePictureURLs); // Temporary route
+router.post("/fix-profile-picture-urls", authenticateJWT, fixProfilePictureURLs); // This should now work
+
 module.exports = router;
