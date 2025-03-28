@@ -98,6 +98,56 @@ const Post = {
       throw new Error('Database error: Unable to fetch user posts.');
     }
   },
+  deletePost: async (postId, userId) => {
+    console.log('=== 🔹 Deleting Post ===');
+    console.log('Post ID:', postId, 'User ID:', userId);
+  
+    const verifyQuery = `
+      IF NOT EXISTS (SELECT 1 FROM posts WHERE post_id = @postId)
+        THROW 50404, 'Post not found.', 1;
+      IF NOT EXISTS (SELECT 1 FROM posts WHERE post_id = @postId AND user_id = @userId)
+        THROW 50403, 'Unauthorized to delete this post.', 1;
+    `;
+  
+    const deleteQuery = `
+      DELETE FROM posts 
+      WHERE post_id = @postId AND user_id = @userId;
+    `;
+  
+    try {
+      const pool = await connectDB();
+      const transaction = new sql.Transaction(pool);
+      await transaction.begin();
+  
+      try {
+        await pool.request()
+          .input('postId', sql.Int, postId)
+          .input('userId', sql.Int, userId)
+          .query(verifyQuery);
+  
+        const result = await pool.request()
+          .input('postId', sql.Int, postId)
+          .input('userId', sql.Int, userId)
+          .query(deleteQuery);
+  
+        await transaction.commit();
+        console.log('✅ Post deleted successfully');
+        return { deleted: result.rowsAffected[0] > 0 };
+      } catch (err) {
+        await transaction.rollback();
+        throw err;
+      }
+    } catch (error) {
+      console.error('❌ Database error in deletePost:', error);
+      if (error.message.includes('Post not found')) {
+        throw new Error('Post not found');
+      }
+      if (error.message.includes('Unauthorized')) {
+        throw new Error('Unauthorized to delete this post');
+      }
+      throw new Error('Database error: Unable to delete post');
+    }
+  },
 
   getPostsByUsername: async (username) => {
     console.log('=== 🔹 Fetching Posts for Username:', username);

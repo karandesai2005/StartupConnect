@@ -33,6 +33,37 @@ const postController = {
     }
   },
 
+  // Add this to your postController object
+deletePost: async (req, res) => {
+  try {
+    console.log('=== Delete Post Debug ===');
+    const { postId } = req.params;
+    const userId = req.user?.userId || req.user?.id;
+
+    if (!userId) {
+      return res.status(400).json({ error: "User ID is required." });
+    }
+
+    if (!postId) {
+      return res.status(400).json({ error: "Post ID is required." });
+    }
+
+    console.log('Deleting post:', { postId, userId });
+    const result = await Post.deletePost(parseInt(postId), userId);
+    console.log('Post deleted:', result);
+    res.status(200).json({ message: 'Post deleted successfully' });
+  } catch (error) {
+    console.error('Error in deletePost:', error);
+    if (error.message.includes('Post not found')) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
+    if (error.message.includes('Unauthorized')) {
+      return res.status(403).json({ error: 'Unauthorized to delete this post' });
+    }
+    res.status(500).json({ error: 'Server error', details: error.message });
+  }
+},
+
   getAllPosts: async (req, res) => {
     try {
       console.log('=== Fetching All Posts ===');

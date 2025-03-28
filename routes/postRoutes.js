@@ -13,6 +13,10 @@ const debugMiddleware = (req, res, next) => {
   next();
 };
 
+router.delete('/posts/:postId', 
+  authenticateJWT, 
+  postController.deletePost
+);
 
 router.post('/posts',
   debugMiddleware,
