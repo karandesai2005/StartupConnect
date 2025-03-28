@@ -34,31 +34,27 @@ const postController = {
   },
 
   // Add this to your postController object
+// In postController.js
 deletePost: async (req, res) => {
   try {
-    console.log('=== Delete Post Debug ===');
     const { postId } = req.params;
     const userId = req.user?.userId || req.user?.id;
 
+    console.log('Delete request received - Post ID:', postId, 'User ID:', userId);
+
     if (!userId) {
-      return res.status(400).json({ error: "User ID is required." });
+      return res.status(401).json({ error: "User authentication required" });
+    }
+    if (!postId || isNaN(postId)) {
+      return res.status(400).json({ error: "Valid Post ID is required" });
     }
 
-    if (!postId) {
-      return res.status(400).json({ error: "Post ID is required." });
-    }
-
-    console.log('Deleting post:', { postId, userId });
     const result = await Post.deletePost(parseInt(postId), userId);
-    console.log('Post deleted:', result);
-    res.status(200).json({ message: 'Post deleted successfully' });
+    res.status(200).json({ message: 'Post deleted successfully', result });
   } catch (error) {
-    console.error('Error in deletePost:', error);
-    if (error.message.includes('Post not found')) {
-      return res.status(404).json({ error: 'Post not found' });
-    }
-    if (error.message.includes('Unauthorized')) {
-      return res.status(403).json({ error: 'Unauthorized to delete this post' });
+    console.error('Error in deletePost controller:', error);
+    if (error.message.includes('not found') || error.message.includes('unauthorized')) {
+      return res.status(403).json({ error: 'Post not found or unauthorized' });
     }
     res.status(500).json({ error: 'Server error', details: error.message });
   }

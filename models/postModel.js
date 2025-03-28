@@ -101,51 +101,59 @@ const Post = {
   deletePost: async (postId, userId) => {
     console.log('=== 🔹 Deleting Post ===');
     console.log('Post ID:', postId, 'User ID:', userId);
-  
-    const verifyQuery = `
-      IF NOT EXISTS (SELECT 1 FROM posts WHERE post_id = @postId)
-        THROW 50404, 'Post not found.', 1;
-      IF NOT EXISTS (SELECT 1 FROM posts WHERE post_id = @postId AND user_id = @userId)
-        THROW 50403, 'Unauthorized to delete this post.', 1;
-    `;
-  
-    const deleteQuery = `
-      DELETE FROM posts 
-      WHERE post_id = @postId AND user_id = @userId;
-    `;
-  
+
     try {
       const pool = await connectDB();
-      const transaction = new sql.Transaction(pool);
-      await transaction.begin();
-  
-      try {
-        await pool.request()
-          .input('postId', sql.Int, postId)
-          .input('userId', sql.Int, userId)
-          .query(verifyQuery);
-  
-        const result = await pool.request()
-          .input('postId', sql.Int, postId)
-          .input('userId', sql.Int, userId)
-          .query(deleteQuery);
-  
-        await transaction.commit();
-        console.log('✅ Post deleted successfully');
-        return { deleted: result.rowsAffected[0] > 0 };
-      } catch (err) {
-        await transaction.rollback();
-        throw err;
+      if (!pool) {
+        throw new Error('Database connection failed');
       }
+
+      // First verify the post exists and belongs to the user
+      const verifyResult = await pool.request()
+        .input('postId', sql.Int, postId)
+        .input('userId', sql.Int, userId)
+        .query(`
+          SELECT COUNT(*) as count 
+          FROM posts 
+          WHERE post_id = @postId AND user_id = @userId
+        `);
+
+      if (verifyResult.recordset[0].count === 0) {
+        throw new Error('Post not found or unauthorized');
+      }
+
+      // Delete related records first (likes, comments) if your schema requires it
+      await pool.request()
+        .input('postId', sql.Int, postId)
+        .query('DELETE FROM likes WHERE post_id = @postId');
+
+      await pool.request()
+        .input('postId', sql.Int, postId)
+        .query('DELETE FROM comments WHERE post_id = @postId');
+
+      // Now delete the post
+      const deleteResult = await pool.request()
+        .input('postId', sql.Int, postId)
+        .input('userId', sql.Int, userId)
+        .query(`
+          DELETE FROM posts 
+          WHERE post_id = @postId AND user_id = @userId
+        `);
+
+      console.log('Delete result:', deleteResult.rowsAffected);
+
+      if (deleteResult.rowsAffected[0] === 0) {
+        throw new Error('Failed to delete post - no rows affected');
+      }
+
+      console.log('✅ Post deleted successfully');
+      return { deleted: true };
     } catch (error) {
       console.error('❌ Database error in deletePost:', error);
-      if (error.message.includes('Post not found')) {
-        throw new Error('Post not found');
+      if (error.message.includes('not found') || error.message.includes('unauthorized')) {
+        throw new Error('Post not found or unauthorized');
       }
-      if (error.message.includes('Unauthorized')) {
-        throw new Error('Unauthorized to delete this post');
-      }
-      throw new Error('Database error: Unable to delete post');
+      throw new Error('Database error: Unable to delete post - ' + error.message);
     }
   },
 
