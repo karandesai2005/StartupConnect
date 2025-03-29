@@ -320,7 +320,7 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
                 source={
                   typeof item.profile_picture === 'string' && item.profile_picture.startsWith('http')
                     ? { uri: item.profile_picture }
-                    : require('../assets/del.png')
+                    : require('../assets/profiledefault.jpg')
                 }
                 style={styles.avatar}
               />
@@ -384,7 +384,7 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
             />
           )}
           {isVideo && !isVisible && (
-            <View style={styles.playButtonOverlay}>
+            <View>
               <Image source={require('../assets/play-button.png')} style={styles.playButton} />
             </View>
           )}
@@ -727,7 +727,7 @@ export default function Home() {
             source={
               userData?.profile_picture
                 ? { uri: userData.profile_picture }
-                : require('../assets/del.png')
+                : require('../assets/profiledefault.jpg')
             }
             style={styles.profilePic}
           />
@@ -973,14 +973,6 @@ const styles = StyleSheet.create({
     height: 20,
     marginBottom: Platform.OS === 'ios' ? 3 : 0,
     tintColor: '#000000', // Default black for all icons
-  },
-  playButtonOverlay: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    transform: [{ translateX: -30 }, { translateY: -30 }],
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   captionContainer: {
     paddingHorizontal: 12,

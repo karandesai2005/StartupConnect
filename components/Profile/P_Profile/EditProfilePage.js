@@ -8,6 +8,7 @@ import {
   Image,
   ScrollView,
   Alert,
+  SafeAreaView,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
@@ -91,7 +92,7 @@ const EditProfilePage = () => {
   
 
   return (
-    <ScrollView style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Text style={styles.backButtonText}>Cancel</Text>
@@ -123,7 +124,7 @@ const EditProfilePage = () => {
           />
         </View>
       </View>
-    </ScrollView>
+    </SafeAreaView>
   );
 };
 
@@ -136,13 +137,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    padding: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
-    marginTop: 13
+
   },
   backButton: {
-    padding: 8,
+    paddingLeft: 8,
   },
   backButtonText: {
     color: '#666',

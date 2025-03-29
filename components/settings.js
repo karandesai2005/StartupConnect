@@ -297,13 +297,10 @@ export default function SettingsScreen() {
                                         source={
                                             userData?.profile_picture
                                                 ? { uri: userData.profile_picture }
-                                                : require('../assets/del.png')
+                                                : require('../assets/profiledefault.jpg')
                                         }
                                         style={styles.profileImage}
                                     />
-                                    <View style={styles.editIconContainer}>
-                                        <Text style={styles.editIconText}>+</Text>
-                                    </View>
                                 </View>
                             </TouchableOpacity>
                             <View style={styles.profileInfo}>
@@ -311,7 +308,7 @@ export default function SettingsScreen() {
                                 <Text style={styles.userEmail}>{userData?.email || 'email@example.com'}</Text>
                                 <TouchableOpacity
                                     style={styles.editProfileButton}
-                                    onPress={() => navigation.navigate('EditProfile', { userData })}
+                                    onPress={() => navigation.navigate('EditProfilePage', { userData })}
                                 >
                                     <Text style={styles.editProfileText}>Edit Profile</Text>
                                 </TouchableOpacity>
@@ -441,22 +438,6 @@ export default function SettingsScreen() {
                     </View>
                 </ScrollView>
             )}
-
-            <View style={styles.bottomNav}>
-                <TouchableOpacity onPress={() => navigation.navigate('Home')}>
-                    <Image source={require('../assets/film.png')} style={styles.navIcon} />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => navigation.navigate('CreatePost')}>
-                    <Image source={require('../assets/plus3.png')} style={styles.navIcon} />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => navigation.navigate('Reel')}>
-                    <Image source={require('../assets/bell.png')} style={styles.navIcon} />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
-                    <Image source={require('../assets/settings.png')} style={styles.navIcon} />
-                </TouchableOpacity>
-            </View>
-
             {/* Modals remain unchanged */}
             <Modal
                 animationType="slide"
@@ -484,8 +465,8 @@ export default function SettingsScreen() {
                             <TouchableOpacity
                                 style={[styles.modalButton, { backgroundColor: '#1f219c', borderColor: '#1f219c' }]}
                                 onPress={() => {
-                                    setAccountModalVisible(false);
-                                    navigation.navigate('EditProfile', { userData });
+                                    setAccountModalVisible(true);
+                                    navigation.navigate('EditProfilePage', { userData });
                                 }}
                             >
                                 <Text style={[styles.modalButtonText, { color: '#fff' }]}>Edit</Text>
@@ -835,26 +816,8 @@ const styles = StyleSheet.create({
         width: 70,
         height: 70,
         borderRadius: 35,
-        borderWidth: 2,
+        borderWidth: 0,
         borderColor: '#E9ECEF',
-    },
-    editIconContainer: {
-        position: 'absolute',
-        bottom: 0,
-        right: 0,
-        backgroundColor: '#1f219c',
-        borderRadius: 12,
-        width: 24,
-        height: 24,
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 2,
-        borderColor: '#fff',
-    },
-    editIconText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: 'bold',
     },
     loadingIndicator: {
         position: 'absolute',

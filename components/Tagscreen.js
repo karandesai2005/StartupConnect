@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'; // Added useEffect
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -31,7 +31,7 @@ const entrepreneurTechTags = [
   'VentureCapital',
   'Productivity',
   'SoftwareDev',
-  'PITCH2025', // Added PITCH2025 to the list
+  'PITCH2025',
 ];
 
 export default function SelectTagsScreen() {
@@ -41,12 +41,11 @@ export default function SelectTagsScreen() {
   const route = useRoute();
   const { media, mediaType, caption, fromEvent = false } = route.params;
 
-  // Pre-select PITCH2025 if coming from event
   useEffect(() => {
     if (fromEvent && !selectedTags.includes('PITCH2025')) {
       setSelectedTags(['PITCH2025']);
     }
-  }, [fromEvent]); // Runs when fromEvent changes (initial render)
+  }, [fromEvent]);
 
   const toggleTag = (tag) => {
     if (selectedTags.includes(tag)) {
@@ -62,14 +61,6 @@ export default function SelectTagsScreen() {
       const token = await AsyncStorage.getItem('token');
       if (!token) throw new Error('No authentication token found');
 
-      console.log('Starting upload with token:', token.substring(0, 10) + '...');
-      console.log('Selected tags:', selectedTags);
-      console.log('Content:', caption);
-      console.log('Media type:', mediaType);
-      console.log('Media URI:', media);
-
-      if (!media) throw new Error('Media is required');
-
       const formData = new FormData();
       formData.append('content', caption || '');
       formData.append('tags', JSON.stringify(selectedTags));
@@ -80,8 +71,6 @@ export default function SelectTagsScreen() {
       });
 
       const url = `${NGROK_URL}/api/posts`;
-      console.log(`Uploading to: ${url}`);
-
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -91,20 +80,8 @@ export default function SelectTagsScreen() {
         body: formData,
       });
 
-      console.log('Response status:', response.status);
-
-      let responseData;
-      try {
-        responseData = await response.json();
-        console.log('Response data:', responseData);
-      } catch (jsonError) {
-        console.error('Failed to parse response as JSON:', jsonError);
-        const responseText = await response.text();
-        console.log('Raw response:', responseText);
-        throw new Error(`Server returned ${response.status}: ${responseText}`);
-      }
-
       if (!response.ok) {
+        const responseData = await response.json();
         throw new Error(responseData.message || `Failed to upload post (Status: ${response.status})`);
       }
 
@@ -119,7 +96,8 @@ export default function SelectTagsScreen() {
   };
 
   return (
-    <View style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#000" />
@@ -137,7 +115,6 @@ export default function SelectTagsScreen() {
           )}
         </TouchableOpacity>
       </View>
-
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <View style={styles.tagsContainer}>
           {entrepreneurTechTags.map((tag) => (
@@ -161,26 +138,37 @@ export default function SelectTagsScreen() {
           ))}
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#fff' },
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    height: 44,
-    borderBottomWidth: 0.5,
+    height: 60, // Increased height for better top bar feel
+    borderBottomWidth: 1,
     borderBottomColor: '#dbdbdb',
-    marginTop: 29,
+    backgroundColor: '#fff', // Ensure it stands out
+    zIndex: 1, // Keep it above other content
   },
-  backButton: { padding: 8 },
-  headerText: { fontSize: 17, fontWeight: '600' },
-  postButton: {
+  backButton: {
     padding: 8,
+  },
+  headerText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#000',
+  },
+  postButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
     backgroundColor: '#0095f6',
     borderRadius: 4,
   },
@@ -188,12 +176,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#0095f660',
   },
   postButtonText: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '600',
     color: '#fff',
   },
   scrollContainer: {
     padding: 16,
+    flexGrow: 1, // Ensures ScrollView takes remaining space
   },
   tagsContainer: {
     flexDirection: 'row',
@@ -207,7 +196,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0f0f0',
   },
   tagButtonSelected: {
-    backgroundColor: '#00cc00', // Green when selected
+    backgroundColor: '#00cc00',
   },
   tagText: {
     fontSize: 14,

@@ -1,6 +1,8 @@
 import React, { useState } from "react";
-import { Text, StyleSheet, View, Pressable, FlatList } from "react-native";
+import { Text, StyleSheet, View, Pressable, FlatList, Alert } from "react-native";
 import { useNavigation } from "@react-navigation/native";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { NGROK_URL } from '@env';
 
 const INTERESTS = [
   "AI & Machine Learning", 
@@ -28,9 +30,44 @@ const Signup = () => {
     );
   };
 
-  const handleNext = () => {
-    if (selectedInterests.length >= 3) {
-      navigation.navigate('Login', { interests: selectedInterests });
+  const handleNext = async () => {
+    if (selectedInterests.length < 3) {
+      Alert.alert("Error", "Please select at least 3 interests.");
+      return;
+    }
+
+    try {
+      const userId = await AsyncStorage.getItem('userId');
+      if (!userId) {
+        Alert.alert("Error", "Session expired. Please restart registration.");
+        navigation.navigate("Register1");
+        return;
+      }
+
+      const response = await fetch(`${NGROK_URL}/api/auth/save-user-details`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          step: 6,
+          data: { interests: selectedInterests, userId: parseInt(userId) },
+        }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        // Store the token and user data
+        await AsyncStorage.setItem('token', result.token);
+        await AsyncStorage.setItem('user', JSON.stringify(result.user));
+
+        // Navigate to dashboard or home screen
+        navigation.navigate("Main"); // Replace "Dashboard" with your actual home screen route
+      } else {
+        Alert.alert("Error", result.message || "Failed to complete registration.");
+      }
+    } catch (err) {
+      console.error("Error completing registration:", err);
+      Alert.alert("Error", "Something went wrong. Please try again.");
     }
   };
 
@@ -72,6 +109,7 @@ const Signup = () => {
   );
 };
 
+// Styles remain the same
 const styles = StyleSheet.create({
   container: {
     flex: 1,

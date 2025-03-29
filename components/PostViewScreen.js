@@ -186,20 +186,20 @@ const PostItem = memo(({ item, index, toggleExpand, expandedItems, navigation, i
       const postId = getPostId();
       
       console.log('Attempting to delete - Token:', token ? 'Yes' : 'No', 'Post ID:', postId);
-
+  
       if (!token) {
         throw new Error('No authentication token found. Please log in again.');
       }
       if (!postId) {
         throw new Error('Post ID is missing from the item data: ' + JSON.stringify(item));
       }
-
+  
       const response = await axios.delete(`${NGROK_URL}/api/posts/${postId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-
+  
       console.log('Delete response:', response.status, response.data);
-
+  
       if (response.status === 200) {
         setIsOptionsModalVisible(false);
         onDelete(postId);
@@ -209,7 +209,7 @@ const PostItem = memo(({ item, index, toggleExpand, expandedItems, navigation, i
       }
     } catch (error) {
       console.error('Error deleting post:', error.message, error.response?.data);
-      alert(`Failed to delete post: ${error.message || 'Unknown error'}`);
+      alert(`Failed to delete post: ${error.response?.data?.error || error.message}`);
     } finally {
       setIsDeleting(false);
     }

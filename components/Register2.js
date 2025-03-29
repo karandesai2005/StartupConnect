@@ -162,12 +162,12 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
     alignItems: "center",
-    paddingTop: 54, // Adjusted for SafeAreaView
+    paddingTop: 20,                           
   },
   backButton: {
     position: "absolute",
     left: 28,
-    top: 46, // Adjusted to fit within SafeAreaView
+    top: 10,                                     
     zIndex: 1,
   },
   backButtonText: {
