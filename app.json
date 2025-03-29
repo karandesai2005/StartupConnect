@@ -4,7 +4,7 @@
     "slug": "StartupConnect",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/PITCH.png",
+    "icon": "./assets/PitchIcon.jpeg",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
@@ -24,7 +24,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/PITCH.png",
+        "foregroundImage": "./assets/PitchIcon.jpeg",
         "backgroundColor": "#ffffff"
       },
       "package": "com.croww.StartupConnect",

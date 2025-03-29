@@ -111,13 +111,14 @@ const Profile = ({ route }) => {
     return () => { mounted = false; };
   }, []);
 
-  const isOwnProfile = useMemo(() => 
-    !route.params?.username || 
-    (currentUser && route.params?.username === currentUser.username),
-    [route.params?.username, currentUser]
-  );
+  const isOwnProfile = useMemo(() => {
+    if (!currentUser) return false; // Ensures currentUser is loaded
+    return !route.params?.username || route.params?.username === currentUser.username;
+  }, [route.params?.username, currentUser]);
+  
 
   const fetchUserDataAndPosts = useCallback(async () => {
+    let mounted = true; // Add this flag
     try {
       const token = await AsyncStorage.getItem("token");
       if (!token) {
@@ -126,12 +127,14 @@ const Profile = ({ route }) => {
       }
       const username = route.params?.username;
       const headers = { "Authorization": `Bearer ${token}`, "Content-Type": "application/json", "Cache-Control": "no-cache" };
+  
       const [profileResponse, postsResponse] = await Promise.all([
         fetch(username && !isOwnProfile ? `${NGROK_URL}/api/profile/user/${username}` : `${NGROK_URL}/api/profile`, { method: "GET", headers }),
         fetch(username && !isOwnProfile ? `${NGROK_URL}/api/posts/user/${username}` : `${NGROK_URL}/api/posts/myposts`, { method: "GET", headers })
       ]);
-
+  
       if (!profileResponse.ok || !postsResponse.ok) throw new Error('Network response was not ok');
+  
       const [profileData, postsData] = await Promise.all([profileResponse.json(), postsResponse.json()]);
       const formattedUserData = {
         ...profileData,
@@ -139,38 +142,48 @@ const Profile = ({ route }) => {
           ? profileData.profile_picture 
           : profileData.profile_picture ? `${NGROK_URL}/uploads/${profileData.profile_picture}` : null,
       };
-      setUserData(formattedUserData);
-      if (isOwnProfile) await AsyncStorage.setItem('userData', JSON.stringify(formattedUserData));
-
-      const mappedPosts = Array.isArray(postsData) ? postsData.map(post => ({
-        _id: post.post_id || post.id,
-        username: post.username,
-        profile_picture: post.profile_picture?.startsWith('https') ? post.profile_picture : post.profile_picture ? `${NGROK_URL}/uploads/${post.profile_picture}` : null,
-        image_url: post.media_url?.startsWith('https') ? post.media_url : post.media_url ? `${NGROK_URL}/uploads/${post.media_url}` : null,
-        content: post.content,
-        created_at: post.created_at,
-        likes: post.like_count || 0,
-        comments: post.comment_count || 0,
-        media_type: post.media_type || (post.media_url?.includes('.mp4') ? 'video' : 'image')
-      })).filter(post => post.image_url && !post.image_url.includes('undefined'))
-      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at)) : [];
-      setUserPosts(mappedPosts);
+  
+      if (mounted) {
+        setUserData(formattedUserData);
+        if (isOwnProfile) await AsyncStorage.setItem('userData', JSON.stringify(formattedUserData));
+  
+        const mappedPosts = Array.isArray(postsData) ? postsData.map(post => ({
+          _id: post.post_id || post.id,
+          username: post.username,
+          profile_picture: post.profile_picture?.startsWith('https') ? post.profile_picture : post.profile_picture ? `${NGROK_URL}/uploads/${post.profile_picture}` : null,
+          image_url: post.media_url?.startsWith('https') ? post.media_url : post.media_url ? `${NGROK_URL}/uploads/${post.media_url}` : null,
+          content: post.content,
+          created_at: post.created_at,
+          likes: post.like_count || 0,
+          comments: post.comment_count || 0,
+          media_type: post.media_type || (post.media_url?.includes('.mp4') ? 'video' : 'image')
+        })).filter(post => post.image_url && !post.image_url.includes('undefined'))
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at)) : [];
+        
+        setUserPosts(mappedPosts);
+        setIsLoading(false);
+        setRefreshing(false);
+      }
     } catch (error) {
       console.error("Fetch error:", error);
-      setUserPosts([]);
-      Alert.alert('Error', `Failed to fetch data: ${error.message}`);
-    } finally {
-      setIsLoading(false);
-      setRefreshing(false);
+      if (mounted) {
+        setUserPosts([]);
+        Alert.alert('Error', `Failed to fetch data: ${error.message}`);
+      }
     }
+  
+    return () => { mounted = false; }; // Cleanup function to avoid setting state on unmounted component
   }, [navigation, route.params?.username, isOwnProfile]);
+  
 
-  useFocusEffect(useCallback(() => {
-    if (!userData || !userPosts.length) {
-      setIsLoading(true);
-      fetchUserDataAndPosts();
-    }
-  }, [fetchUserDataAndPosts, userData, userPosts]));
+
+useFocusEffect(
+  useCallback(() => {
+    setIsLoading(true);
+    fetchUserDataAndPosts();
+  }, [fetchUserDataAndPosts])
+);
+
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);

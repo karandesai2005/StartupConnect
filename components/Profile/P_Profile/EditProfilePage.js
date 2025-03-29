@@ -106,7 +106,7 @@ const EditProfilePage = () => {
       <View style={styles.content}>
         <TouchableOpacity onPress={handleProfilePictureChange} style={styles.imageContainer}>
           <Image
-            source={updatedProfileImage ? { uri: updatedProfileImage } : require('../../../assets/del.png')}
+            source={updatedProfileImage ? { uri: updatedProfileImage } : require('../../../assets/profiledefault.jpg')}
             style={styles.profileImage}
           />
           <Text style={styles.changePhotoText}>Change Profile Photo</Text>

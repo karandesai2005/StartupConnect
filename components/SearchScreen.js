@@ -68,7 +68,7 @@ const SearchScreen = () => {
         source={
           item.profile_picture
             ? { uri: item.profile_picture }
-            : require('../assets/del.png')
+            : require('../assets/profiledefault.jpg')
         }
         style={styles.searchAvatar}
       />

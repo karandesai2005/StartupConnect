@@ -5,7 +5,7 @@ import Card from "./Card";
 const StoryItem = memo(({ story, onPress }) => {
   const imageSource = story.imageUrl 
     ? { uri: story.imageUrl }
-    : require('../assets/del.png');
+    : require('../assets/profiledefault.jpg');
 
   return (
     <TouchableOpacity

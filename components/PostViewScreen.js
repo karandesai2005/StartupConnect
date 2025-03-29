@@ -233,7 +233,7 @@ const PostItem = memo(({ item, index, toggleExpand, expandedItems, navigation, i
         >
           <View style={styles.userInfo}>
             <Image
-              source={item.profile_picture ? { uri: item.profile_picture } : require('../assets/del.png')}
+              source={item.profile_picture ? { uri: item.profile_picture } : require('../assets/profiledefault.jpg')}
               style={styles.avatar}
             />
             <Text style={styles.name}>{item.username || 'Unknown User'}</Text>
@@ -273,7 +273,7 @@ const PostItem = memo(({ item, index, toggleExpand, expandedItems, navigation, i
               source={
                 item.image_url || item.media_url
                   ? { uri: item.image_url || item.media_url }
-                  : require('../assets/del.png')
+                  : require('../assets/profiledefault.jpg')
               }
               style={[styles.postImage, { height: imageHeight }]}
               resizeMode="cover"

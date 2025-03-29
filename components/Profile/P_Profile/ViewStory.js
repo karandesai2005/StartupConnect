@@ -118,7 +118,7 @@ const ViewStory = ({ route }) => {
           source={
             currentStory.profile_picture
               ? { uri: currentStory.profile_picture }
-              : require('../../../assets/del.png')
+              : require('../../../assets/profiledefault.jpg')
           }
           style={styles.avatar}
         />
@@ -145,7 +145,7 @@ const ViewStory = ({ route }) => {
             source={{ uri: currentStory.image_url }}
             style={styles.media}
             resizeMode="contain"
-            defaultSource={require('../../../assets/del.png')}
+            defaultSource={require('../../../assets/profiledefault.jpg')}
           />
         )}
       </Pressable>

@@ -35,33 +35,39 @@ const Signup = () => {
       Alert.alert("Error", "Please select at least 3 interests.");
       return;
     }
-
+  
     try {
       const userId = await AsyncStorage.getItem('userId');
+      console.log("userId:", userId);
       if (!userId) {
         Alert.alert("Error", "Session expired. Please restart registration.");
         navigation.navigate("Register1");
         return;
       }
-
+  
+      const payload = {
+        step: 6,
+        data: { interests: selectedInterests, userId: parseInt(userId) },
+      };
+      console.log("Sending payload:", JSON.stringify(payload));
+      console.log("NGROK_URL:", NGROK_URL);
+  
       const response = await fetch(`${NGROK_URL}/api/auth/save-user-details`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          step: 6,
-          data: { interests: selectedInterests, userId: parseInt(userId) },
-        }),
+        body: JSON.stringify(payload),
       });
-
-      const result = await response.json();
-
+  
+      console.log("Response status:", response.status);
+      const responseText = await response.text();
+      console.log("Response text:", responseText);
+  
+      const result = await JSON.parse(responseText);
+  
       if (response.ok) {
-        // Store the token and user data
         await AsyncStorage.setItem('token', result.token);
         await AsyncStorage.setItem('user', JSON.stringify(result.user));
-
-        // Navigate to dashboard or home screen
-        navigation.navigate("Main"); // Replace "Dashboard" with your actual home screen route
+        navigation.navigate("Main");
       } else {
         Alert.alert("Error", result.message || "Failed to complete registration.");
       }
@@ -70,7 +76,6 @@ const Signup = () => {
       Alert.alert("Error", "Something went wrong. Please try again.");
     }
   };
-
   const renderInterest = ({ item }) => (
     <Pressable 
       style={[

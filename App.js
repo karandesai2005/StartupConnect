@@ -17,7 +17,7 @@
   import Preference from './components/preference';
   import HandlePersonal from './components/Profile/P_Profile/handlePersonal';
   import HandleBusiness from './components/Profile/B_Profile/handleBusiness';
-  import EditProfileB from './components/Profile/B_Profile/editProfile';
+  // import EditProfileB from './components/Profile/B_Profile/editProfile';
   import Field from './components/field';
   import Popup from './components/Popup';
   import CreatePostScreen from './components/CreatePostScreen';
@@ -67,7 +67,7 @@
               <Stack.Screen name="Register1" component={Register1} />
               <Stack.Screen name="Register2" component={Register2} />
               <Stack.Screen name="Profile" component={Profile} />
-              <Stack.Screen name="EditProfileB" component={EditProfileB} />
+              {/* <Stack.Screen name="EditProfileB" component={EditProfileB} /> */}
               <Stack.Screen name="username" component={Username} />
               <Stack.Screen name="preference" component={Preference} />
               <Stack.Screen name="handlePersonal" component={HandlePersonal} />

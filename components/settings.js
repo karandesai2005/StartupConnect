@@ -168,7 +168,7 @@ export default function SettingsScreen() {
                     text: "Logout",
                     onPress: async () => {
                         try {
-                            await AsyncStorage.removeItem("token");
+                            await AsyncStorage.multiRemove(["token", "userData"]); // Clears both token and user data
                             navigation.reset({
                                 index: 0,
                                 routes: [{ name: 'Login' }],
@@ -182,6 +182,7 @@ export default function SettingsScreen() {
             ]
         );
     };
+    
 
     const handleDeleteAccount = () => {
         Alert.alert(
