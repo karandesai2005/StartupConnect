@@ -6,6 +6,7 @@ import {
   Image,
   TouchableOpacity,
   ScrollView,
+  SafeAreaView,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,12 +22,12 @@ const EventDetailsScreen = () => {
   };
 
   const handleParticipate = () => {
-    // Navigate to CreatePostScreen when Participate is clicked
-    navigation.navigate('CreatePost');
+    navigation.navigate('CreatePost', { eventTag: event.title }); // Pass event title as a tag
   };
+  
 
   return (
-    <View style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#000" />
@@ -57,7 +58,7 @@ const EventDetailsScreen = () => {
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -74,7 +75,6 @@ const styles = StyleSheet.create({
     height: 44,
     borderBottomWidth: 0.5,
     borderBottomColor: '#dbdbdb',
-    marginTop: 29,
   },
   backButton: {
     padding: 8,

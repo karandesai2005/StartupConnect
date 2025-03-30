@@ -16,22 +16,10 @@ import { NGROK_URL } from '@env';
 import { Ionicons } from '@expo/vector-icons';
 
 const entrepreneurTechTags = [
-  'Entrepreneurship',
-  'Startup',
-  'Technology',
-  'Innovation',
-  'Business',
-  'AI',
-  'Blockchain',
-  'Web3',
-  'FinTech',
-  'SaaS',
-  'Ecommerce',
-  'Marketing',
-  'VentureCapital',
-  'Productivity',
-  'SoftwareDev',
-  'PITCH2025',
+  'Entrepreneurship', 'Startup', 'Technology', 'Innovation', 'Business',
+  'AI', 'Blockchain', 'Web3', 'FinTech', 'SaaS', 'Ecommerce', 'Marketing',
+  'VentureCapital', 'Productivity', 'SoftwareDev', 'PITCH2025', 'Ideathon',
+  'WannaGetFunded', 'CofounderStory'
 ];
 
 export default function SelectTagsScreen() {
@@ -39,15 +27,16 @@ export default function SelectTagsScreen() {
   const [loading, setLoading] = useState(false);
   const navigation = useNavigation();
   const route = useRoute();
-  const { media, mediaType, caption, fromEvent = false } = route.params;
+  const { media, mediaType, caption, fromEvent = false, eventTag } = route.params;
 
   useEffect(() => {
-    if (fromEvent && !selectedTags.includes('PITCH2025')) {
-      setSelectedTags(['PITCH2025']);
+    if (fromEvent && eventTag) {
+      setSelectedTags([eventTag]);
     }
-  }, [fromEvent]);
+  }, [fromEvent, eventTag]);
 
   const toggleTag = (tag) => {
+    if (tag === eventTag) return; // Prevent unselecting eventTag
     if (selectedTags.includes(tag)) {
       setSelectedTags(selectedTags.filter((t) => t !== tag));
     } else {
@@ -73,10 +62,7 @@ export default function SelectTagsScreen() {
       const url = `${NGROK_URL}/api/posts`;
       const response = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json',
-        },
+        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' },
         body: formData,
       });
 
@@ -108,32 +94,25 @@ export default function SelectTagsScreen() {
           disabled={loading}
           style={[styles.postButton, loading && styles.postButtonDisabled]}
         >
-          {loading ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Text style={styles.postButtonText}>Post</Text>
-          )}
+          {loading ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.postButtonText}>Post</Text>}
         </TouchableOpacity>
       </View>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <View style={styles.tagsContainer}>
+          {/* Event Tag (Always First & Selected) */}
+          {eventTag && (
+            <View style={[styles.tagButton, styles.eventTagButton]}>
+              <Text style={[styles.tagText, styles.tagTextSelected]}>{eventTag}</Text>
+            </View>
+          )}
+          {/* Other Tags */}
           {entrepreneurTechTags.map((tag) => (
             <TouchableOpacity
               key={tag}
               onPress={() => toggleTag(tag)}
-              style={[
-                styles.tagButton,
-                selectedTags.includes(tag) && styles.tagButtonSelected,
-              ]}
+              style={[styles.tagButton, selectedTags.includes(tag) && styles.tagButtonSelected]}
             >
-              <Text
-                style={[
-                  styles.tagText,
-                  selectedTags.includes(tag) && styles.tagTextSelected,
-                ]}
-              >
-                {tag}
-              </Text>
+              <Text style={[styles.tagText, selectedTags.includes(tag) && styles.tagTextSelected]}>{tag}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -143,66 +122,21 @@ export default function SelectTagsScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
+  safeArea: { flex: 1, backgroundColor: '#fff' },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    height: 60, // Increased height for better top bar feel
-    borderBottomWidth: 1,
-    borderBottomColor: '#dbdbdb',
-    backgroundColor: '#fff', // Ensure it stands out
-    zIndex: 1, // Keep it above other content
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, height: 60, borderBottomWidth: 1, borderBottomColor: '#dbdbdb', backgroundColor: '#fff'
   },
-  backButton: {
-    padding: 8,
-  },
-  headerText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#000',
-  },
-  postButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    backgroundColor: '#0095f6',
-    borderRadius: 4,
-  },
-  postButtonDisabled: {
-    backgroundColor: '#0095f660',
-  },
-  postButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  scrollContainer: {
-    padding: 16,
-    flexGrow: 1, // Ensures ScrollView takes remaining space
-  },
-  tagsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  tagButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    backgroundColor: '#f0f0f0',
-  },
-  tagButtonSelected: {
-    backgroundColor: '#00cc00',
-  },
-  tagText: {
-    fontSize: 14,
-    color: '#262626',
-  },
-  tagTextSelected: {
-    color: '#fff',
-  },
+  backButton: { padding: 8 },
+  headerText: { fontSize: 18, fontWeight: '700', color: '#000' },
+  postButton: { paddingVertical: 6, paddingHorizontal: 12, backgroundColor: '#0095f6', borderRadius: 4 },
+  postButtonDisabled: { backgroundColor: '#0095f660' },
+  postButtonText: { fontSize: 16, fontWeight: '600', color: '#fff' },
+  scrollContainer: { padding: 16, flexGrow: 1 },
+  tagsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  tagButton: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, backgroundColor: '#f0f0f0' },
+  tagButtonSelected: { backgroundColor: '#00cc00' },
+  tagText: { fontSize: 14, color: '#262626' },
+  tagTextSelected: { color: '#fff' },
+  eventTagButton: { backgroundColor: '#00cc00', borderWidth: 2, borderColor: '#008800' },
 });

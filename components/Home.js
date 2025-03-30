@@ -165,7 +165,7 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
 
   const fetchComments = async () => {
     try {
-      console.log('Fetching comments for post:', item.post_id);
+      // console.log('Fetching comments for post:', item.post_id);
       setIsCommentsLoading(true);
       const token = await AsyncStorage.getItem('token');
       if (!token || !item.post_id) return;
@@ -1150,7 +1150,8 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#eee',
     paddingTop: 10,
-    paddingBottom: 30,
+    paddingBottom: 10,
+    marginBottom: 20,
   },
   commentInput: {
     flex: 1,

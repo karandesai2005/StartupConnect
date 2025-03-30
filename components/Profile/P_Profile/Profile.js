@@ -18,10 +18,10 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { NGROK_URL } from '@env';
 import { Video } from 'expo-av';
 
-const ProfileHeader = React.memo(({ userData, lastUpdate, navigation, isOwnProfile, onFollow }) => {
+const ProfileHeader = React.memo(({ userData, navigation, isOwnProfile, onFollow }) => {
   const isBusinessProfile = userData?.account_type === "business";
   const [imageError, setImageError] = useState(false);
-  
+
   const avatarStyle = useMemo(() => ({
     height: "100%",
     width: "100%",
@@ -30,12 +30,13 @@ const ProfileHeader = React.memo(({ userData, lastUpdate, navigation, isOwnProfi
     overflow: "hidden",
   }), [isBusinessProfile]);
 
+  // Stable profile picture URL without lastUpdate dependency
   const profilePictureUrl = useMemo(() => {
     if (!userData?.profile_picture) return null;
     return userData.profile_picture.startsWith('https')
-      ? `${userData.profile_picture}?cache_bust=${lastUpdate}`
-      : `${NGROK_URL}/uploads/${userData.profile_picture}?cache_bust=${lastUpdate}`;
-  }, [userData?.profile_picture, lastUpdate]);
+      ? userData.profile_picture
+      : `${NGROK_URL}/uploads/${userData.profile_picture}`;
+  }, [userData?.profile_picture]);
 
   return (
     <View style={styles.profile}>
@@ -98,55 +99,91 @@ const Profile = ({ route }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [userPosts, setUserPosts] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
+  const [profileType, setProfileType] = useState(null); // Add this to track whose profile we're viewing
   const { width: screenWidth } = Dimensions.get('window');
   const itemSize = useMemo(() => (screenWidth - 32 - 4) / 3, [screenWidth]);
 
+  // Load current user data first, before any profile fetching
   useEffect(() => {
     let mounted = true;
-    AsyncStorage.getItem('userData')
-      .then(userDataStr => {
-        if (mounted && userDataStr) setCurrentUser(JSON.parse(userDataStr));
-      })
-      .catch(error => console.error('Error getting current user:', error));
+    const loadCurrentUser = async () => {
+      try {
+        const userDataStr = await AsyncStorage.getItem('userData');
+        if (mounted && userDataStr) {
+          const parsedUser = JSON.parse(userDataStr);
+          setCurrentUser(parsedUser);
+          
+          // Determine profile type based on route params
+          const { username } = route.params || {};
+          if (username && username !== parsedUser.username) {
+            setProfileType('other');
+          } else {
+            setProfileType('own');
+          }
+        }
+      } catch (error) {
+        console.error('Error getting current user:', error);
+      }
+    };
+    
+    loadCurrentUser();
     return () => { mounted = false; };
-  }, []);
+  }, [route.params]);
 
   const isOwnProfile = useMemo(() => {
-    if (!currentUser) return false; // Ensures currentUser is loaded
-    return !route.params?.username || route.params?.username === currentUser.username;
-  }, [route.params?.username, currentUser]);
-  
+    return profileType === 'own';
+  }, [profileType]);
 
   const fetchUserDataAndPosts = useCallback(async () => {
-    let mounted = true; // Add this flag
+    // Don't proceed until we know which profile type we're showing
+    if (!profileType || !currentUser) return;
+    
+    let mounted = true;
     try {
       const token = await AsyncStorage.getItem("token");
       if (!token) {
         navigation.navigate('Login');
         return;
       }
-      const username = route.params?.username;
-      const headers = { "Authorization": `Bearer ${token}`, "Content-Type": "application/json", "Cache-Control": "no-cache" };
-  
+
+      const headers = {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json",
+        "Cache-Control": "no-cache"
+      };
+
+      const { username } = route.params || {};
+      const isViewingOtherUser = profileType === 'other';
+      
+      const profileUrl = isViewingOtherUser
+        ? `${NGROK_URL}/api/profile/user/${username}`
+        : `${NGROK_URL}/api/profile`;
+      const postsUrl = isViewingOtherUser
+        ? `${NGROK_URL}/api/posts/user/${username}`
+        : `${NGROK_URL}/api/posts/myposts`;
+
       const [profileResponse, postsResponse] = await Promise.all([
-        fetch(username && !isOwnProfile ? `${NGROK_URL}/api/profile/user/${username}` : `${NGROK_URL}/api/profile`, { method: "GET", headers }),
-        fetch(username && !isOwnProfile ? `${NGROK_URL}/api/posts/user/${username}` : `${NGROK_URL}/api/posts/myposts`, { method: "GET", headers })
+        fetch(profileUrl, { method: "GET", headers }),
+        fetch(postsUrl, { method: "GET", headers })
       ]);
-  
+
       if (!profileResponse.ok || !postsResponse.ok) throw new Error('Network response was not ok');
-  
       const [profileData, postsData] = await Promise.all([profileResponse.json(), postsResponse.json()]);
       const formattedUserData = {
         ...profileData,
-        profile_picture: profileData.profile_picture?.startsWith('https') 
-          ? profileData.profile_picture 
+        profile_picture: profileData.profile_picture?.startsWith('https')
+          ? profileData.profile_picture
           : profileData.profile_picture ? `${NGROK_URL}/uploads/${profileData.profile_picture}` : null,
       };
-  
+
       if (mounted) {
         setUserData(formattedUserData);
-        if (isOwnProfile) await AsyncStorage.setItem('userData', JSON.stringify(formattedUserData));
-  
+        
+        // Update local storage only if viewing own profile
+        if (!isViewingOtherUser) {
+          await AsyncStorage.setItem('userData', JSON.stringify(formattedUserData));
+        }
+
         const mappedPosts = Array.isArray(postsData) ? postsData.map(post => ({
           _id: post.post_id || post.id,
           username: post.username,
@@ -156,10 +193,10 @@ const Profile = ({ route }) => {
           created_at: post.created_at,
           likes: post.like_count || 0,
           comments: post.comment_count || 0,
-          media_type: post.media_type || (post.media_url?.includes('.mp4') ? 'video' : 'image')
+          "mediaHospitality": post.media_type || (post.media_url?.includes('.mp4') ? 'video' : 'image')
         })).filter(post => post.image_url && !post.image_url.includes('undefined'))
-        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at)) : [];
-        
+          .sort((a, b) => new Date(b.created_at) - new Date(a.created_at)) : [];
+
         setUserPosts(mappedPosts);
         setIsLoading(false);
         setRefreshing(false);
@@ -169,26 +206,29 @@ const Profile = ({ route }) => {
       if (mounted) {
         setUserPosts([]);
         Alert.alert('Error', `Failed to fetch data: ${error.message}`);
+        setIsLoading(false);
+        setRefreshing(false);
       }
     }
-  
-    return () => { mounted = false; }; // Cleanup function to avoid setting state on unmounted component
-  }, [navigation, route.params?.username, isOwnProfile]);
-  
+    return () => { mounted = false; };
+  }, [navigation, route.params, currentUser, profileType]);
 
+  // Only fetch data once we know which profile type we're viewing
+  useEffect(() => {
+    if (profileType) {
+      setIsLoading(true);
+      setUserData(null);
+      fetchUserDataAndPosts();
+    }
+  }, [profileType, fetchUserDataAndPosts]);
 
-useFocusEffect(
-  useCallback(() => {
-    setIsLoading(true);
-    fetchUserDataAndPosts();
-  }, [fetchUserDataAndPosts])
-);
-
-
+  // Remove the useFocusEffect to prevent refetching on focus (which causes flicker)
+  // Instead, handle refreshes explicitly
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
     fetchUserDataAndPosts();
   }, [fetchUserDataAndPosts]);
+
 
   const renderGridItem = useCallback(({ item, index }) => (
     <TouchableOpacity
@@ -218,8 +258,13 @@ useFocusEffect(
       )}
     </TouchableOpacity>
   ), [itemSize, navigation, userPosts]);
-
-  if (isLoading) return <SafeAreaView style={styles.safeArea}><ActivityIndicator size="large" color="#007BFF" /></SafeAreaView>;
+  if (isLoading || !userData) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <ActivityIndicator size="large" color="#007BFF" />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -227,12 +272,14 @@ useFocusEffect(
       <FlatList
         ListHeaderComponent={
           <>
-            <TouchableOpacity onPress={() => navigation.goBack('Home')} style={styles.backButton}>
+            <TouchableOpacity
+              onPress={() => navigation.reset({ index: 0, routes: [{ name: 'Main' }] })}
+              style={styles.backButton}
+            >
               <Text style={styles.backButtonText}>←</Text>
             </TouchableOpacity>
             <ProfileHeader
               userData={userData}
-              lastUpdate={Date.now()}
               navigation={navigation}
               isOwnProfile={isOwnProfile}
               onFollow={async () => {

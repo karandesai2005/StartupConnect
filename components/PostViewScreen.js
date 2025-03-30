@@ -37,7 +37,7 @@ const formatTimestamp = (timestamp) => {
   return postDate.toLocaleDateString();
 };
 
-const PostItem = memo(({ item, index, toggleExpand, expandedItems, navigation, isVisible, onDelete }) => {
+const PostItem = memo(({ item, index, toggleExpand, expandedItems, navigation, isVisible, onDelete, currentUsername }) => {
   const [imageHeight, setImageHeight] = useState(width);
   const [isLoading, setIsLoading] = useState(true);
   const [isLiked, setIsLiked] = useState(false);
@@ -53,8 +53,10 @@ const PostItem = memo(({ item, index, toggleExpand, expandedItems, navigation, i
   const animatedScale = useRef(new Animated.Value(1)).current;
   const videoRef = useRef(null);
 
+  const isOwnPost = item.username === currentUsername;
+
   useEffect(() => {
-    console.log('Post item data:', JSON.stringify(item)); // Debug post structure
+    console.log('Post item data:', JSON.stringify(item));
     fetchLikeStatus();
     const mediaUrl = item.image_url || item.media_url;
     if (typeof mediaUrl === 'string') {
@@ -97,7 +99,7 @@ const PostItem = memo(({ item, index, toggleExpand, expandedItems, navigation, i
   }, [isVisible, isVideo]);
 
   const getPostId = () => {
-    return item.post_id || item._id || item.id; // Try different possible field names
+    return item.post_id || item._id || item.id;
   };
 
   const fetchLikeStatus = async () => {
@@ -239,12 +241,14 @@ const PostItem = memo(({ item, index, toggleExpand, expandedItems, navigation, i
             <Text style={styles.name}>{item.username || 'Unknown User'}</Text>
           </View>
         </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.moreButton}
-          onPress={() => setIsOptionsModalVisible(true)}
-        >
-          <Text style={styles.moreButtonText}>•••</Text>
-        </TouchableOpacity>
+        {isOwnPost && (
+          <TouchableOpacity 
+            style={styles.moreButton}
+            onPress={() => setIsOptionsModalVisible(true)}
+          >
+            <Text style={styles.moreButtonText}>•••</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <TouchableOpacity activeOpacity={0.95} onPressIn={handlePressIn} onPressOut={handlePressOut}>
@@ -383,30 +387,43 @@ const PostItem = memo(({ item, index, toggleExpand, expandedItems, navigation, i
         </View>
       </Modal>
 
-      <Modal
-        isVisible={isOptionsModalVisible}
-        onBackdropPress={() => setIsOptionsModalVisible(false)}
-        onSwipeComplete={() => setIsOptionsModalVisible(false)}
-        swipeDirection="up"
-        backdropOpacity={0.3}
-        style={styles.optionsModal}
-        animationIn="slideInUp"
-        animationOut="slideOutDown"
-      >
-        <View style={styles.optionsModalContent}>
-          <TouchableOpacity 
-            style={styles.optionButton}
-            onPress={handleDeletePost}
-            disabled={isDeleting}
-          >
-            <Text style={styles.optionText}>Delete Post</Text>
-            {isDeleting && <ActivityIndicator size="small" color="#FF0000" />}
-          </TouchableOpacity>
-        </View>
-      </Modal>
+      {isOwnPost && (
+        <Modal
+          isVisible={isOptionsModalVisible}
+          onBackdropPress={() => setIsOptionsModalVisible(false)}
+          onSwipeComplete={() => setIsOptionsModalVisible(false)}
+          swipeDirection="up"
+          backdropOpacity={0.3}
+          style={styles.optionsModal}
+          animationIn="slideInUp"
+          animationOut="slideOutDown"
+        >
+          <View style={styles.optionsModalContent}>
+            <TouchableOpacity 
+              style={styles.optionButton}
+              onPress={handleDeletePost}
+              disabled={isDeleting}
+            >
+              <Text style={styles.optionText}>Delete Post</Text>
+              {isDeleting && <ActivityIndicator size="small" color="#FF0000" />}
+            </TouchableOpacity>
+          </View>
+        </Modal>
+      )}
     </Animated.View>
   );
 });
+
+PostItem.propTypes = {
+  item: PropTypes.object.isRequired,
+  index: PropTypes.number.isRequired,
+  toggleExpand: PropTypes.func.isRequired,
+  expandedItems: PropTypes.object.isRequired,
+  navigation: PropTypes.object.isRequired,
+  isVisible: PropTypes.bool.isRequired,
+  onDelete: PropTypes.func.isRequired,
+  currentUsername: PropTypes.string,
+};
 
 const PostViewScreen = ({ route }) => {
   const { posts: initialPosts = [], initialIndex = 0 } = route?.params || {};
@@ -418,6 +435,22 @@ const PostViewScreen = ({ route }) => {
   const [posts, setPosts] = useState(initialPosts);
   const [viewableItems, setViewableItems] = useState([]);
   const [isInitialScrollDone, setIsInitialScrollDone] = useState(false);
+  const [currentUsername, setCurrentUsername] = useState('');
+
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      try {
+        const userDataStr = await AsyncStorage.getItem('userData');
+        if (userDataStr) {
+          const userData = JSON.parse(userDataStr);
+          setCurrentUsername(userData.username);
+        }
+      } catch (error) {
+        console.error('Error getting current user:', error);
+      }
+    };
+    getCurrentUser();
+  }, []);
 
   const toggleExpand = useCallback((index) => {
     setExpandedItems((prev) => ({
@@ -451,14 +484,24 @@ const PostViewScreen = ({ route }) => {
 
   useEffect(() => {
     console.log('Initial posts:', initialPosts.length);
-    console.log('Sample post data:', JSON.stringify(initialPosts[0])); // Debug first post
-    if (posts.length > 0 && initialIndex >= 0 && flatListRef.current) {
-      setTimeout(() => {
-        flatListRef.current.scrollToIndex({ index: initialIndex, animated: false });
-        setIsInitialScrollDone(true);
-      }, 1500);
+    console.log('Sample post data:', JSON.stringify(initialPosts[0]));
+    
+    if (posts.length > 0 && initialIndex >= 0) {
+      const timer = setTimeout(() => {
+        if (flatListRef.current) {
+          flatListRef.current.scrollToIndex({
+            index: initialIndex,
+            animated: false,
+            viewPosition: 0.5 // Scroll to center of screen
+          });
+          setIsInitialScrollDone(true);
+        }
+      }, 500); // Reduced delay from 1500ms to 500ms
+  
+      return () => clearTimeout(timer); // Clean up timer
     }
   }, [posts, initialIndex]);
+
 
   const onViewableItemsChanged = useCallback(
     ({ viewableItems }) => {
@@ -481,22 +524,32 @@ const PostViewScreen = ({ route }) => {
     index,
   });
 
-  const onScrollToIndexFailed = (info) => {
-    const retryScroll = (attempt = 1) => {
-      if (attempt > 3) {
-        const estimatedOffset = info.index * (width * 1.5);
-        flatListRef.current.scrollToOffset({ offset: estimatedOffset, animated: false });
-        setIsInitialScrollDone(true);
-        return;
+  const onScrollToIndexFailed = useCallback((info) => {
+  const retryScroll = (attempt = 1) => {
+    if (attempt > 3) {
+      const estimatedOffset = info.index * (width * 1.5);
+      if (flatListRef.current) {
+        flatListRef.current.scrollToOffset({
+          offset: estimatedOffset,
+          animated: false
+        });
       }
-      setTimeout(() => {
-        if (flatListRef.current && posts.length > info.index) {
-          flatListRef.current.scrollToIndex({ index: info.index, animated: false });
-        }
-      }, 1000 * attempt);
-    };
-    retryScroll();
+      setIsInitialScrollDone(true);
+      return;
+    }
+    
+    setTimeout(() => {
+      if (flatListRef.current && posts.length > info.index) {
+        flatListRef.current.scrollToIndex({
+          index: info.index,
+          animated: false,
+          viewPosition: 0.5
+        });
+      }
+    }, 300 * attempt);
   };
+  retryScroll();
+}, [posts.length]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -523,6 +576,7 @@ const PostViewScreen = ({ route }) => {
               navigation={navigation}
               isVisible={viewableItems.includes(index)}
               onDelete={handleDelete}
+              currentUsername={currentUsername}
             />
           )}
           keyExtractor={(item) => (item.post_id || item._id || item.id || index).toString()}

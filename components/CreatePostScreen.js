@@ -22,7 +22,7 @@ import { NGROK_URL } from '@env';
 import { useNavigation } from '@react-navigation/native';
 import * as FileSystem from 'expo-file-system';
 import { Ionicons, Feather } from '@expo/vector-icons';
-
+import { useRoute } from '@react-navigation/native';
 const getFileUri = async (uri) => {
   if (Platform.OS === 'android' && uri.startsWith('content://')) {
     const fileUri = `${FileSystem.cacheDirectory}tempUpload`;
@@ -50,7 +50,6 @@ export default function CreatePostScreen() {
     const fetchUserProfile = async () => {
       try {
         setIsLoadingUsername(true);
-        // Check cached userData (shared with Profile.js)
         const cachedUserData = await AsyncStorage.getItem('userData');
         if (cachedUserData) {
           const userData = JSON.parse(cachedUserData);
@@ -59,7 +58,6 @@ export default function CreatePostScreen() {
           setIsLoadingUsername(false);
           return;
         }
-
         const token = await AsyncStorage.getItem('token');
         if (!token) throw new Error('No authentication token found');
 
@@ -68,7 +66,7 @@ export default function CreatePostScreen() {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
-            'Cache-Control': 'no-cache', // Prevent stale data
+            'Cache-Control': 'no-cache',
           },
         });
 
@@ -80,11 +78,10 @@ export default function CreatePostScreen() {
           const profilePicUrl = `${NGROK_URL}${profileData.profile_picture}`;
           setProfilePic(profilePicUrl);
         }
-        // Cache the full userData object like Profile.js
         await AsyncStorage.setItem('userData', JSON.stringify(profileData));
       } catch (error) {
         console.error('Error fetching profile:', error);
-        setUsername('User'); // Fallback
+        setUsername('User');
         setProfilePic(null);
       } finally {
         setIsLoadingUsername(false);
@@ -97,7 +94,7 @@ export default function CreatePostScreen() {
       if (Platform.OS !== 'web') {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') {
-          Alert.alert('Permission Needed', 'Sorry, we need media permissions to make this work!');
+          Alert.alert('Permission Needed', 'Please grant permission to access media.');
         }
       }
     })();
@@ -108,21 +105,23 @@ export default function CreatePostScreen() {
     };
   }, []);
 
+
   const pickMedia = async () => {
     try {
+      // Check permission before launching the picker
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'We need media permissions to proceed.');
+        Alert.alert('Permission Denied', 'We need access to your media to proceed.');
         return;
       }
-
+  
       let result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.All,
         allowsEditing: true,
         aspect: [4, 5],
         quality: 1,
       });
-
+  
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const selectedMedia = result.assets[0];
         setMedia(selectedMedia.uri);
@@ -133,20 +132,34 @@ export default function CreatePostScreen() {
       Alert.alert('Media Selection Error', error.message);
     }
   };
+  
+
+  const route = useRoute();
+  const eventTag = route.params?.eventTag || null; // Get eventTag if available
 
   const nextStep = () => {
     if (!media) {
       Alert.alert('No Media', 'Please select an image or video first');
       return;
     }
-    navigation.navigate('SelectTags', { media, mediaType, caption });
+    navigation.navigate('SelectTags', { media, mediaType, caption, eventTag }); // Pass eventTag
   };
+
+
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.keyboardAvoid}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.cancelButton}>
+          <TouchableOpacity
+            onPress={() => {
+              setMedia(null);
+              setMediaType(null);
+              setCaption('');
+              navigation.goBack();
+            }}
+            style={styles.cancelButton}
+          >
             <Ionicons name="close" size={24} color="#000" />
           </TouchableOpacity>
           <Text style={styles.headerText}>New Post</Text>
@@ -211,15 +224,15 @@ export default function CreatePostScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </SafeAreaView >
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { 
-    flex: 1, 
+  safeArea: {
+    flex: 1,
     backgroundColor: '#fff' // Remove paddingTop: 50
-  },  keyboardAvoid: { flex: 1 },
+  }, keyboardAvoid: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, height: 44, borderBottomWidth: 0.5, borderBottomColor: '#dbdbdb' },
   cancelButton: { padding: 8 },
   headerText: { fontSize: 17, fontWeight: '600' },

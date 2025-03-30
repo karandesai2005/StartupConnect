@@ -66,7 +66,7 @@ const Signup = () => {
   
       if (response.ok) {
         await AsyncStorage.setItem('token', result.token);
-        await AsyncStorage.setItem('user', JSON.stringify(result.user));
+        await AsyncStorage.setItem('useruserData', JSON.stringify(result.user));
         navigation.navigate("Main");
       } else {
         Alert.alert("Error", result.message || "Failed to complete registration.");
