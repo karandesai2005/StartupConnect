@@ -72,7 +72,7 @@ const EditProfilePage = () => {
         await AsyncStorage.setItem('userData', JSON.stringify(updatedUser));
   
         // 🔥 Navigate back and force refresh
-        navigation.navigate('Profile', {
+        navigation.goBack('Profile', {
           updatedUser,
           forceRefresh: true,
           timestamp: Date.now(),
