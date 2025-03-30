@@ -112,12 +112,7 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
         videoRef.current.pauseAsync().catch((error) => console.error('Pause error:', error));
       }
     }
-    return () => {
-      if (isVideo && videoRef.current) {
-        videoRef.current.pauseAsync().catch(() => {});
-      }
-    };
-  }, [isVisible, isVideo]);
+  }, [isVisible, isVideo]); // Add this closing bracket and dependency array
 
   useEffect(() => {
     console.log('Comments state updated:', comments);
@@ -382,11 +377,6 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
               style={[styles.postImage, { height: imageHeight }]}
               onLoad={() => setIsLoading(false)}
             />
-          )}
-          {isVideo && !isVisible && (
-            <View>
-              <Image source={require('../assets/play-button.png')} style={styles.playButton} />
-            </View>
           )}
         </View>
       </TouchableOpacity>
@@ -672,6 +662,19 @@ export default function Home() {
     useCallback(() => {
       fetchUserData();
     }, [fetchUserData])
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      // This runs when the screen comes into focus
+      
+      // Return a cleanup function that runs when screen loses focus
+      return () => {
+        // This will ensure videos are paused when navigating away
+        // Force all viewable items to be considered "not visible"
+        setViewableItems([]);
+      };
+    }, [])
   );
 
   const keyExtractor = useCallback((item, index) => {
@@ -998,13 +1001,7 @@ const styles = StyleSheet.create({
   loaderContainer: {
     paddingVertical: 20,
   },
-
-  playButton: {
-    width: 60,
-    height: 60,
-    tintColor: 'white',
-  },
-  video: {
+    video: {
     width: width,
     backgroundColor: 'black',
   },

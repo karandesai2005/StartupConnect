@@ -11,9 +11,10 @@ import {
   Animated,
   ActivityIndicator,
   TextInput,
+  Platform,
 } from 'react-native';
 import { Video } from 'expo-av';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import PropTypes from 'prop-types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
@@ -62,6 +63,7 @@ const PostItem = memo(({ item, index, toggleExpand, expandedItems, navigation, i
     if (typeof mediaUrl === 'string') {
       if (mediaUrl.match(/\.(mp4|mov|avi|wmv|3gp|mkv)$/i)) {
         setIsVideo(true);
+        // Set video height to width * 5 / 4
         setImageHeight(width * 5 / 4);
         setIsLoading(false);
       } else if (mediaUrl.startsWith('http')) {
@@ -97,6 +99,17 @@ const PostItem = memo(({ item, index, toggleExpand, expandedItems, navigation, i
       }
     };
   }, [isVisible, isVideo]);
+
+  // Pause video when screen loses focus (e.g., navigating to profile)
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        if (isVideo && videoRef.current) {
+          videoRef.current.pauseAsync().catch((error) => console.error('Pause on unfocus error:', error));
+        }
+      };
+    }, [isVideo])
+  );
 
   const getPostId = () => {
     return item.post_id || item._id || item.id;
@@ -186,22 +199,11 @@ const PostItem = memo(({ item, index, toggleExpand, expandedItems, navigation, i
     try {
       const token = await AsyncStorage.getItem('token');
       const postId = getPostId();
-      
-      console.log('Attempting to delete - Token:', token ? 'Yes' : 'No', 'Post ID:', postId);
-  
-      if (!token) {
-        throw new Error('No authentication token found. Please log in again.');
-      }
-      if (!postId) {
-        throw new Error('Post ID is missing from the item data: ' + JSON.stringify(item));
-      }
-  
+      if (!token) throw new Error('No authentication token found. Please log in again.');
+      if (!postId) throw new Error('Post ID is missing from the item data: ' + JSON.stringify(item));
       const response = await axios.delete(`${NGROK_URL}/api/posts/${postId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-  
-      console.log('Delete response:', response.status, response.data);
-  
       if (response.status === 200) {
         setIsOptionsModalVisible(false);
         onDelete(postId);
@@ -242,7 +244,7 @@ const PostItem = memo(({ item, index, toggleExpand, expandedItems, navigation, i
           </View>
         </TouchableOpacity>
         {isOwnPost && (
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.moreButton}
             onPress={() => setIsOptionsModalVisible(true)}
           >
@@ -269,8 +271,9 @@ const PostItem = memo(({ item, index, toggleExpand, expandedItems, navigation, i
               onError={(e) => {
                 console.error('Video error:', e);
                 setIsLoading(false);
+                setIsVideo(false); // Fallback to image if video fails
               }}
-              useNativeControls={true}
+              useNativeControls={false} // No native controls, consistent with Home screen
             />
           ) : (
             <Image
@@ -399,7 +402,7 @@ const PostItem = memo(({ item, index, toggleExpand, expandedItems, navigation, i
           animationOut="slideOutDown"
         >
           <View style={styles.optionsModalContent}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.optionButton}
               onPress={handleDeletePost}
               disabled={isDeleting}
@@ -461,7 +464,7 @@ const PostViewScreen = ({ route }) => {
 
   const handleDelete = useCallback((postId) => {
     setPosts((prevPosts) => {
-      const newPosts = prevPosts.filter(post => {
+      const newPosts = prevPosts.filter((post) => {
         const id = post.post_id || post._id || post.id;
         return id !== postId;
       });
@@ -485,23 +488,22 @@ const PostViewScreen = ({ route }) => {
   useEffect(() => {
     console.log('Initial posts:', initialPosts.length);
     console.log('Sample post data:', JSON.stringify(initialPosts[0]));
-    
+
     if (posts.length > 0 && initialIndex >= 0) {
       const timer = setTimeout(() => {
         if (flatListRef.current) {
           flatListRef.current.scrollToIndex({
             index: initialIndex,
             animated: false,
-            viewPosition: 0.5 // Scroll to center of screen
+            viewPosition: 0.5, // Scroll to center of screen
           });
           setIsInitialScrollDone(true);
         }
-      }, 500); // Reduced delay from 1500ms to 500ms
-  
+      }, 500);
+
       return () => clearTimeout(timer); // Clean up timer
     }
   }, [posts, initialIndex]);
-
 
   const onViewableItemsChanged = useCallback(
     ({ viewableItems }) => {
@@ -524,32 +526,35 @@ const PostViewScreen = ({ route }) => {
     index,
   });
 
-  const onScrollToIndexFailed = useCallback((info) => {
-  const retryScroll = (attempt = 1) => {
-    if (attempt > 3) {
-      const estimatedOffset = info.index * (width * 1.5);
-      if (flatListRef.current) {
-        flatListRef.current.scrollToOffset({
-          offset: estimatedOffset,
-          animated: false
-        });
-      }
-      setIsInitialScrollDone(true);
-      return;
-    }
-    
-    setTimeout(() => {
-      if (flatListRef.current && posts.length > info.index) {
-        flatListRef.current.scrollToIndex({
-          index: info.index,
-          animated: false,
-          viewPosition: 0.5
-        });
-      }
-    }, 300 * attempt);
-  };
-  retryScroll();
-}, [posts.length]);
+  const onScrollToIndexFailed = useCallback(
+    (info) => {
+      const retryScroll = (attempt = 1) => {
+        if (attempt > 3) {
+          const estimatedOffset = info.index * (width * 1.5);
+          if (flatListRef.current) {
+            flatListRef.current.scrollToOffset({
+              offset: estimatedOffset,
+              animated: false,
+            });
+          }
+          setIsInitialScrollDone(true);
+          return;
+        }
+
+        setTimeout(() => {
+          if (flatListRef.current && posts.length > info.index) {
+            flatListRef.current.scrollToIndex({
+              index: info.index,
+              animated: false,
+              viewPosition: 0.5,
+            });
+          }
+        }, 300 * attempt);
+      };
+      retryScroll();
+    },
+    [posts.length]
+  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -676,6 +681,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8F9FA',
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden', // Match Home screen
   },
   imageLoader: {
     position: 'absolute',
@@ -716,9 +722,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   navIcon: {
-    width: 24,
-    height: 24,
-    marginBottom: 4,
+    width: 20,
+    height: 20,
+    marginBottom: Platform.OS === 'ios' ? 3 : 0,
+    tintColor: '#000000', // Default black for all icons
   },
   captionContainer: {
     paddingHorizontal: 12,

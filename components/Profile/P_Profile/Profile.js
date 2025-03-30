@@ -112,7 +112,7 @@ const Profile = ({ route }) => {
         if (mounted && userDataStr) {
           const parsedUser = JSON.parse(userDataStr);
           setCurrentUser(parsedUser);
-          
+
           // Determine profile type based on route params
           const { username } = route.params || {};
           if (username && username !== parsedUser.username) {
@@ -125,7 +125,7 @@ const Profile = ({ route }) => {
         console.error('Error getting current user:', error);
       }
     };
-    
+
     loadCurrentUser();
     return () => { mounted = false; };
   }, [route.params]);
@@ -137,7 +137,7 @@ const Profile = ({ route }) => {
   const fetchUserDataAndPosts = useCallback(async () => {
     // Don't proceed until we know which profile type we're showing
     if (!profileType || !currentUser) return;
-    
+
     let mounted = true;
     try {
       const token = await AsyncStorage.getItem("token");
@@ -154,7 +154,7 @@ const Profile = ({ route }) => {
 
       const { username } = route.params || {};
       const isViewingOtherUser = profileType === 'other';
-      
+
       const profileUrl = isViewingOtherUser
         ? `${NGROK_URL}/api/profile/user/${username}`
         : `${NGROK_URL}/api/profile`;
@@ -178,7 +178,7 @@ const Profile = ({ route }) => {
 
       if (mounted) {
         setUserData(formattedUserData);
-        
+
         // Update local storage only if viewing own profile
         if (!isViewingOtherUser) {
           await AsyncStorage.setItem('userData', JSON.stringify(formattedUserData));
@@ -246,7 +246,10 @@ const Profile = ({ route }) => {
             useNativeControls={false}
           />
           <View style={styles.playIconContainer}>
-            <Text style={styles.playIcon}>▶</Text>
+            <Image
+              source={require("../../../assets/play-button.png")}
+              style={styles.playIcon}
+            />
           </View>
         </View>
       ) : (
@@ -344,8 +347,23 @@ const styles = StyleSheet.create({
   gridItem: { backgroundColor: '#f0f0f0', margin: 1 },
   gridImage: { width: '100%', height: '100%', borderRadius: 4 },
   videoContainer: { position: 'relative', width: '100%', height: '100%' },
-  playIconContainer: { position: 'absolute', top: 5, right: 5, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 12, width: 24, height: 24 },
-  playIcon: { color: 'white', fontSize: 16 },
+  playIconContainer: {
+    position: 'absolute',
+    top: 5,
+    right: 5,
+    // backgroundColo`r: 'rgb(0, 0, 0)',
+    borderRadius: 12,
+    width: 30,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  playIcon: {
+    width: 20,
+    height: 20,
+    tintColor: 'black',
+
+  },
 });
 
 export default Profile;
