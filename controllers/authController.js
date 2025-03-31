@@ -2,7 +2,7 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const { getUserByEmail, createUser } = require("../models/userModel");
 const { queryDB } = require("../config/db");
-const upload = require("../config/multerConfig"); // Adjust path to your Multer config
+const upload = require("../multerConfig"); // Adjust path to your Multer config
 // Register user
 const register = async (req, res) => {
   try {
@@ -85,7 +85,7 @@ const login = async (req, res) => {
 
     console.log("JWT_SECRET:", process.env.JWT_SECRET);
     const token = jwt.sign({ userId: user.user_id }, process.env.JWT_SECRET, {
-      expiresIn: "14d",
+      expiresIn: "1h",
     });
     console.log("Generated token:", token);
 
@@ -211,7 +211,7 @@ const deleteAccount = async (req, res) => {
 // Save user details step-by-step
 const saveUserDetails = async (req, res) => {
   console.log("Request Body:", req.body);
-  console.log("Uploaded File:", req.file);
+
   try {
     const { step, data } = req.body;
 
@@ -220,7 +220,6 @@ const saveUserDetails = async (req, res) => {
     }
 
     let query, params;
-    const parsedData = typeof data === "string" ? JSON.parse(data) : data;
 
     switch (step) {
       case 1:
@@ -285,12 +284,12 @@ const saveUserDetails = async (req, res) => {
         params = [data.preference === "personal" ? 1 : 0, data.preference === "business" ? 1 : 0, data.userId];
         break;
 
-      case 5:
-        if (!req.file || !parsedData.userId) {
-          return res.status(400).json({ message: "Video file and userId are required." });
-        }
-        const reelUrl = `https://pitch-backend-avb7geahhvfteqf9.centralindia-01.azurewebsites.net/uploads/reels/${req.file.filename}`;
-        query = `
+        case 5:
+          if (!req.file || !parsedData.userId) {
+            return res.status(400).json({ message: "Video file and userId are required." });
+          }
+          const reelUrl = `https://pitch-backend-avb7geahhvfteqf9.centralindia-01.azurewebsites.net/uploads/reels/${req.file.filename}`;
+          query = `
             UPDATE users 
             SET reel_url = @param1 
             WHERE user_id = @param2;
@@ -298,8 +297,9 @@ const saveUserDetails = async (req, res) => {
             FROM users 
             WHERE user_id = @param2;
           `;
-        params = [reelUrl, parsedData.userId];
-        break;
+          params = [reelUrl, parsedData.userId];
+          break;
+
       case 6: // New step for interests and completing registration
         if (!data.interests || !Array.isArray(data.interests) || data.interests.length < 3) {
           return res.status(400).json({ message: "At least 3 interests are required." });
@@ -388,7 +388,7 @@ const getUserProfile = async (req, res) => {
     const userId = req.user.userId;
 
     const query = `
-      SELECT user_id, username, email, name, bio, profile_picture, is_personal, is_business 
+      SELECT user_id, username, email, name, bio, profile_picture, is_personal, is_business, reel_url 
       FROM users 
       WHERE user_id = @param1
     `;
@@ -454,7 +454,7 @@ const updateProfile = async (req, res) => {
     console.error("Update error:", err);
     return res.status(500).json({ message: "Internal server error", error: err.message });
   }
-};
+};  
 
 
 const fixProfilePictureURLs = async (req, res) => {
@@ -562,9 +562,7 @@ module.exports = {
   logout, // Added logout endpoint
   deleteAccount, // Updated deleteAccount endpoint
   validateUsername,
-  saveUserDetails: [upload.single("reel"), saveUserDetails], // Add Multer middleware,
-  getUserProfile,
-  updateProfile,
+  saveUserDetails: [uploadAndConvertReelMedia, saveUserDetails], // Use the new middleware  updateProfile,
   getUserProfileByUsername,
   getUserPostsByUsername,
   searchUsers,
