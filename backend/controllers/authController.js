@@ -284,20 +284,21 @@ const saveUserDetails = async (req, res) => {
         params = [data.preference === "personal" ? 1 : 0, data.preference === "business" ? 1 : 0, data.userId];
         break;
 
-      case 5:
-        // Existing real name step (if applicable)
-        if (!req.file || !data.userId) {
-          return res.status(400).json({ message: "Video file and userId are required." });
-        }
-        const reelUrl = `${NGROK_URL}/uploads/reels/${req.file.filename}`; // Adjust based on your server URL
-        query = `
-          UPDATE users 
-          SET reel_url = @param1 
-          WHERE user_id = @param2;
-          SELECT user_id FROM users WHERE user_id = @param2;
-        `;
-        params = [reelUrl, data.userId];
-        break;
+        case 5:
+          if (!req.file || !parsedData.userId) {
+            return res.status(400).json({ message: "Video file and userId are required." });
+          }
+          const reelUrl = `https://pitch-backend-avb7geahhvfteqf9.centralindia-01.azurewebsites.net/uploads/reels/${req.file.filename}`;
+          query = `
+            UPDATE users 
+            SET reel_url = @param1 
+            WHERE user_id = @param2;
+            SELECT user_id, username, email, reel_url 
+            FROM users 
+            WHERE user_id = @param2;
+          `;
+          params = [reelUrl, parsedData.userId];
+          break;
 
       case 6: // New step for interests and completing registration
         if (!data.interests || !Array.isArray(data.interests) || data.interests.length < 3) {
@@ -561,8 +562,7 @@ module.exports = {
   logout, // Added logout endpoint
   deleteAccount, // Updated deleteAccount endpoint
   validateUsername,
-  saveUserDetails: [upload.single("reel"), saveUserDetails], // Add Multer middleware  getUserProfile,
-  updateProfile,
+  saveUserDetails: [uploadAndConvertReelMedia, saveUserDetails], // Use the new middleware  updateProfile,
   getUserProfileByUsername,
   getUserPostsByUsername,
   searchUsers,
