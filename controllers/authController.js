@@ -561,8 +561,7 @@ module.exports = {
   logout, // Added logout endpoint
   deleteAccount, // Updated deleteAccount endpoint
   validateUsername,
-  saveUserDetails: [uploadAndConvertReelMedia, saveUserDetails], // Now it’s defined  getUserProfileByUsername,
-  getUserPostsByUsername,
+  saveUserDetails, // Just the function  getUserPostsByUsername,
   searchUsers,
   checkTokenBlacklist, // Middleware for token blacklist checking
   fixProfilePictureURLs

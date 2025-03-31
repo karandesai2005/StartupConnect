@@ -24,11 +24,9 @@ const router = express.Router();
 router.post("/register", validateSaveUserDetailsInput, register);
 router.post("/login", login);
 router.post("/validate-username", validateUsernameInput, validateUsername);
-router.post("/save-user-details", validateSaveUserDetailsInput, saveUserDetails);
-
-// Protected routes
+router.post("/save-user-details", validateSaveUserDetailsInput, uploadAndConvertReelMedia, saveUserDetails);// Protected routes
 router.post("/logout", authenticateJWT, logout);
-router.delete("/delete-account", authenticateJWT, deleteAccount);
+router.delete("/delete-account", authenticateJWT, deleteAccount);ss
 router.get("/profile", authenticateJWT, getUserProfile);
 router.put("/update-profile", authenticateJWT, uploadProfilePicture.single('profile_picture'), updateProfile);
 router.get("/users/:username", authenticateJWT, getUserProfileByUsername);
