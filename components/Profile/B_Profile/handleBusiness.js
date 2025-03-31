@@ -12,12 +12,12 @@ const SetupBusinessProfile = () => {
     
     const handleNext = () => {
         if (!companyName.trim()) {
-            Alert.alert("Error", "Please enter your company's name");
-            return;
+          Alert.alert("Error", "Please enter your company's name");
+          return;
         }
-        // Here you might want to save the company name to AsyncStorage or send it to your backend
-        navigation.navigate("field"); // Assuming "field" is your next screen
-    };
+        // Save company name to AsyncStorage or pass it along
+        navigation.navigate("UploadPitchVideo");
+      };
 
     return (
         <View style={styles.container}>

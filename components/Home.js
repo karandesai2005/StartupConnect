@@ -708,15 +708,12 @@ export default function Home() {
       console.log('User data not loaded yet');
       return;
     }
-
-    const isBusinessUser = userData.is_business;
+  
     const username = userData.username;
-
-    if (isBusinessUser) {
-      navigation.navigate('BusinessProfile', { username, isOtherUser: false });
-    } else {
-      navigation.navigate('Profile', { username, isOtherUser: false });
-    }
+    const reelUrl = userData.reel_url; // Ensure this is fetched in fetchUserData
+  
+    // Navigate to ReelScreen instead of Profile
+    navigation.navigate("ReelScreen", { reelUrl, username });
   };
 
   
