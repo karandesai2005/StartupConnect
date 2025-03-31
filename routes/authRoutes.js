@@ -1,3 +1,7 @@
+const express = require("express");
+const { validateUsernameInput, validateSaveUserDetailsInput } = require("../middleware/validator");
+const authenticateJWT = require("../middleware/authenticateJWT");
+const { uploadProfilePicture, uploadAndConvertPostMedia } = require("../config/multerConfig"); // Update to use uploadAndConvertPostMedia
 const {
   register,
   login,
@@ -10,13 +14,8 @@ const {
   getUserProfileByUsername,
   getUserPostsByUsername,
   searchUsers,
-  fixProfilePictureURLs // Add this here
+  fixProfilePictureURLs
 } = require("../controllers/authController");
-
-const express = require("express");
-const { validateUsernameInput, validateSaveUserDetailsInput } = require("../middleware/validator");
-const authenticateJWT = require("../middleware/authenticateJWT");
-const { uploadProfilePicture } = require("../config/multerConfig");
 
 const router = express.Router();
 
@@ -24,14 +23,16 @@ const router = express.Router();
 router.post("/register", validateSaveUserDetailsInput, register);
 router.post("/login", login);
 router.post("/validate-username", validateUsernameInput, validateUsername);
-router.post("/save-user-details", validateSaveUserDetailsInput, uploadAndConvertReelMedia, saveUserDetails);// Protected routes
+router.post("/save-user-details", validateSaveUserDetailsInput, uploadAndConvertPostMedia, saveUserDetails); // Fixed: Use uploadAndConvertPostMedia
+
+// Protected routes
 router.post("/logout", authenticateJWT, logout);
-router.delete("/delete-account", authenticateJWT, deleteAccount);ss
+router.delete("/delete-account", authenticateJWT, deleteAccount);
 router.get("/profile", authenticateJWT, getUserProfile);
 router.put("/update-profile", authenticateJWT, uploadProfilePicture.single('profile_picture'), updateProfile);
 router.get("/users/:username", authenticateJWT, getUserProfileByUsername);
 router.get("/posts/user/:username", authenticateJWT, getUserPostsByUsername);
 router.get("/search-users", authenticateJWT, searchUsers);
-router.post("/fix-profile-picture-urls", authenticateJWT, fixProfilePictureURLs); // This should now work
+router.post("/fix-profile-picture-urls", authenticateJWT, fixProfilePictureURLs);
 
 module.exports = router;
