@@ -2,7 +2,7 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const { getUserByEmail, createUser } = require("../models/userModel");
 const { queryDB } = require("../config/db");
-
+const upload = require("../multerConfig"); // Adjust path to your Multer config
 // Register user
 const register = async (req, res) => {
   try {
@@ -85,7 +85,7 @@ const login = async (req, res) => {
 
     console.log("JWT_SECRET:", process.env.JWT_SECRET);
     const token = jwt.sign({ userId: user.user_id }, process.env.JWT_SECRET, {
-      expiresIn: "14d",
+      expiresIn: "1h",
     });
     console.log("Generated token:", token);
 
@@ -146,7 +146,7 @@ const checkTokenBlacklist = async (req, res, next) => {
     res.status(500).json({ message: "Internal server error", error: err.message });
   }
 };
-//ah
+
 // Delete user account
 const deleteAccount = async (req, res) => {
   try {
@@ -286,16 +286,17 @@ const saveUserDetails = async (req, res) => {
 
       case 5:
         // Existing real name step (if applicable)
-        if (!data.realName || data.realName.trim() === "") {
-          return res.status(400).json({ message: "Real name is required." });
+        if (!req.file || !data.userId) {
+          return res.status(400).json({ message: "Video file and userId are required." });
         }
+        const reelUrl = `${NGROK_URL}/uploads/reels/${req.file.filename}`; // Adjust based on your server URL
         query = `
           UPDATE users 
-          SET name = @param1 
+          SET reel_url = @param1 
           WHERE user_id = @param2;
           SELECT user_id FROM users WHERE user_id = @param2;
         `;
-        params = [data.realName.trim(), data.userId];
+        params = [reelUrl, data.userId];
         break;
 
       case 6: // New step for interests and completing registration
@@ -386,7 +387,7 @@ const getUserProfile = async (req, res) => {
     const userId = req.user.userId;
 
     const query = `
-      SELECT user_id, username, email, name, bio, profile_picture, is_personal, is_business 
+      SELECT user_id, username, email, name, bio, profile_picture, is_personal, is_business, reel_url 
       FROM users 
       WHERE user_id = @param1
     `;
@@ -560,8 +561,7 @@ module.exports = {
   logout, // Added logout endpoint
   deleteAccount, // Updated deleteAccount endpoint
   validateUsername,
-  saveUserDetails,
-  getUserProfile,
+  saveUserDetails: [upload.single("reel"), saveUserDetails], // Add Multer middleware  getUserProfile,
   updateProfile,
   getUserProfileByUsername,
   getUserPostsByUsername,
