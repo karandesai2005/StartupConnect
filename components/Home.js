@@ -41,15 +41,15 @@ const formatTimestamp = (timestamp) => {
   const diffInDays = Math.floor(diffInHours / 24);
   if (diffInDays < 7) return `${diffInDays}d ago`;
   return postDate.toLocaleDateString();
-  
+
 };
 const handleChatPress = () => {
-    Alert.alert(
-      "Feature Unavailable",
-      "Sorry, this feature is not available currently.",
-      [{ text: "OK" }]
-    );
-  };
+  Alert.alert(
+    "Feature Unavailable",
+    "Sorry, this feature is not available currently.",
+    [{ text: "OK" }]
+  );
+};
 // Memoized Post Card Component
 const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, navigation }) => {
   const [imageHeight, setImageHeight] = useState(width);
@@ -70,6 +70,31 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
   const [isMeasured, setIsMeasured] = useState(false);
   const [fullTextHeight, setFullTextHeight] = useState(0);
   const [lastTap, setLastTap] = useState(null);
+
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const token = await AsyncStorage.getItem('token');
+        if (!token) {
+          // No token found, user is not logged in
+          navigation.reset({
+            index: 0,
+            routes: [{ name: 'Login' }],
+          });
+        }
+      } catch (error) {
+        console.error('Error checking authentication status:', error);
+        // In case of an error, also redirect to Login
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Login' }],
+        });
+      }
+    };
+
+    checkAuth();
+  }, [navigation]);
 
   useEffect(() => {
     fetchLikeStatus();
@@ -224,8 +249,8 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
     const username = isUserPost
       ? item.username
       : item.name
-      ? `${item.name.first} ${item.name.last}`
-      : 'User';
+        ? `${item.name.first} ${item.name.last}`
+        : 'User';
     navigation.navigate('Profile', { username, isOtherUser: true });
   };
 
@@ -338,9 +363,9 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
-      <TouchableOpacity 
-        activeOpacity={0.95} 
-        onPressIn={handlePressIn} 
+      <TouchableOpacity
+        activeOpacity={0.95}
+        onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         onPress={handleDoubleTap}
       >
@@ -371,8 +396,8 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
                 typeof item.image_url === 'string' && item.image_url.startsWith('http')
                   ? { uri: item.image_url }
                   : typeof item.media_url === 'string' && item.media_url.startsWith('http')
-                  ? { uri: item.media_url }
-                  : require('../assets/PITCH.png')
+                    ? { uri: item.media_url }
+                    : require('../assets/PITCH.png')
               }
               style={[styles.postImage, { height: imageHeight }]}
               onLoad={() => setIsLoading(false)}
@@ -667,7 +692,7 @@ export default function Home() {
   useFocusEffect(
     useCallback(() => {
       // This runs when the screen comes into focus
-      
+
       // Return a cleanup function that runs when screen loses focus
       return () => {
         // This will ensure videos are paused when navigating away
@@ -708,15 +733,15 @@ export default function Home() {
       console.log('User data not loaded yet');
       return;
     }
-  
+
     const username = userData.username;
     const reelUrl = userData.reel_url; // Ensure this is fetched in fetchUserData
-  
+
     // Navigate to ReelScreen instead of Profile
     navigation.navigate("ReelScreen", { reelUrl, username });
   };
 
-  
+
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -998,7 +1023,7 @@ const styles = StyleSheet.create({
   loaderContainer: {
     paddingVertical: 20,
   },
-    video: {
+  video: {
     width: width,
     backgroundColor: 'black',
   },
