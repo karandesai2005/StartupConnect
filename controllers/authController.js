@@ -2,8 +2,7 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const { getUserByEmail, createUser } = require("../models/userModel");
 const { queryDB } = require("../config/db");
-const upload = require("../config/multerConfig"); // Adjust path to your Multer config
-// Register user
+const { uploadAndConvertReelMedia } = require("../config/multerConfig"); // Destructure here// Register user
 const register = async (req, res) => {
   try {
     const { username, email, password, isFounder, isInvestor } = req.body;
@@ -562,8 +561,7 @@ module.exports = {
   logout, // Added logout endpoint
   deleteAccount, // Updated deleteAccount endpoint
   validateUsername,
-  saveUserDetails: [uploadAndConvertReelMedia, saveUserDetails], // Use the new middleware  updateProfile,
-  getUserProfileByUsername,
+  saveUserDetails: [uploadAndConvertReelMedia, saveUserDetails], // Now it’s defined  getUserProfileByUsername,
   getUserPostsByUsername,
   searchUsers,
   checkTokenBlacklist, // Middleware for token blacklist checking
