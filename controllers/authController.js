@@ -2,7 +2,7 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const { getUserByEmail, createUser } = require("../models/userModel");
 const { queryDB } = require("../config/db");
-
+const upload = require("../config/multerConfig"); // Adjust path to your Multer config
 // Register user
 const register = async (req, res) => {
   try {
@@ -211,7 +211,7 @@ const deleteAccount = async (req, res) => {
 // Save user details step-by-step
 const saveUserDetails = async (req, res) => {
   console.log("Request Body:", req.body);
-
+  console.log("Uploaded File:", req.file);
   try {
     const { step, data } = req.body;
 
@@ -220,6 +220,7 @@ const saveUserDetails = async (req, res) => {
     }
 
     let query, params;
+    const parsedData = typeof data === "string" ? JSON.parse(data) : data;
 
     switch (step) {
       case 1:
@@ -285,19 +286,20 @@ const saveUserDetails = async (req, res) => {
         break;
 
       case 5:
-        // Existing real name step (if applicable)
-        if (!data.realName || data.realName.trim() === "") {
-          return res.status(400).json({ message: "Real name is required." });
+        if (!req.file || !parsedData.userId) {
+          return res.status(400).json({ message: "Video file and userId are required." });
         }
+        const reelUrl = `https://pitch-backend-avb7geahhvfteqf9.centralindia-01.azurewebsites.net/uploads/reels/${req.file.filename}`;
         query = `
-          UPDATE users 
-          SET name = @param1 
-          WHERE user_id = @param2;
-          SELECT user_id FROM users WHERE user_id = @param2;
-        `;
-        params = [data.realName.trim(), data.userId];
+            UPDATE users 
+            SET reel_url = @param1 
+            WHERE user_id = @param2;
+            SELECT user_id, username, email, reel_url 
+            FROM users 
+            WHERE user_id = @param2;
+          `;
+        params = [reelUrl, parsedData.userId];
         break;
-
       case 6: // New step for interests and completing registration
         if (!data.interests || !Array.isArray(data.interests) || data.interests.length < 3) {
           return res.status(400).json({ message: "At least 3 interests are required." });
@@ -452,7 +454,7 @@ const updateProfile = async (req, res) => {
     console.error("Update error:", err);
     return res.status(500).json({ message: "Internal server error", error: err.message });
   }
-};  
+};
 
 
 const fixProfilePictureURLs = async (req, res) => {
@@ -560,7 +562,7 @@ module.exports = {
   logout, // Added logout endpoint
   deleteAccount, // Updated deleteAccount endpoint
   validateUsername,
-  saveUserDetails,
+  saveUserDetails: [upload.single("reel"), saveUserDetails], // Add Multer middleware,
   getUserProfile,
   updateProfile,
   getUserProfileByUsername,
