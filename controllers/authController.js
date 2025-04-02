@@ -539,5 +539,5 @@ module.exports = {
   getUserProfileByUsername,
   getUserPostsByUsername,
   searchUsers,
-  checkTokenBlacklist // Middleware for token blacklist checking
+  checkTokenBlacklist 
 };
