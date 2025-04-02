@@ -38,6 +38,22 @@ const formatTimestamp = (timestamp) => {
   return postDate.toLocaleDateString();
 };
 
+// Utility function to normalize profile picture URL
+const normalizeProfilePictureUrl = (url) => {
+  if (!url || typeof url !== 'string') return null;
+  // Check if the URL contains the domain twice
+  const domain = 'https://pitch-backend-avb7geahhvfteqf9.centralindia-01.azurewebsites.net';
+  if (url.includes(`${domain}//uploads/http`)) {
+    // Extract the correct part after the first domain
+    const parts = url.split(`${domain}//uploads/`);
+    if (parts.length > 1) {
+      return `${domain}/uploads/${parts[1].replace(/^http:\/\/[^\/]+/, '')}`;
+    }
+  }
+  // Return original URL if no fix needed
+  return url;
+};
+
 const PostItem = memo(({ item, index, toggleExpand, expandedItems, navigation, isVisible, onDelete, currentUsername, onHeightCalculated }) => {
   const [imageHeight, setImageHeight] = useState(width); // Default height
   const [isLoading, setIsLoading] = useState(true);
@@ -51,6 +67,7 @@ const PostItem = memo(({ item, index, toggleExpand, expandedItems, navigation, i
   const [isVideo, setIsVideo] = useState(false);
   const [isLikeLoading, setIsLikeLoading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [profilePicError, setProfilePicError] = useState(false);
   const animatedScale = useRef(new Animated.Value(1)).current;
   const videoRef = useRef(null);
 
@@ -230,6 +247,8 @@ const PostItem = memo(({ item, index, toggleExpand, expandedItems, navigation, i
     Animated.spring(animatedScale, { toValue: 1, useNativeDriver: true }).start();
   };
 
+  const profilePictureUri = normalizeProfilePictureUrl(item.profile_picture);
+
   return (
     <Animated.View style={[styles.card, { transform: [{ scale: animatedScale }] }]}>
       <View style={styles.cardHeader}>
@@ -240,8 +259,17 @@ const PostItem = memo(({ item, index, toggleExpand, expandedItems, navigation, i
         >
           <View style={styles.userInfo}>
             <Image
-              source={item.profile_picture ? { uri: item.profile_picture } : require('../assets/profiledefault.jpg')}
+              source={
+                profilePictureUri && !profilePicError
+                  ? { uri: profilePictureUri }
+                  : require('../assets/profiledefault.jpg')
+              }
               style={styles.avatar}
+              onError={(e) => {
+                console.error('Profile picture load error:', e.nativeEvent.error);
+                setProfilePicError(true);
+              }}
+              onLoad={() => setProfilePicError(false)}
             />
             <Text style={styles.name}>{item.username || 'Unknown User'}</Text>
           </View>
