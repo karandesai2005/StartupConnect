@@ -560,7 +560,7 @@ module.exports = {
   logout, // Added logout endpoint
   deleteAccount, // Updated deleteAccount endpoint
   validateUsername,
-  saveUserDetails: [uploadAndConvertReelMedia, saveUserDetails], // Use the new middleware  updateProfile,
+  saveUserDetails,
   getUserProfileByUsername,
   getUserPostsByUsername,
   searchUsers,
