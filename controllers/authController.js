@@ -2,7 +2,7 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const { getUserByEmail, createUser } = require("../models/userModel");
 const { queryDB } = require("../config/db");
-const upload = require("../multerConfig"); // Adjust path to your Multer config
+const upload = require("../config/multerConfig"); // Adjust path to your Multer config
 // Register user
 const register = async (req, res) => {
   try {
