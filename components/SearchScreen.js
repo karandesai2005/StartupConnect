@@ -18,6 +18,19 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NGROK_URL } from '@env';
 import { debounce } from 'lodash';
 
+// Utility function to normalize profile picture URL
+const normalizeProfilePictureUrl = (url) => {
+  if (!url || typeof url !== 'string') return null;
+  const domain = 'https://pitch-backend-avb7geahhvfteqf9.centralindia-01.azurewebsites.net';
+  if (url.includes(`${domain}//uploads/http`)) {
+    const parts = url.split(`${domain}//uploads/`);
+    if (parts.length > 1) {
+      return `${domain}/uploads/${parts[1].replace(/^http:\/\/[^\/]+/, '')}`;
+    }
+  }
+  return url;
+};
+
 const SearchScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -59,22 +72,28 @@ const SearchScreen = () => {
     navigation.navigate('Profile', { username, isOtherUser: true });
   };
 
-  const renderSearchResult = ({ item }) => (
-    <TouchableOpacity
-      style={styles.searchResultItem}
-      onPress={() => handleUserPress(item.username)}
-    >
-      <Image
-        source={
-          item.profile_picture
-            ? { uri: item.profile_picture }
-            : require('../assets/profiledefault.jpg')
-        }
-        style={styles.searchAvatar}
-      />
-      <Text style={styles.searchUsername}>{item.username}</Text>
-    </TouchableOpacity>
-  );
+  const renderSearchResult = ({ item }) => {
+    const profilePictureUri = normalizeProfilePictureUrl(item.profile_picture);
+    return (
+      <TouchableOpacity
+        style={styles.searchResultItem}
+        onPress={() => handleUserPress(item.username)}
+      >
+        <Image
+          source={
+            profilePictureUri
+              ? { uri: profilePictureUri }
+              : require('../assets/profiledefault.jpg')
+          }
+          style={styles.searchAvatar}
+          onError={(e) => {
+            console.error(`Profile picture load error for ${item.username}:`, e.nativeEvent.error);
+          }}
+        />
+        <Text style={styles.searchUsername}>{item.username}</Text>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>

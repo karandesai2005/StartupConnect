@@ -2,14 +2,43 @@ import React from 'react';
 import { StyleSheet, View, Text, Image, TouchableOpacity, FlatList, Dimensions, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-
 const eventsData = [
-  { id: '1', title: 'IDEATHON', description: 'Join us for the latest in tech innovations and networking.', imageUrl: require('../assets/ideathon.webp') },
-  { id: '2', title: 'PITCH2025', description: 'Pitch your ideas to investors and win funding!', imageUrl: require('../assets/startup-pitch.webp') },
-  { id: '3', title: 'STARTMEUP', description: 'Code, collaborate, and compete for awesome prizes.', imageUrl: require('../assets/startmeup.jpeg') },
-  { id: '4', title: 'CO-FOUNDER STORY', description: 'Learn business skills from industry experts.', imageUrl: require('../assets/cofounderstory.png.png') },
-  { id: '5', title: 'BEST MVP', description: 'Explore the future of artificial intelligence.', imageUrl: require('../assets/MVP.jpeg') },
-  { id: '6', title: 'WANNA GET FUNDED', description: 'Connect with professionals in your industry.', imageUrl: require('../assets/wannagetfunded.webp') },
+  {
+    id: '1',
+    title: 'IDEATHON',
+    description: 'Unleash your creativity in a marathon of ideas, where bold thinkers collide to spark the next big thing. To join, click the "Participate" button, where you’ll get a screen to post an image, add tags, and upload.',
+    imageUrl: require('../assets/ideathon.webp')
+  },
+  {
+    id: '2',
+    title: 'PITCH2025',
+    description: 'Step into the future of pitching, where your vision meets opportunity in a high-stakes showdown. To join, click the "Participate" button, where you’ll get a screen to post an image, add tags, and upload.',
+    imageUrl: require('../assets/startup-pitch.webp')
+  },
+  {
+    id: '3',
+    title: 'STARTMEUP',
+    description: 'Ignite your journey with a burst of energy, collaboration, and the drive to kick things off right. To join, click the "Participate" button, where you’ll get a screen to post an image, add tags, and upload.',
+    imageUrl: require('../assets/startmeup.jpeg')
+  },
+  {
+    id: '4',
+    title: 'CO-FOUNDER STORY',
+    description: 'Hear the untold tales of partnership, grit, and triumph from those who built success side by side. To join, click the "Participate" button, where you’ll get a screen to post an image, add tags, and upload.',
+    imageUrl: require('../assets/cofounderstory.png.png')
+  },
+  {
+    id: '5',
+    title: 'BEST MVP',
+    description: 'Celebrate the champions of minimal brilliance, where lean ideas prove their maximum potential. To join, click the "Participate" button, where you’ll get a screen to post an image, add tags, and upload.',
+    imageUrl: require('../assets/MVP.jpeg')
+  },
+  {
+    id: '6',
+    title: 'WANNA GET FUNDED',
+    description: 'Say yes to your dreams and unlock the cash flow you’ve been chasing—opportunity knocks loud. To join, click the "Participate" button, where you’ll get a screen to post an image, add tags, and upload.',
+    imageUrl: require('../assets/wannagetfunded.webp')
+  },
 ];
 
 const EventItem = ({ event, onPress, isLast }) => {

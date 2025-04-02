@@ -700,7 +700,7 @@ export default function Home() {
  };
 
  const handleSearchFocus = () => {
- navigation.navigate('UserMetrics');
+ navigation.navigate('Search');
  };
 
  const handleProfilePress = () => {
