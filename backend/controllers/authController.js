@@ -2,7 +2,7 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const { getUserByEmail, createUser } = require("../models/userModel");
 const { queryDB } = require("../config/db");
-const upload = require("../multerConfig"); // Adjust path to your Multer config
+
 // Register user
 const register = async (req, res) => {
   try {
@@ -223,16 +223,23 @@ const saveUserDetails = async (req, res) => {
 
     switch (step) {
       case 1:
-        // Existing email step
         if (!data.email) {
           return res.status(400).json({ message: "Email is required." });
         }
+
         const normalizedEmail = data.email.toLowerCase();
-        const existingUsers = await queryDB('SELECT * FROM users WHERE email = @param1', [normalizedEmail]);
+
+        const existingUsers = await queryDB(
+          'SELECT * FROM users WHERE email = @param1',
+          [normalizedEmail]
+        );
+
         if (existingUsers.length > 0) {
           return res.status(400).json({ message: "Email already in use." });
         }
+
         const tempUsername = `user_${Date.now()}`;
+
         query = `
           INSERT INTO users (email, username, created_at)
           VALUES (@param1, @param2, GETDATE());
@@ -242,11 +249,16 @@ const saveUserDetails = async (req, res) => {
         break;
 
       case 2:
-        // Existing password step
-        if (!data.password || !data.userId) {
-          return res.status(400).json({ message: "Password and userId are required." });
+        if (!data.password) {
+          return res.status(400).json({ message: "Password is required." });
         }
+
+        if (!data.userId) {
+          return res.status(400).json({ message: "User ID is required." });
+        }
+
         const passwordHash = await bcrypt.hash(data.password, parseInt(process.env.SALT_ROUNDS, 10));
+
         query = `
           UPDATE users 
           SET password_hash = @param1 
@@ -257,10 +269,12 @@ const saveUserDetails = async (req, res) => {
         break;
 
       case 3:
-        // Existing username step
         if (!data.username || data.username.length < 3 || data.username.length > 20) {
-          return res.status(400).json({ message: "Username must be between 3 and 20 characters." });
+          return res.status(400).json({
+            message: "Username must be between 3 and 20 characters.",
+          });
         }
+
         query = `
           UPDATE users 
           SET username = @param1 
@@ -271,64 +285,36 @@ const saveUserDetails = async (req, res) => {
         break;
 
       case 4:
-        // Existing preference step
         if (data.preference !== "personal" && data.preference !== "business") {
           return res.status(400).json({ message: "Invalid preference." });
         }
+
         query = `
           UPDATE users 
           SET is_personal = @param1, is_business = @param2 
           WHERE user_id = @param3;
           SELECT user_id FROM users WHERE user_id = @param3;
         `;
-        params = [data.preference === "personal" ? 1 : 0, data.preference === "business" ? 1 : 0, data.userId];
+        params = [
+          data.preference === "personal" ? 1 : 0,
+          data.preference === "business" ? 1 : 0,
+          data.userId
+        ];
         break;
 
-        case 5:
-          if (!req.file || !parsedData.userId) {
-            return res.status(400).json({ message: "Video file and userId are required." });
-          }
-          const reelUrl = `https://pitch-backend-avb7geahhvfteqf9.centralindia-01.azurewebsites.net/uploads/reels/${req.file.filename}`;
-          query = `
-            UPDATE users 
-            SET reel_url = @param1 
-            WHERE user_id = @param2;
-            SELECT user_id, username, email, reel_url 
-            FROM users 
-            WHERE user_id = @param2;
-          `;
-          params = [reelUrl, parsedData.userId];
-          break;
-
-      case 6: // New step for interests and completing registration
-        if (!data.interests || !Array.isArray(data.interests) || data.interests.length < 3) {
-          return res.status(400).json({ message: "At least 3 interests are required." });
-        }
-        if (!data.userId) {
-          return res.status(400).json({ message: "User ID is required." });
+      case 5:
+        if (!data.realName || data.realName.trim() === "") {
+          return res.status(400).json({ message: "Real name is required." });
         }
 
-        // Save interests (assuming you have an interests table or column)
-        // For simplicity, let's assume a JSON column 'interests' in the users table
         query = `
           UPDATE users 
-          SET interests = @param1 
+          SET name = @param1 
           WHERE user_id = @param2;
-          SELECT user_id, email, username FROM users WHERE user_id = @param2;
+          SELECT user_id FROM users WHERE user_id = @param2;
         `;
-        params = [JSON.stringify(data.interests), data.userId];
-
-        const result = await queryDB(query, params);
-        const user = result[0];
-
-        // Generate JWT token
-        const token = jwt.sign({ userId: user.user_id }, process.env.JWT_SECRET, { expiresIn: "1h" });
-
-        return res.status(200).json({
-          message: "Registration completed successfully",
-          user: { user_id: user.user_id, email: user.email, username: user.username },
-          token,
-        });
+        params = [data.realName.trim(), data.userId];
+        break;
 
       default:
         return res.status(400).json({ message: "Invalid step." });
@@ -341,6 +327,7 @@ const saveUserDetails = async (req, res) => {
     res.status(500).json({ message: "Internal server error", error: err.message });
   }
 };
+
 // Validate username availability
 const validateUsername = async (req, res) => {
   try {
@@ -388,7 +375,7 @@ const getUserProfile = async (req, res) => {
     const userId = req.user.userId;
 
     const query = `
-      SELECT user_id, username, email, name, bio, profile_picture, is_personal, is_business, reel_url 
+      SELECT user_id, username, email, name, bio, profile_picture, is_personal, is_business 
       FROM users 
       WHERE user_id = @param1
     `;
@@ -425,8 +412,7 @@ const updateProfile = async (req, res) => {
     }
 
     if (profilePicture) {
-      // Always use HTTPS for the URL
-      const profilePicturePath = `https://pitch-backend-avb7geahhvfteqf9.centralindia-01.azurewebsites.net/uploads/profile_pictures/${profilePicture.filename}`;
+      const profilePicturePath = `${req.protocol}://${req.get("host")}/uploads/profile_pictures/${profilePicture.filename}`;
       updates.push("profile_picture = @param2");
       values.push(profilePicturePath);
     }
@@ -454,23 +440,8 @@ const updateProfile = async (req, res) => {
     console.error("Update error:", err);
     return res.status(500).json({ message: "Internal server error", error: err.message });
   }
-};  
-
-
-const fixProfilePictureURLs = async (req, res) => {
-  try {
-    const query = `
-      UPDATE users
-      SET profile_picture = REPLACE(profile_picture, 'http://pitch-backend-avb7geahhvfteqf9.centralindia-01.azurewebsites.net', 'https://pitch-backend-avb7geahhvfteqf9.centralindia-01.azurewebsites.net')
-      WHERE profile_picture LIKE 'http://pitch-backend-avb7geahhvfteqf9.centralindia-01.azurewebsites.net%';
-    `;
-    await queryDB(query, []);
-    res.status(200).json({ message: "Profile picture URLs updated to HTTPS" });
-  } catch (err) {
-    console.error("Error updating profile picture URLs:", err);
-    res.status(500).json({ message: "Internal server error", error: err.message });
-  }
 };
+
 // New endpoint: Get user profile by username
 const getUserProfileByUsername = async (req, res) => {
   try {
@@ -562,10 +533,11 @@ module.exports = {
   logout, // Added logout endpoint
   deleteAccount, // Updated deleteAccount endpoint
   validateUsername,
-  saveUserDetails: [uploadAndConvertReelMedia, saveUserDetails], // Use the new middleware  updateProfile,
+  saveUserDetails,
+  getUserProfile,
+  updateProfile,
   getUserProfileByUsername,
   getUserPostsByUsername,
   searchUsers,
-  checkTokenBlacklist, // Middleware for token blacklist checking
-  fixProfilePictureURLs
+  checkTokenBlacklist // Middleware for token blacklist checking
 };

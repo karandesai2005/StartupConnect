@@ -16,7 +16,7 @@ const SetupBusinessProfile = () => {
           return;
         }
         // Save company name to AsyncStorage or pass it along
-        navigation.navigate("UploadPitchVideo");
+        navigation.navigate("field");
       };
 
     return (

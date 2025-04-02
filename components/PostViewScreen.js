@@ -38,8 +38,8 @@ const formatTimestamp = (timestamp) => {
   return postDate.toLocaleDateString();
 };
 
-const PostItem = memo(({ item, index, toggleExpand, expandedItems, navigation, isVisible, onDelete, currentUsername }) => {
-  const [imageHeight, setImageHeight] = useState(width);
+const PostItem = memo(({ item, index, toggleExpand, expandedItems, navigation, isVisible, onDelete, currentUsername, onHeightCalculated }) => {
+  const [imageHeight, setImageHeight] = useState(width); // Default height
   const [isLoading, setIsLoading] = useState(true);
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(item.likes || 0);
@@ -63,27 +63,31 @@ const PostItem = memo(({ item, index, toggleExpand, expandedItems, navigation, i
     if (typeof mediaUrl === 'string') {
       if (mediaUrl.match(/\.(mp4|mov|avi|wmv|3gp|mkv)$/i)) {
         setIsVideo(true);
-        // Set video height to width * 5 / 4
         setImageHeight(width * 5 / 4);
         setIsLoading(false);
+        onHeightCalculated(index, width * 5 / 4 + 110); // Approx height: video + header/footer
       } else if (mediaUrl.startsWith('http')) {
         Image.getSize(
           mediaUrl,
           (imgWidth, imgHeight) => {
-            setImageHeight(width / (imgWidth / imgHeight));
+            const calculatedHeight = width / (imgWidth / imgHeight);
+            setImageHeight(calculatedHeight);
             setIsLoading(false);
+            onHeightCalculated(index, calculatedHeight + 110); // Approx height: image + header/footer
           },
           (error) => {
             console.log('Error getting image size:', error);
             setImageHeight(width);
             setIsLoading(false);
+            onHeightCalculated(index, width + 110); // Fallback height
           }
         );
       } else {
         setIsLoading(false);
+        onHeightCalculated(index, width + 110); // Default height
       }
     }
-  }, [item, index]);
+  }, [item, index, onHeightCalculated]);
 
   useEffect(() => {
     if (isVideo && videoRef.current) {
@@ -100,7 +104,6 @@ const PostItem = memo(({ item, index, toggleExpand, expandedItems, navigation, i
     };
   }, [isVisible, isVideo]);
 
-  // Pause video when screen loses focus (e.g., navigating to profile)
   useFocusEffect(
     useCallback(() => {
       return () => {
@@ -271,9 +274,9 @@ const PostItem = memo(({ item, index, toggleExpand, expandedItems, navigation, i
               onError={(e) => {
                 console.error('Video error:', e);
                 setIsLoading(false);
-                setIsVideo(false); // Fallback to image if video fails
+                setIsVideo(false);
               }}
-              useNativeControls={false} // No native controls, consistent with Home screen
+              useNativeControls={false}
             />
           ) : (
             <Image
@@ -426,6 +429,7 @@ PostItem.propTypes = {
   isVisible: PropTypes.bool.isRequired,
   onDelete: PropTypes.func.isRequired,
   currentUsername: PropTypes.string,
+  onHeightCalculated: PropTypes.func.isRequired,
 };
 
 const PostViewScreen = ({ route }) => {
@@ -437,8 +441,8 @@ const PostViewScreen = ({ route }) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [posts, setPosts] = useState(initialPosts);
   const [viewableItems, setViewableItems] = useState([]);
-  const [isInitialScrollDone, setIsInitialScrollDone] = useState(false);
   const [currentUsername, setCurrentUsername] = useState('');
+  const [postHeights, setPostHeights] = useState({}); // Store calculated heights
 
   useEffect(() => {
     const getCurrentUser = async () => {
@@ -481,93 +485,81 @@ const PostViewScreen = ({ route }) => {
     setIsRefreshing(true);
     setPosts(initialPosts);
     setCurrentIndex(initialIndex);
+    setPostHeights({}); // Reset heights
     setIsRefreshing(false);
-    setIsInitialScrollDone(false);
   }, [initialPosts, initialIndex]);
 
+  const onHeightCalculated = useCallback((index, height) => {
+    setPostHeights((prev) => {
+      const newHeights = { ...prev, [index]: height };
+      if (Object.keys(newHeights).length >= posts.length && flatListRef.current) {
+        scrollToSelectedPost(newHeights);
+      }
+      return newHeights;
+    });
+  }, [posts.length, initialIndex]);
+
+  const scrollToSelectedPost = (heights) => {
+    const headerHeight = styles.header.height + (Platform.OS === 'ios' ? 44 : 0); // Header + status bar
+    const offset = Object.keys(heights)
+      .filter((idx) => parseInt(idx) < initialIndex)
+      .reduce((sum, idx) => sum + heights[idx], 0);
+    flatListRef.current.scrollToOffset({
+      offset: offset - headerHeight,
+      animated: false,
+    });
+  };
+
   useEffect(() => {
-    console.log('Initial posts:', initialPosts.length);
-    console.log('Sample post data:', JSON.stringify(initialPosts[0]));
-
-    if (posts.length > 0 && initialIndex >= 0) {
-      const timer = setTimeout(() => {
-        if (flatListRef.current) {
-          flatListRef.current.scrollToIndex({
-            index: initialIndex,
-            animated: false,
-            viewPosition: 0.5, // Scroll to center of screen
-          });
-          setIsInitialScrollDone(true);
-        }
-      }, 500);
-
-      return () => clearTimeout(timer); // Clean up timer
+    if (posts.length > 0 && initialIndex >= 0 && flatListRef.current) {
+      // Initial scroll with estimated height if heights aren't calculated yet
+      const estimatedHeight = width * 1.5;
+      const headerHeight = styles.header.height + (Platform.OS === 'ios' ? 44 : 0);
+      const initialOffset = initialIndex * estimatedHeight - headerHeight;
+      flatListRef.current.scrollToOffset({
+        offset: initialOffset > 0 ? initialOffset : 0,
+        animated: false,
+      });
     }
   }, [posts, initialIndex]);
 
-  const onViewableItemsChanged = useCallback(
-    ({ viewableItems }) => {
-      if (viewableItems.length > 0 && isInitialScrollDone) {
-        const topItem = viewableItems[0];
-        setCurrentIndex(topItem.index);
-        setViewableItems(viewableItems.map((item) => item.index));
-      }
-    },
-    [isInitialScrollDone]
-  );
+  const onViewableItemsChanged = useCallback(({ viewableItems }) => {
+    if (viewableItems.length > 0) {
+      const topItem = viewableItems[0];
+      setCurrentIndex(topItem.index);
+      setViewableItems(viewableItems.map((item) => item.index));
+    }
+  }, []);
 
   const viewabilityConfig = {
     itemVisiblePercentThreshold: 50,
   };
 
-  const getItemLayout = (data, index) => ({
-    length: width * 1.5,
-    offset: (width * 1.5) * index,
-    index,
-  });
+  const getItemLayout = useCallback((data, index) => {
+    const baseHeight = postHeights[index] || width * 1.5; // Use calculated height or fallback
+    return {
+      length: baseHeight,
+      offset: Object.keys(postHeights)
+        .filter((idx) => parseInt(idx) < index)
+        .reduce((sum, idx) => sum + (postHeights[idx] || width * 1.5), 0),
+      index,
+    };
+  }, [postHeights, width]);
 
-  const onScrollToIndexFailed = useCallback(
-    (info) => {
-      const retryScroll = (attempt = 1) => {
-        if (attempt > 3) {
-          const estimatedOffset = info.index * (width * 1.5);
-          if (flatListRef.current) {
-            flatListRef.current.scrollToOffset({
-              offset: estimatedOffset,
-              animated: false,
-            });
-          }
-          setIsInitialScrollDone(true);
-          return;
-        }
-
-        setTimeout(() => {
-          if (flatListRef.current && posts.length > info.index) {
-            flatListRef.current.scrollToIndex({
-              index: info.index,
-              animated: false,
-              viewPosition: 0.5,
-            });
-          }
-        }, 300 * attempt);
-      };
-      retryScroll();
-    },
-    [posts.length]
+  const renderHeader = () => (
+    <View style={styles.header}>
+      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+        <Text style={styles.backButtonText}>←</Text>
+      </TouchableOpacity>
+      <Text style={styles.headerText}>
+        {posts.length > 0 ? `${Math.min(currentIndex + 1, posts.length)} of ${posts.length}` : 'No posts'}
+      </Text>
+      <View style={styles.backButton} />
+    </View>
   );
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Text style={styles.backButtonText}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerText}>
-          {posts.length > 0 ? `${Math.min(currentIndex + 1, posts.length)} of ${posts.length}` : 'No posts'}
-        </Text>
-        <View style={styles.backButton} />
-      </View>
-
       {posts.length > 0 ? (
         <FlatList
           ref={flatListRef}
@@ -582,22 +574,25 @@ const PostViewScreen = ({ route }) => {
               isVisible={viewableItems.includes(index)}
               onDelete={handleDelete}
               currentUsername={currentUsername}
+              onHeightCalculated={onHeightCalculated}
             />
           )}
-          keyExtractor={(item) => (item.post_id || item._id || item.id || index).toString()}
+          keyExtractor={(item) => (item.post_id || item._id || item.id).toString()}
+          ListHeaderComponent={renderHeader}
           showsVerticalScrollIndicator={false}
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
           refreshing={isRefreshing}
           onRefresh={handleRefresh}
           getItemLayout={getItemLayout}
-          onScrollToIndexFailed={onScrollToIndexFailed}
-          initialNumToRender={4}
-          maxToRenderPerBatch={4}
-          initialScrollIndex={initialIndex}
+          initialNumToRender={5}
+          maxToRenderPerBatch={5}
         />
       ) : (
-        <Text style={{ textAlign: 'center', padding: 20 }}>No posts available</Text>
+        <>
+          {renderHeader()}
+          <Text style={{ textAlign: 'center', padding: 20 }}>No posts available</Text>
+        </>
       )}
     </SafeAreaView>
   );
@@ -626,6 +621,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#E9ECEF',
+    height: 64, // Fixed height for consistent offset
   },
   headerText: {
     fontSize: 16,
@@ -681,7 +677,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8F9FA',
     justifyContent: 'center',
     alignItems: 'center',
-    overflow: 'hidden', // Match Home screen
+    overflow: 'hidden',
   },
   imageLoader: {
     position: 'absolute',
@@ -725,7 +721,7 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     marginBottom: Platform.OS === 'ios' ? 3 : 0,
-    tintColor: '#000000', // Default black for all icons
+    tintColor: '#000000',
   },
   captionContainer: {
     paddingHorizontal: 12,

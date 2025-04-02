@@ -18,8 +18,11 @@
       "infoPlist": {
         "UIBackgroundModes": [
           "remote-notification",
+          "remote-notification",
+          "remote-notification",
           "remote-notification"
-        ]
+        ],
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
