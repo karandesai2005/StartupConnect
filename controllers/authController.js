@@ -557,13 +557,15 @@ const searchUsers = async (req, res) => {
 module.exports = {
   register,
   login,
-  logout, // Added logout endpoint
-  deleteAccount, // Updated deleteAccount endpoint
+  logout,
+  deleteAccount,
   validateUsername,
   saveUserDetails,
+  getUserProfile,          // Add this
+  updateProfile,          // Add this
   getUserProfileByUsername,
   getUserPostsByUsername,
   searchUsers,
-  checkTokenBlacklist, // Middleware for token blacklist checking
+  checkTokenBlacklist,
   fixProfilePictureURLs
 };
