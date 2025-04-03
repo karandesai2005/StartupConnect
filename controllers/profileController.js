@@ -63,29 +63,47 @@ const profileController = {
       const followerId = getUserId(req);
       if (!followerId) return res.status(401).json({ error: 'User authentication required' });
 
-      const { username } = req.body;
+      const { username } = req.params; // Changed to req.params to match route
       validateString(username, 'Username', 3, 20);
 
       const followee = await User.getUserByUsername(username);
       if (!followee) return res.status(404).json({ error: 'User not found' });
       if (followerId === followee.user_id) {
-        return res.status(400).json({ error: 'Cannot follow/unfollow yourself' });
+        return res.status(400).json({ error: 'Cannot follow yourself' });
       }
 
       const isFollowing = await User.isFollowing(followerId, followee.user_id);
-      if (req.method === 'POST') {
-        if (isFollowing) return res.status(400).json({ error: 'Already following this user' });
-        await User.followUser(followerId, followee.user_id);
-        res.status(200).json({ message: 'Successfully followed user' });
-      } else if (req.method === 'DELETE') {
-        if (!isFollowing) return res.status(400).json({ error: 'Not following this user' });
-        await User.unfollowUser(followerId, followee.user_id);
-        res.status(200).json({ message: 'Successfully unfollowed user' });
-      } else {
-        return res.status(405).json({ error: 'Method not allowed' });
-      }
+      if (isFollowing) return res.status(400).json({ error: 'Already following this user' });
+
+      await User.followUser(followerId, followee.user_id);
+      res.status(200).json({ message: 'Successfully followed user' });
     } catch (error) {
       console.error('Follow user error:', error);
+      res.status(error.message.includes('Username') ? 400 : 500).json({ error: error.message });
+    }
+  },
+
+  unfollowUser: async (req, res) => {
+    try {
+      const followerId = getUserId(req);
+      if (!followerId) return res.status(401).json({ error: 'User authentication required' });
+
+      const { username } = req.params; // Changed to req.params to match route
+      validateString(username, 'Username', 3, 20);
+
+      const followee = await User.getUserByUsername(username);
+      if (!followee) return res.status(404).json({ error: 'User not found' });
+      if (followerId === followee.user_id) {
+        return res.status(400).json({ error: 'Cannot unfollow yourself' });
+      }
+
+      const isFollowing = await User.isFollowing(followerId, followee.user_id);
+      if (!isFollowing) return res.status(400).json({ error: 'Not following this user' });
+
+      await User.unfollowUser(followerId, followee.user_id);
+      res.status(200).json({ message: 'Successfully unfollowed user' });
+    } catch (error) {
+      console.error('Unfollow user error:', error);
       res.status(error.message.includes('Username') ? 400 : 500).json({ error: error.message });
     }
   },
