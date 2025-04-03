@@ -1,4 +1,3 @@
-// authRoutes.js
 const express = require('express');
 const router = express.Router();
 const {
@@ -15,7 +14,7 @@ const {
   searchUsers
 } = require('../controllers/authController');
 const {
-  validateUsernameInputcipher,
+  validateUsernameInput, // Corrected from validateUsernameInputcipher
   validateSaveUserDetailsInput
 } = require('../middleware/validator');
 const authenticateJWT = require('../middleware/authenticateJWT');
