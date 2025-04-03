@@ -3,30 +3,40 @@ const router = express.Router();
 const profileController = require('../controllers/profileController');
 const authMiddleware = require('../middleware/authenticateJWT');
 
-// Get authenticated user's profile
-router.get('/', authMiddleware, profileController.getProfile);
+// Profile Routes
+router.route('/')
+  .get(authMiddleware, profileController.getProfile);
 
-// Get another user's profile by username
-router.get('/user/:username', authMiddleware, profileController.getUserProfile);
+router.route('/user/:username')
+  .get(authMiddleware, profileController.getUserProfile);
 
-// Stories
-router.get('/stories', authMiddleware, profileController.getStories);
-router.post('/stories', authMiddleware, profileController.addStory);
-router.delete('/stories/:storyId', authMiddleware, profileController.deleteStory); // New DELETE route
+// Story Routes
+router.route('/stories')
+  .get(authMiddleware, profileController.getStories)
+  .post(authMiddleware, profileController.addStory);
 
-// Sections
-router.get('/sections', authMiddleware, profileController.getSections);
-router.post('/sections', authMiddleware, profileController.addSection);
-router.delete('/sections/:sectionId', authMiddleware, profileController.deleteSection); // New DELETE route
+router.route('/stories/:storyId')
+  .delete(authMiddleware, profileController.deleteStory);
 
-// Graphs
-router.get('/graphs', authMiddleware, profileController.getGraphs);
-router.post('/graphs', authMiddleware, profileController.addGraph);
-router.delete('/graphs/:graphId', authMiddleware, profileController.deleteGraph); // New DELETE route
+// Section Routes
+router.route('/sections')
+  .get(authMiddleware, profileController.getSections)
+  .post(authMiddleware, profileController.addSection);
 
-// Follow/Unfollow
-router.route('/follow')
-  .post(authMiddleware, profileController.followUser)    // POST to follow
-  .delete(authMiddleware, profileController.followUser); // DELETE to unfollow
+router.route('/sections/:sectionId')
+  .delete(authMiddleware, profileController.deleteSection);
+
+// Graph Routes
+router.route('/graphs')
+  .get(authMiddleware, profileController.getGraphs)
+  .post(authMiddleware, profileController.addGraph);
+
+router.route('/graphs/:graphId')
+  .delete(authMiddleware, profileController.deleteGraph);
+
+// Follow Routes
+router.route('/follow/:username')  // Added :username parameter for clarity
+  .post(authMiddleware, profileController.followUser)
+  .delete(authMiddleware, profileController.unfollowUser);  // Changed to unfollowUser for clarity
 
 module.exports = router;

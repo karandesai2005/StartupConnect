@@ -1,173 +1,150 @@
 const sql = require('mssql');
 const { connectDB } = require('../config/db');
 
+// SQL query templates
+const QUERIES = {
+  GET_BY_EMAIL: 'SELECT * FROM dbo.users WHERE email = @email',
+  GET_USER_DETAILS: `
+    SELECT u.*, 
+           (SELECT COUNT(*) FROM dbo.followers WHERE followee_id = u.user_id) AS followers,
+           (SELECT COUNT(*) FROM dbo.followers WHERE follower_id = u.user_id) AS following
+    FROM dbo.users u
+    WHERE `,
+  CREATE_USER: `
+    INSERT INTO dbo.users (username, email, password_hash, is_founder, is_investor)
+    VALUES (@username, @email, @passwordHash, @isFounder, @isInvestor);
+    SELECT SCOPE_IDENTITY() AS user_id`,
+  FOLLOW: `
+    INSERT INTO dbo.followers (follower_id, followee_id, followed_at)
+    VALUES (@followerId, @followeeId, GETDATE())`,
+  UNFOLLOW: `
+    DELETE FROM dbo.followers
+    WHERE follower_id = @followerId AND followee_id = @followeeId`,
+  IS_FOLLOWING: `
+    SELECT COUNT(*) AS count
+    FROM dbo.followers
+    WHERE follower_id = @followerId AND followee_id = @followeeId`,
+  GET_FOLLOWERS: `
+    SELECT u.user_id, u.username, u.profile_picture
+    FROM dbo.users u
+    JOIN dbo.followers f ON u.user_id = f.follower_id
+    WHERE f.followee_id = @userId`,
+  GET_FOLLOWING: `
+    SELECT u.user_id, u.username, u.profile_picture
+    FROM dbo.users u
+    JOIN dbo.followers f ON u.user_id = f.followee_id
+    WHERE f.follower_id = @userId`
+};
+
+// Utility function to execute queries
+async function executeQuery(query, inputs = {}) {
+  const pool = await connectDB();
+  const request = pool.request();
+  
+  for (const [name, { type, value }] of Object.entries(inputs)) {
+    request.input(name, type, value);
+  }
+  
+  const result = await request.query(query);
+  return result;
+}
+
+// Error handling wrapper
+async function withErrorHandling(fn, operationName) {
+  try {
+    return await fn();
+  } catch (error) {
+    console.error(`Error in ${operationName}:`, error.message);
+    throw error;
+  }
+}
+
 const User = {
   async getUserByEmail(email) {
-    try {
-      const pool = await connectDB();
-      const request = pool.request();
-      const result = await request
-        .input('email', sql.VarChar, email)
-        .query('SELECT * FROM dbo.users WHERE email = @email');
+    return withErrorHandling(async () => {
+      const result = await executeQuery(QUERIES.GET_BY_EMAIL, {
+        email: { type: sql.VarChar, value: email }
+      });
       return result.recordset[0];
-    } catch (error) {
-      console.error('Error in getUserByEmail:', error.message);
-      throw error;
-    }
+    }, 'getUserByEmail');
   },
 
   async getUserByUsername(username) {
-    try {
-      const pool = await connectDB();
-      const request = pool.request();
-      const result = await request
-        .input('username', sql.VarChar, username)
-        .query(`
-          SELECT u.*, 
-                 (SELECT COUNT(*) FROM dbo.followers WHERE followee_id = u.user_id) AS followers,
-                 (SELECT COUNT(*) FROM dbo.followers WHERE follower_id = u.user_id) AS following
-          FROM dbo.users u
-          WHERE u.username = @username
-        `);
+    return withErrorHandling(async () => {
+      const result = await executeQuery(`${QUERIES.GET_USER_DETAILS} u.username = @username`, {
+        username: { type: sql.VarChar, value: username }
+      });
       return result.recordset[0];
-    } catch (error) {
-      console.error('Error in getUserByUsername:', error.message);
-      throw error;
-    }
+    }, 'getUserByUsername');
   },
 
   async getUserById(userId) {
-    try {
-      const pool = await connectDB();
-      const request = pool.request();
-      const result = await request
-        .input('userId', sql.Int, userId)
-        .query(`
-          SELECT u.*, 
-                 (SELECT COUNT(*) FROM dbo.followers WHERE followee_id = u.user_id) AS followers,
-                 (SELECT COUNT(*) FROM dbo.followers WHERE follower_id = u.user_id) AS following
-          FROM dbo.users u
-          WHERE u.user_id = @userId
-        `);
+    return withErrorHandling(async () => {
+      const result = await executeQuery(`${QUERIES.GET_USER_DETAILS} u.user_id = @userId`, {
+        userId: { type: sql.Int, value: userId }
+      });
       return result.recordset[0];
-    } catch (error) {
-      console.error('Error in getUserById:', error.message);
-      throw error;
-    }
+    }, 'getUserById');
   },
 
   async createUser(username, email, passwordHash, isFounder, isInvestor) {
-    try {
-      const pool = await connectDB();
-      const request = pool.request();
-      const result = await request
-        .input('username', sql.VarChar, username)
-        .input('email', sql.VarChar, email)
-        .input('passwordHash', sql.VarChar, passwordHash)
-        .input('isFounder', sql.Bit, isFounder)
-        .input('isInvestor', sql.Bit, isInvestor)
-        .query(`
-          INSERT INTO dbo.users (username, email, password_hash, is_founder, is_investor)
-          VALUES (@username, @email, @passwordHash, @isFounder, @isInvestor);
-          SELECT SCOPE_IDENTITY() AS user_id
-        `);
+    return withErrorHandling(async () => {
+      const result = await executeQuery(QUERIES.CREATE_USER, {
+        username: { type: sql.VarChar, value: username },
+        email: { type: sql.VarChar, value: email },
+        passwordHash: { type: sql.VarChar, value: passwordHash },
+        isFounder: { type: sql.Bit, value: isFounder },
+        isInvestor: { type: sql.Bit, value: isInvestor }
+      });
       const newUserId = result.recordset[0].user_id;
-      return await this.getUserById(newUserId); // Return full user object
-    } catch (error) {
-      console.error('Error in createUser:', error.message);
-      throw error;
-    }
+      return this.getUserById(newUserId);
+    }, 'createUser');
   },
 
   async followUser(followerId, followeeId) {
-    try {
-      const pool = await connectDB();
-      const request = pool.request();
-      await request
-        .input('followerId', sql.Int, followerId)
-        .input('followeeId', sql.Int, followeeId)
-        .query(`
-          INSERT INTO dbo.followers (follower_id, followee_id, followed_at)
-          VALUES (@followerId, @followeeId, GETDATE())
-        `);
-    } catch (error) {
-      console.error('Error in followUser:', error.message);
-      throw error;
-    }
+    return withErrorHandling(async () => {
+      await executeQuery(QUERIES.FOLLOW, {
+        followerId: { type: sql.Int, value: followerId },
+        followeeId: { type: sql.Int, value: followeeId }
+      });
+    }, 'followUser');
   },
 
   async unfollowUser(followerId, followeeId) {
-    try {
-      const pool = await connectDB();
-      const request = pool.request();
-      await request
-        .input('followerId', sql.Int, followerId)
-        .input('followeeId', sql.Int, followeeId)
-        .query(`
-          DELETE FROM dbo.followers
-          WHERE follower_id = @followerId AND followee_id = @followeeId
-        `);
-    } catch (error) {
-      console.error('Error in unfollowUser:', error.message);
-      throw error;
-    }
+    return withErrorHandling(async () => {
+      await executeQuery(QUERIES.UNFOLLOW, {
+        followerId: { type: sql.Int, value: followerId },
+        followeeId: { type: sql.Int, value: followeeId }
+      });
+    }, 'unfollowUser');
   },
 
   async isFollowing(followerId, followeeId) {
-    try {
-      const pool = await connectDB();
-      const request = pool.request();
-      const result = await request
-        .input('followerId', sql.Int, followerId)
-        .input('followeeId', sql.Int, followeeId)
-        .query(`
-          SELECT COUNT(*) AS count
-          FROM dbo.followers
-          WHERE follower_id = @followerId AND followee_id = @followeeId
-        `);
+    return withErrorHandling(async () => {
+      const result = await executeQuery(QUERIES.IS_FOLLOWING, {
+        followerId: { type: sql.Int, value: followerId },
+        followeeId: { type: sql.Int, value: followeeId }
+      });
       return result.recordset[0].count > 0;
-    } catch (error) {
-      console.error('Error in isFollowing:', error.message);
-      throw error;
-    }
+    }, 'isFollowing');
   },
 
   async getFollowers(userId) {
-    try {
-      const pool = await connectDB();
-      const request = pool.request();
-      const result = await request
-        .input('userId', sql.Int, userId)
-        .query(`
-          SELECT u.user_id, u.username, u.profile_picture
-          FROM dbo.users u
-          JOIN dbo.followers f ON u.user_id = f.follower_id
-          WHERE f.followee_id = @userId
-        `);
+    return withErrorHandling(async () => {
+      const result = await executeQuery(QUERIES.GET_FOLLOWERS, {
+        userId: { type: sql.Int, value: userId }
+      });
       return result.recordset;
-    } catch (error) {
-      console.error('Error in getFollowers:', error.message);
-      throw error;
-    }
+    }, 'getFollowers');
   },
 
   async getFollowing(userId) {
-    try {
-      const pool = await connectDB();
-      const request = pool.request();
-      const result = await request
-        .input('userId', sql.Int, userId)
-        .query(`
-          SELECT u.user_id, u.username, u.profile_picture
-          FROM dbo.users u
-          JOIN dbo.followers f ON u.user_id = f.followee_id
-          WHERE f.follower_id = @userId
-        `);
+    return withErrorHandling(async () => {
+      const result = await executeQuery(QUERIES.GET_FOLLOWING, {
+        userId: { type: sql.Int, value: userId }
+      });
       return result.recordset;
-    } catch (error) {
-      console.error('Error in getFollowing:', error.message);
-      throw error;
-    }
+    }, 'getFollowing');
   },
 };
 

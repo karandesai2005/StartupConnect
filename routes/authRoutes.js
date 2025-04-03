@@ -1,4 +1,6 @@
-const express = require("express");
+// authRoutes.js
+const express = require('express');
+const router = express.Router();
 const {
   register,
   login,
@@ -11,31 +13,49 @@ const {
   getUserProfileByUsername,
   getUserPostsByUsername,
   searchUsers
-} = require("../controllers/authController");
-
+} = require('../controllers/authController');
 const {
-  validateUsernameInput,
+  validateUsernameInputcipher,
   validateSaveUserDetailsInput
-} = require("../middleware/validator");
+} = require('../middleware/validator');
+const authenticateJWT = require('../middleware/authenticateJWT');
+const { uploadProfilePicture } = require('../config/multerConfig');
 
-const authenticateJWT = require("../middleware/authenticateJWT");
-const { uploadProfilePicture } = require("../config/multerConfig");
+// Authentication Routes
+router.route('/register')
+  .post(validateSaveUserDetailsInput, register);
 
-const router = express.Router();
+router.route('/login')
+  .post(login);
 
-// Public routes
-router.post("/register", validateSaveUserDetailsInput, register);
-router.post("/login", login);
-router.post("/validate-username", validateUsernameInput, validateUsername);
-router.post("/save-user-details", validateSaveUserDetailsInput, saveUserDetails);
+router.route('/logout')
+  .post(authenticateJWT, logout);
 
-// Protected routes
-router.post("/logout", authenticateJWT, logout);
-router.delete("/delete-account", authenticateJWT, deleteAccount);
-router.get("/profile", authenticateJWT, getUserProfile);
-router.put("/update-profile", authenticateJWT, uploadProfilePicture.single('profile_picture'), updateProfile);
-router.get("/users/:username", authenticateJWT, getUserProfileByUsername);
-router.get("/posts/user/:username", authenticateJWT, getUserPostsByUsername);
-router.get("/search-users", authenticateJWT, searchUsers);
+// User Management Routes
+router.route('/validate-username')
+  .post(validateUsernameInput, validateUsername);
+
+router.route('/save-user-details')
+  .post(validateSaveUserDetailsInput, saveUserDetails);
+
+router.route('/delete-account')
+  .delete(authenticateJWT, deleteAccount);
+
+// Profile Routes
+router.route('/profile')
+  .get(authenticateJWT, getUserProfile);
+
+router.route('/update-profile')
+  .put(authenticateJWT, uploadProfilePicture.single('profile_picture'), updateProfile);
+
+router.route('/users/:username')
+  .get(authenticateJWT, getUserProfileByUsername);
+
+// User Content Routes
+router.route('/posts/user/:username')
+  .get(authenticateJWT, getUserPostsByUsername);
+
+router.route('/search-users')
+  .get(authenticateJWT, searchUsers);
 
 module.exports = router;

@@ -1,221 +1,151 @@
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs');
+const fs = require('fs').promises; // Use promises for cleaner async code
 const ffmpeg = require('fluent-ffmpeg');
+const { promisify } = require('util');
 
-// 🔥 Critical Fix: Set FFmpeg path explicitly
+// Load environment variables (e.g., with dotenv in your app)
+const { env } = process;
+const FFMPEG_PATH = env.FFMPEG_PATH || '/usr/bin/ffmpeg';
+const FFPROBE_PATH = env.FFPROBE_PATH || '/usr/bin/ffprobe';
+const UPLOAD_BASE_DIR = env.UPLOAD_BASE_DIR || path.join(__dirname, '../uploads');
+
+// FFmpeg setup with verification
 try {
-  ffmpeg.setFfmpegPath('/usr/bin/ffmpeg');
-  ffmpeg.setFfprobePath('/usr/bin/ffprobe');
-  
-  // Verify FFmpeg installation
-  ffmpeg.getAvailableFormats((err, formats) => {
-    if (err) {
+  ffmpeg.setFfmpegPath(FFMPEG_PATH);
+  ffmpeg.setFfprobePath(FFPROBE_PATH);
+  promisify(ffmpeg.getAvailableFormats)()
+    .then(() => console.log('✅ FFmpeg initialized'))
+    .catch(err => {
       console.error('❌ FFmpeg verification failed:', err);
       process.exit(1);
-    }
-    console.log('✅ FFmpeg successfully initialized');
-  });
+    });
 } catch (error) {
-  console.error('❌ FFmpeg initialization failed:', error);
+  console.error('❌ FFmpeg setup failed:', error);
   process.exit(1);
 }
 
-// Ensure upload directories exist
-const profileUploadDir = path.join(__dirname, '../uploads/profile_pictures');
-const postUploadDir = path.join(__dirname, '../uploads/posts');
-fs.mkdirSync(profileUploadDir, { recursive: true });
-fs.mkdirSync(postUploadDir, { recursive: true });
+// Ensure upload directories exist (async for non-blocking startup)
+const profileUploadDir = path.join(UPLOAD_BASE_DIR, 'profile_pictures');
+const postUploadDir = path.join(UPLOAD_BASE_DIR, 'posts');
+(async () => {
+  await Promise.all([
+    fs.mkdir(profileUploadDir, { recursive: true }),
+    fs.mkdir(postUploadDir, { recursive: true }),
+  ]);
+})().catch(err => console.error('❌ Directory creation failed:', err));
 
-// ✅ Keep original extensions for accurate format detection
-const generateFilename = (prefix, file) => {
-  const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-  return `${prefix}-${uniqueSuffix}${path.extname(file.originalname)}`;
-};
+// Filename generator
+const generateFilename = (prefix, file) =>
+  `${prefix}-${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(file.originalname)}`;
 
-// Multer storage for profile pictures
+// Multer storage configs
 const profileStorage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, profileUploadDir),
-  filename: (req, file, cb) => cb(null, generateFilename('profile', file))
+  destination: (_, __, cb) => cb(null, profileUploadDir),
+  filename: (_, file, cb) => cb(null, generateFilename('profile', file)),
 });
 
-// Multer storage for post uploads
 const postStorage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, postUploadDir),
-  filename: (req, file, cb) => cb(null, generateFilename('post', file))
+  destination: (_, __, cb) => cb(null, postUploadDir),
+  filename: (_, file, cb) => cb(null, generateFilename('post', file)),
 });
 
-// Allowed file types
-const imageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-const videoTypes = ['video/mp4', 'video/quicktime', 'video/mov', 'video/avi', 'video/mkv'];
+// File type filters
+const imageTypes = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
+const videoTypes = new Set(['video/mp4', 'video/quicktime', 'video/mov', 'video/avi', 'video/mkv']);
 
-// File filter for profile pictures
-const profileFileFilter = (req, file, cb) => {
-  if (imageTypes.includes(file.mimetype)) {
-    cb(null, true);
-  } else {
-    cb(new Error('❌ Invalid file type! Only JPEG, PNG, GIF, and WEBP images are allowed for profile pictures.'), false);
-  }
-};
+const profileFileFilter = (_, file, cb) =>
+  imageTypes.has(file.mimetype)
+    ? cb(null, true)
+    : cb(new Error('Only JPEG, PNG, GIF, and WEBP allowed for profile pictures'), false);
 
-// File filter for post uploads
-const postFileFilter = (req, file, cb) => {
-  if ([...imageTypes, ...videoTypes].includes(file.mimetype)) {
-    cb(null, true);
-  } else {
-    cb(new Error('❌ Invalid file type! Only JPEG, PNG, GIF, WEBP images and MP4, MOV, AVI, MKV videos are allowed for posts.'), false);
-  }
-};
+const postFileFilter = (_, file, cb) =>
+  imageTypes.has(file.mimetype) || videoTypes.has(file.mimetype)
+    ? cb(null, true)
+    : cb(new Error('Only images (JPEG, PNG, GIF, WEBP) and videos (MP4, MOV, AVI, MKV) allowed for posts'), false);
 
 // File size limits
-const profileUploadLimits = { fileSize: 2 * 1024 * 1024 }; // 2MB max
-const postUploadLimits = { fileSize: 100 * 1024 * 1024 }; // 100MB max
-
-// Validate uploaded file
-const validateUploadedFile = (filePath) => {
-  try {
-    const stats = fs.statSync(filePath);
-    if (stats.size === 0) throw new Error('Empty file uploaded');
-    if (!fs.existsSync(filePath)) throw new Error('File missing');
-    return true;
-  } catch (err) {
-    throw new Error(`Invalid file: ${err.message}`);
-  }
+const limits = {
+  profile: { fileSize: parseInt(env.PROFILE_SIZE_LIMIT) || 2 * 1024 * 1024 }, // 2MB default
+  post: { fileSize: parseInt(env.POST_SIZE_LIMIT) || 100 * 1024 * 1024 },   // 100MB default
 };
 
-// Enhanced video conversion function with smart codec selection
-const convertToCompatibleFormat = (filePath, originalMimetype) => {
+// Validate file (async)
+const validateUploadedFile = async filePath => {
+  const stats = await fs.stat(filePath);
+  if (stats.size === 0) throw new Error('Empty file uploaded');
+  return true;
+};
+
+// Optimized video conversion
+const convertToCompatibleFormat = async (filePath, originalMimetype) => {
+  const outputPath = `${path.parse(filePath).dir}/${path.parse(filePath).name}-converted.mp4`;
+  const needsReencode = originalMimetype === 'video/quicktime';
+
   return new Promise((resolve, reject) => {
-    const outputPath = path.join(
-      path.dirname(filePath),
-      `${path.parse(filePath).name}-converted.mp4`
-    );
-
-    // Determine if we need to re-encode or can use stream copy
-    const needsReencode = originalMimetype === 'video/quicktime';
-    
-    const command = ffmpeg(filePath);
-    
-    if (needsReencode) {
-      // Full re-encode for MOV/QuickTime files
-      command.outputOptions([
-        '-c:v libx264',         // Video codec
-        '-preset fast',         // Encoding speed preset
-        '-crf 23',             // Quality
-        '-c:a aac',            // Audio codec
-        '-b:a 128k',           // Audio bitrate
-        '-movflags +faststart', // Web optimization
-        '-pix_fmt yuv420p',    // Compatible pixel format
-        '-vf scale=trunc(iw/2)*2:trunc(ih/2)*2' // Ensure even dimensions
-      ]);
-    } else {
-      // Stream copy for already compatible formats
-      command.outputOptions([
-        '-c:v copy',
-        '-c:a copy',
-        '-movflags +faststart'
-      ]);
-    }
-
-    command
+    const command = ffmpeg(filePath)
+      .outputOptions(needsReencode ? [
+        '-c:v libx264', '-preset fast', '-crf 23',
+        '-c:a aac', '-b:a 128k', '-movflags +faststart',
+        '-pix_fmt yuv420p', '-vf scale=trunc(iw/2)*2:trunc(ih/2)*2',
+      ] : ['-c:v copy', '-c:a copy', '-movflags +faststart'])
       .toFormat('mp4')
       .save(outputPath)
-      .on('progress', (progress) => {
-        console.log(`Processing: ${progress.percent}% done`);
-      })
-      .on('end', () => {
-        // Delete original file after successful conversion
-        fs.unlink(filePath, (err) => {
-          if (err) console.error('Error deleting original file:', err);
-        });
+      .on('end', async () => {
+        await fs.unlink(filePath).catch(err => console.error('Error deleting original:', err));
         resolve(outputPath);
       })
-      .on('error', (err) => {
-        console.error('FFmpeg error:', err);
-        // Don't delete original file on error
-        reject(err);
-      });
+      .on('error', reject);
   });
 };
 
-// Function to get video metadata
-const getVideoMetadata = (filePath) => {
-  return new Promise((resolve, reject) => {
-    ffmpeg.ffprobe(filePath, (err, metadata) => {
-      if (err) return reject(err);
-      resolve(metadata);
-    });
-  });
-};
+// Video metadata (cached for reuse)
+const getVideoMetadata = promisify(ffmpeg.ffprobe);
 
-// Enhanced middleware to handle uploads and video conversion
-const uploadAndConvertPostMedia = (req, res, next) => {
+// Upload and convert middleware
+const uploadAndConvertPostMedia = async (req, res, next) => {
   const upload = multer({
     storage: postStorage,
     fileFilter: postFileFilter,
-    limits: postUploadLimits,
+    limits: limits.post,
   }).single('media');
 
-  upload(req, res, async (err) => {
-    if (err) {
-      console.error('Upload error:', err);
-      return res.status(400).json({ error: err.message });
-    }
-
+  try {
+    await promisify(upload)(req, res);
     if (!req.file) return next();
 
-    try {
-      // Validate uploaded file
-      validateUploadedFile(req.file.path);
+    await validateUploadedFile(req.file.path);
 
-      // Convert only non-MP4 videos
-      if (req.file.mimetype !== 'video/mp4' && req.file.mimetype.startsWith('video/')) {
-        console.log(`Starting conversion for: ${req.file.filename}`);
-        const startTime = Date.now();
-
-        // Convert the video
-        req.file.path = await convertToCompatibleFormat(req.file.path, req.file.mimetype);
-        req.file.filename = path.basename(req.file.path);
-        req.file.mimetype = 'video/mp4';
-
-        // Get and log video metadata
-        const metadata = await getVideoMetadata(req.file.path);
-        console.log('Converted video metadata:', {
-          codec: metadata.streams[0]?.codec_name,
-          duration: metadata.format?.duration,
-          size: metadata.format?.size
-        });
-
-        console.log(`Conversion completed in ${(Date.now() - startTime)/1000}s`);
-      }
-
-      next();
-    } catch (error) {
-      console.error('Processing error:', error);
-      return res.status(500).json({ 
-        error: 'File processing failed', 
-        details: error.message 
-      });
+    if (req.file.mimetype !== 'video/mp4' && videoTypes.has(req.file.mimetype)) {
+      const startTime = Date.now();
+      req.file.path = await convertToCompatibleFormat(req.file.path, req.file.mimetype);
+      req.file.filename = path.basename(req.file.path);
+      req.file.mimetype = 'video/mp4';
+      console.log(`Conversion took ${(Date.now() - startTime) / 1000}s`);
     }
-  });
+
+    next();
+  } catch (err) {
+    console.error('Upload/Processing error:', err);
+    res.status(err instanceof multer.MulterError ? 400 : 500).json({
+      error: 'File processing failed',
+      details: err.message,
+    });
+  }
 };
 
 // Error handling middleware
-const handleUploadError = (err, req, res, next) => {
-  console.error('Upload error:', err);
-  res.status(500).json({ 
-    error: 'File upload failed', 
-    details: err.message 
-  });
-};
+const handleUploadError = (err, req, res, next) =>
+  res.status(500).json({ error: 'File upload failed', details: err.message });
 
+// Exports
 module.exports = {
   uploadProfilePicture: multer({
     storage: profileStorage,
     fileFilter: profileFileFilter,
-    limits: profileUploadLimits
+    limits: limits.profile,
   }),
   uploadAndConvertPostMedia,
   handleUploadError,
-  getVideoMetadata
+  getVideoMetadata,
 };
