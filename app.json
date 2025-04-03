@@ -4,7 +4,7 @@
     "slug": "StartupConnect",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/PitchIcon.jpeg",
+    "icon": "./assets/PitchIcon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
@@ -17,9 +17,6 @@
       "bundleIdentifier": "com.croww.StartupConnect",
       "infoPlist": {
         "UIBackgroundModes": [
-          "remote-notification",
-          "remote-notification",
-          "remote-notification",
           "remote-notification"
         ],
         "ITSAppUsesNonExemptEncryption": false
@@ -33,17 +30,9 @@
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
         "READ_EXTERNAL_STORAGE",
-        "NOTIFICATIONS",
-        "CAMERA",
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION",
-        "READ_EXTERNAL_STORAGE",
         "NOTIFICATIONS"
       ],
-      "googleServicesFile": "./google-services.json",
-      "colors": {
-        "notification_icon_color": "#FF0000"
-      }
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "favicon": "./assets/favicon.png"
