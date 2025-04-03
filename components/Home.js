@@ -71,6 +71,7 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
  const [fullTextHeight, setFullTextHeight] = useState(0);
  const [lastTap, setLastTap] = useState(null);
 
+
  useEffect(() => {
  fetchLikeStatus();
  }, [item.post_id]);
@@ -607,6 +608,26 @@ export default function Home() {
  setPostsError(error.message);
  }
  }, []);
+
+ useEffect(() => {
+    const checkAuthStatus = async () => {
+      try {
+        const token = await AsyncStorage.getItem('token');
+        if (!token) {
+          navigation.replace('Login');
+          return;
+        }
+        fetchUserData(); // Defined in Home
+        loadUsers();     // Defined in Home
+        fetchAllPosts(); // Defined in Home
+      } catch (error) {
+        console.error('Error checking auth status:', error);
+        navigation.replace('Login');
+      }
+    };
+  
+    checkAuthStatus();
+  }, [navigation, fetchUserData, loadUsers, fetchAllPosts]);
 
  useEffect(() => {
  loadUsers();

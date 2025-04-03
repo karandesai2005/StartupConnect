@@ -29,6 +29,7 @@ import ViewStory from './components/Profile/P_Profile/ViewStory';
 import EventDetails from './components/EventDetail';
 import ReelScreen from './components/Reels'; // Import the ReelScreen component
 import UploadPitchVideo from './components/UploadPitchVideo'; // Adjust path
+import PostItem from './components/PostItem';
 const Stack = createStackNavigator();
 
 const App = () => {
@@ -84,6 +85,7 @@ const App = () => {
             <Stack.Screen name="BusinessProfile" component={BusinessProfile} />
             <Stack.Screen name="ReelScreen" component={ReelScreen} options={{ headerShown: false }} />
             <Stack.Screen name="UploadPitchVideo" component={UploadPitchVideo} />
+            <Stack.Screen name='PostItem' component={PostItem}/>
           </Stack.Navigator>
         </NavigationContainer>
       </UserRegistrationProvider>
