@@ -113,7 +113,7 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
  videoRef.current.pauseAsync().catch((error) => console.error('Pause error:', error));
  }
  }
- }, [isVisible, isVideo]); // Add this closing bracket and dependency array
+ }, [isVisible, isVideo]);
 
  useEffect(() => {
  console.log('Comments state updated:', comments);
@@ -161,7 +161,6 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
 
  const fetchComments = async () => {
  try {
- // console.log('Fetching comments for post:', item.post_id);
  setIsCommentsLoading(true);
  const token = await AsyncStorage.getItem('token');
  if (!token || !item.post_id) return;
@@ -400,7 +399,6 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
  isLikeLoading && { opacity: 0.5 }
  ]}
  />
- {/* Removed ActivityIndicator */}
  </TouchableOpacity>
  <TouchableOpacity style={styles.actionButton} onPress={toggleCommentModal}>
  <Image source={require('../assets/comment6.png')} style={styles.navIcon} />
@@ -614,15 +612,19 @@ export default function Home() {
       try {
         const token = await AsyncStorage.getItem('token');
         if (!token) {
-          navigation.replace('Login');
+          // Redirect to Home screen if not logged in
+          navigation.replace('Home');
           return;
         }
-        fetchUserData(); // Defined in Home
-        loadUsers();     // Defined in Home
-        fetchAllPosts(); // Defined in Home
+        // If token exists, proceed with loading data
+        await Promise.all([
+          fetchUserData(),
+          loadUsers(),
+          fetchAllPosts()
+        ]);
       } catch (error) {
         console.error('Error checking auth status:', error);
-        navigation.replace('Login');
+        navigation.replace('Home');
       }
     };
   
@@ -687,12 +689,7 @@ export default function Home() {
 
  useFocusEffect(
  useCallback(() => {
- // This runs when the screen comes into focus
- 
- // Return a cleanup function that runs when screen loses focus
  return () => {
- // This will ensure videos are paused when navigating away
- // Force all viewable items to be considered "not visible"
  setViewableItems([]);
  };
  }, [])
@@ -739,8 +736,6 @@ export default function Home() {
  navigation.navigate('Profile', { username, isOtherUser: false });
  }
  };
-
- 
 
  return (
  <SafeAreaView style={styles.safeArea}>
