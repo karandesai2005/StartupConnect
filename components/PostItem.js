@@ -21,6 +21,7 @@ import { debounce } from 'lodash';
 
 const { width } = Dimensions.get('window');
 const NGROK_URL = 'https://pitch-backend-avb7geahhvfteqf9.centralindia-01.azurewebsites.net/';
+const FIXED_MEDIA_HEIGHT = width * 5 / 4; // Same as PostViewScreen
 
 const formatTimestamp = (timestamp) => {
   if (!timestamp) return 'Just now';
@@ -38,7 +39,7 @@ const formatTimestamp = (timestamp) => {
 
 const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems, toggleExpand }) => {
   const navigation = useNavigation();
-  const videoRef = useRef(null);    
+  const videoRef = useRef(null);
   const animatedScale = useRef(new Animated.Value(1)).current;
   const [isLoading, setIsLoading] = useState(true);
   const [isLiked, setIsLiked] = useState(item.isLiked || false);
@@ -49,7 +50,6 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
   const [isCommentModalVisible, setIsCommentModalVisible] = useState(false);
   const [newComment, setNewComment] = useState('');
   const [isVideo, setIsVideo] = useState(item.media_type === 'video');
-  const [imageHeight, setImageHeight] = useState(item.media_type === 'video' ? width *  5 /4 : width * 5 / 4);
   const [isMeasured, setIsMeasured] = useState(false);
   const [shouldShowMore, setShouldShowMore] = useState(false);
 
@@ -60,19 +60,12 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
     if (typeof mediaUrl === 'string') {
       if (mediaUrl.match(/\.(mp4|mov|avi|wmv|3gp|mkv)$/i)) {
         setIsVideo(true);
-        setImageHeight(width * 9 / 16);
-        setIsLoading(false);
       } else if (mediaUrl.startsWith('http')) {
         Image.getSize(
           mediaUrl,
-          (imgWidth, imgHeight) => {
-            const calculatedHeight = width / (imgWidth / imgHeight);
-            setImageHeight(calculatedHeight);
-            setIsLoading(false);
-          },
+          () => setIsLoading(false),
           (error) => {
             console.log('Error getting image size:', error);
-            setImageHeight(width * 5 / 4);
             setIsLoading(false);
           }
         );
@@ -95,6 +88,7 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
       if (isVideo && videoRef.current) {
         videoRef.current.pauseAsync().catch(() => {});
       }
+      animatedScale.stopAnimation();
     };
   }, [isVisible, isVideo]);
 
@@ -155,8 +149,7 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
   };
 
   const debouncedHandleLike = debounce(handleLike, 300);
-
-  const handleAddComment = async () => {
+  const debouncedHandleAddComment = debounce(async () => {
     if (!newComment.trim()) return;
     try {
       const token = await AsyncStorage.getItem('token');
@@ -172,18 +165,18 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
     } catch (error) {
       console.error('Error adding comment:', error);
     }
-  };
+  }, 300);
 
   const handleProfilePress = () => navigation.navigate('Profile', { username: item.username, isOtherUser: true });
-  const handleChatPress = () => console.log('Chat/Share pressed'); // Placeholder
+  const handleChatPress = () => console.log('Chat/Share pressed');
   const toggleCommentModal = () => setIsCommentModalVisible((prev) => !prev);
-  const handleDoubleTap = () => debouncedHandleLike(); // Double tap to like
+  const handleDoubleTap = () => debouncedHandleLike();
   const handlePressIn = () => Animated.spring(animatedScale, { toValue: 0.98, useNativeDriver: true }).start();
   const handlePressOut = () => Animated.spring(animatedScale, { toValue: 1, useNativeDriver: true }).start();
 
   const handleTextLayout = (event) => {
     const { height } = event.nativeEvent.layout;
-    setShouldShowMore(height > 40); // Approx 2 lines
+    setShouldShowMore(height > 40);
     setIsMeasured(true);
   };
 
@@ -227,7 +220,7 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
         onPressOut={handlePressOut}
         onPress={handleDoubleTap}
       >
-        <View style={[styles.imageContainer, { height: imageHeight }]}>
+        <View style={[styles.imageContainer, { height: FIXED_MEDIA_HEIGHT }]}>
           {isLoading && (
             <View style={styles.imageLoader}>
               <ActivityIndicator size="large" color="#007AFF" />
@@ -237,7 +230,7 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
             <Video
               ref={videoRef}
               source={{ uri: item.image_url || item.media_url }}
-              style={[styles.video, { height: imageHeight }]}
+              style={[styles.video, { height: FIXED_MEDIA_HEIGHT }]}
               resizeMode="cover"
               isLooping={true}
               onLoad={() => setIsLoading(false)}
@@ -257,7 +250,7 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
                   ? { uri: item.media_url }
                   : require('../assets/PITCH.png')
               }
-              style={[styles.postImage, { height: imageHeight }]}
+              style={[styles.postImage, { height: FIXED_MEDIA_HEIGHT }]}
               onLoad={() => setIsLoading(false)}
             />
           )}
@@ -275,6 +268,8 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
           onPress={debouncedHandleLike}
           activeOpacity={0.7}
           disabled={isLikeLoading}
+          accessibilityLabel={isLiked ? "Unlike post" : "Like post"}
+          accessibilityRole="button"
         >
           <Image
             source={require('../assets/icon-like.png')}
@@ -366,10 +361,10 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
               placeholder="Add a comment..."
               value={newComment}
               onChangeText={setNewComment}
-              onSubmitEditing={handleAddComment}
+              onSubmitEditing={debouncedHandleAddComment}
               returnKeyType="send"
             />
-            <TouchableOpacity style={styles.postCommentButton} onPress={handleAddComment}>
+            <TouchableOpacity style={styles.postCommentButton} onPress={debouncedHandleAddComment}>
               <Text style={styles.postCommentText}>Post</Text>
             </TouchableOpacity>
           </View>
@@ -380,7 +375,19 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
 });
 
 PostItem.propTypes = {
-  item: PropTypes.object.isRequired,
+  item: PropTypes.shape({
+    post_id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    username: PropTypes.string,
+    image_url: PropTypes.string,
+    media_url: PropTypes.string,
+    content: PropTypes.string,
+    caption: PropTypes.string,
+    profile_picture: PropTypes.string,
+    created_at: PropTypes.string,
+    likes: PropTypes.number,
+    comments: PropTypes.array,
+    media_type: PropTypes.string,
+  }).isRequired,
   index: PropTypes.number.isRequired,
   currentUsername: PropTypes.string,
   isVisible: PropTypes.bool.isRequired,

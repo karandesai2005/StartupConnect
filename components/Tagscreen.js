@@ -27,7 +27,7 @@ export default function SelectTagsScreen() {
   const [loading, setLoading] = useState(false);
   const navigation = useNavigation();
   const route = useRoute();
-  const { media, mediaType, caption, fromEvent = false, eventTag } = route.params;
+  const { media, mediaType, caption = '', fromEvent = false, eventTag } = route.params; // Default caption to empty string
 
   useEffect(() => {
     if (fromEvent && eventTag) {
@@ -51,7 +51,7 @@ export default function SelectTagsScreen() {
       if (!token) throw new Error('No authentication token found');
 
       const formData = new FormData();
-      formData.append('content', caption || '');
+      formData.append('content', caption || ''); // Ensure empty string if no caption
       formData.append('tags', JSON.stringify(selectedTags));
       formData.append('media', {
         uri: media,
@@ -66,8 +66,8 @@ export default function SelectTagsScreen() {
         body: formData,
       });
 
+      const responseData = await response.json();
       if (!response.ok) {
-        const responseData = await response.json();
         throw new Error(responseData.message || `Failed to upload post (Status: ${response.status})`);
       }
 
@@ -75,7 +75,7 @@ export default function SelectTagsScreen() {
       navigation.navigate('Main');
     } catch (error) {
       console.error('Error uploading post:', error);
-      Alert.alert('Upload Failed', error.message);
+      Alert.alert('Upload Failed', error.message || 'An unexpected error occurred');
     } finally {
       setLoading(false);
     }
@@ -99,13 +99,11 @@ export default function SelectTagsScreen() {
       </View>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <View style={styles.tagsContainer}>
-          {/* Event Tag (Always First & Selected) */}
           {eventTag && (
             <View style={[styles.tagButton, styles.eventTagButton]}>
               <Text style={[styles.tagText, styles.tagTextSelected]}>{eventTag}</Text>
             </View>
           )}
-          {/* Other Tags */}
           {entrepreneurTechTags.map((tag) => (
             <TouchableOpacity
               key={tag}

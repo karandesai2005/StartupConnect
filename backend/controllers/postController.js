@@ -1,213 +1,192 @@
-require('dotenv').config();
-const Post = require('../models/postModel');
+  require('dotenv').config();
+  const Post = require('../models/postModel');
 
-const postController = {
-  createPost: async (req, res) => {
-    try {
-      console.log('=== Create Post Debug ===');
-      console.log('User:', req.user, '| Body:', req.body, '| File:', req.file);
+  // Constants
+  const BASE_URL = process.env.NGROK_URL || 'https://pitch-backend-avb7geahhvfteqf9.centralindia-01.azurewebsites.net';
 
-      const { content } = req.body;
-      const user_id = req.user?.userId || req.user?.id;
+  // Utility Functions
+  const getUserId = (req) => req.user?.userId || req.user?.id;
 
-      if (!user_id) {
-        return res.status(400).json({ error: "User ID is required." });
+  const validateId = (id, name) => {
+    if (!id || isNaN(id)) throw new Error(`${name} must be a valid number`);
+    return parseInt(id);
+  };
+
+  const validateContent = (content) => {
+    if (!content || content.trim() === '') throw new Error('Content is required');
+    return content.trim();
+  };
+
+  // Post Controller
+  const postController = {
+    createPost: async (req, res) => {
+      try {
+        const userId = getUserId(req);
+        if (!userId) return res.status(401).json({ error: 'User authentication required' });
+
+        const { content } = req.body;
+        if (!content && !req.file) {
+          return res.status(400).json({ error: 'Post content or media required' });
+        }
+
+        const mediaUrl = req.file ? `${BASE_URL}/uploads/posts/${req.file.filename}` : null;
+        // Only validate content if there's no file or if content is provided
+        const finalContent = req.file ? (content || '') : validateContent(content || '');
+        const newPost = await Post.create(finalContent, mediaUrl, userId);
+
+        res.status(201).json(newPost);
+      } catch (error) {
+        console.error('Create post error:', error);
+        res.status(error.message.includes('required') ? 400 : 500).json({ error: error.message });
       }
+    },
 
-      if (!content && !req.file) {
-        return res.status(400).json({ error: "Post content or media is required." });
+    deletePost: async (req, res) => {
+      try {
+        const userId = getUserId(req);
+        if (!userId) return res.status(401).json({ error: 'User authentication required' });
+
+        const { postId } = req.params;
+        const result = await Post.deletePost(validateId(postId, 'Post ID'), userId);
+
+        res.status(200).json({ message: 'Post deleted successfully', result });
+      } catch (error) {
+        console.error('Delete post error:', error);
+        if (error.message.includes('not found') || error.message.includes('unauthorized')) {
+          return res.status(403).json({ error: 'Post not found or unauthorized' });
+        }
+        res.status(error.message.includes('valid number') ? 400 : 500).json({ error: error.message });
       }
+    },
 
-      const media_url = req.file
-        ? `${process.env.NGROK_URL || 'https://pitch-backend-avb7geahhvfteqf9.centralindia-01.azurewebsites.net'}/uploads/posts/${req.file.filename}`
-        : '';
+    getAllPosts: async (req, res) => {
+      try {
+        const { page = 1, limit = 10 } = req.query; // Pagination
+        const offset = (page - 1) * limit;
+        const posts = await Post.getAllPosts({ limit: parseInt(limit), offset });
 
-      console.log('Creating post:', { content, user_id, media_url });
-
-      const newPost = await Post.create(content, media_url, user_id);
-      console.log('Post created:', newPost);
-      res.status(201).json(newPost);
-    } catch (error) {
-      console.error('Error in createPost:', error);
-      res.status(500).json({ error: 'Server error', details: error.message });
-    }
-  },
-
-  getAllPosts: async (req, res) => {
-    try {
-      console.log('=== Fetching All Posts ===');
-      const posts = await Post.getAllPosts();
-      console.log('Total posts fetched:', posts.length);
-      res.status(200).json(posts);
-    } catch (error) {
-      console.error('Error in getAllPosts:', error);
-      res.status(500).json({ error: 'Server error', details: error.message });
-    }
-  },
-
-  getUserPosts: async (req, res) => {
-    try {
-      console.log('=== Fetching User Posts ===');
-      const user_id = req.user?.userId || req.user?.id; // For /posts/myposts, use authenticated user's ID
-
-      if (!user_id) {
-        return res.status(400).json({ error: "User ID is required." });
+        res.status(200).json(posts);
+      } catch (error) {
+        console.error('Get all posts error:', error);
+        res.status(500).json({ error: 'Server error' });
       }
+    },
 
-      console.log('Fetching posts for user_id:', user_id);
-      const posts = await Post.getPostsByUserId(user_id);
-      console.log(`Posts found for user ${user_id}:`, posts.length);
-      res.status(200).json(posts);
-    } catch (error) {
-      console.error('Error in getUserPosts:', error);
-      res.status(500).json({ error: 'Server error', details: error.message });
-    }
-  },
+    getUserPosts: async (req, res) => {
+      try {
+        const userId = getUserId(req);
+        if (!userId) return res.status(401).json({ error: 'User authentication required' });
 
-  getPostsByUsername: async (req, res) => {
-    try {
-      console.log('=== Fetching Posts by Username ===');
-      const { username } = req.params;
+        const { page = 1, limit = 10 } = req.query; // Pagination
+        const offset = (page - 1) * limit;
+        const posts = await Post.getPostsByUserId(userId, { limit: parseInt(limit), offset });
 
-      if (!username) {
-        return res.status(400).json({ error: "Username is required." });
+        res.status(200).json(posts);
+      } catch (error) {
+        console.error('Get user posts error:', error);
+        res.status(500).json({ error: 'Server error' });
       }
+    },
 
-      console.log('Fetching posts for username:', username);
-      const posts = await Post.getPostsByUsername(username);
-      console.log(`Posts found for user ${username}:`, posts.length);
-      res.status(200).json(posts);
-    } catch (error) {
-      console.error('Error in getPostsByUsername:', error);
-      if (error.message.includes('User not found')) {
-        return res.status(404).json({ error: 'User not found' });
+    getPostsByUsername: async (req, res) => {
+      try {
+        const { username } = req.params;
+        if (!username) return res.status(400).json({ error: 'Username required' });
+
+        const { page = 1, limit = 10 } = req.query; // Pagination
+        const offset = (page - 1) * limit;
+        const posts = await Post.getPostsByUsername(username, { limit: parseInt(limit), offset });
+
+        res.status(200).json(posts);
+      } catch (error) {
+        console.error('Get posts by username error:', error);
+        if (error.message.includes('User not found')) {
+          return res.status(404).json({ error: 'User not found' });
+        }
+        res.status(500).json({ error: 'Server error' });
       }
-      res.status(500).json({ error: 'Server error', details: error.message });
-    }
-  },
+    },
 
-  toggleLike: async (req, res) => {
-    try {
-      console.log('=== Toggle Like Debug ===');
-      const { postId } = req.params;
-      const userId = req.user?.userId || req.user?.id;
+    toggleLike: async (req, res) => {
+      try {
+        const userId = getUserId(req);
+        if (!userId) return res.status(401).json({ error: 'User authentication required' });
 
-      if (!userId) {
-        return res.status(400).json({ error: "User ID is required." });
+        const { postId } = req.params;
+        const result = await Post.toggleLike(validateId(postId, 'Post ID'), userId);
+
+        res.status(200).json(result);
+      } catch (error) {
+        console.error('Toggle like error:', error);
+        if (error.message.includes('Post not found')) {
+          return res.status(404).json({ error: 'Post not found' });
+        }
+        res.status(error.message.includes('valid number') ? 400 : 500).json({ error: error.message });
       }
+    },
 
-      if (!postId) {
-        return res.status(400).json({ error: "Post ID is required." });
+    getLikeStatus: async (req, res) => {
+      try {
+        const userId = getUserId(req);
+        if (!userId) return res.status(401).json({ error: 'User authentication required' });
+
+        const { postId } = req.params;
+        const status = await Post.getLikeStatus(validateId(postId, 'Post ID'), userId);
+
+        res.status(200).json(status);
+      } catch (error) {
+        console.error('Get like status error:', error);
+        if (error.message.includes('Post not found')) {
+          return res.status(404).json({ error: 'Post not found' });
+        }
+        res.status(error.message.includes('valid number') ? 400 : 500).json({ error: error.message });
       }
+    },
 
-      console.log('Toggling like for:', { postId, userId });
-      const result = await Post.toggleLike(parseInt(postId), userId);
-      console.log('Like toggled:', result);
-      res.status(200).json(result);
-    } catch (error) {
-      console.error('Error in toggleLike:', error);
-      if (error.message.includes('Post not found')) {
-        return res.status(404).json({ error: 'Post not found' });
+    getComments: async (req, res) => {
+      try {
+        const userId = getUserId(req);
+        if (!userId) return res.status(401).json({ error: 'User authentication required' });
+
+        const { postId } = req.params;
+        const comments = await Post.getCommentsByPostId(validateId(postId, 'Post ID'));
+
+        res.status(200).json(comments);
+      } catch (error) {
+        console.error('Get comments error:', error);
+        if (error.message.includes('Post not found')) {
+          return res.status(404).json({ error: 'Post not found' });
+        }
+        res.status(error.message.includes('valid number') ? 400 : 500).json({ error: error.message });
       }
-      res.status(500).json({ error: 'Server error', details: error.message });
-    }
-  },
+    },
 
-  getLikeStatus: async (req, res) => {
-    try {
-      console.log('=== Get Like Status Debug ===');
-      const { postId } = req.params;
-      const userId = req.user?.userId || req.user?.id;
+    createComment: async (req, res) => {
+      try {
+        const userId = getUserId(req);
+        if (!userId) return res.status(401).json({ error: 'User authentication required' });
 
-      if (!userId) {
-        return res.status(400).json({ error: "User ID is required." });
+        const { postId } = req.params;
+        const { content } = req.body;
+
+        const newComment = await Post.createComment(
+          validateId(postId, 'Post ID'),
+          userId,
+          validateContent(content)
+        );
+
+        res.status(201).json(newComment);
+      } catch (error) {
+        console.error('Create comment error:', error);
+        if (error.message.includes('Post not found')) {
+          return res.status(404).json({ error: 'Post not found' });
+        }
+        if (error.message.includes('Foreign key') || error.message.includes('required')) {
+          return res.status(400).json({ error: error.message });
+        }
+        res.status(500).json({ error: 'Server error' });
       }
+    },
+  };
 
-      if (!postId) {
-        return res.status(400).json({ error: "Post ID is required." });
-      }
-
-      console.log('Getting like status for:', { postId, userId });
-      const status = await Post.getLikeStatus(parseInt(postId), userId);
-      console.log('Like status retrieved:', status);
-      res.status(200).json(status);
-    } catch (error) {
-      console.error('Error in getLikeStatus:', error);
-      if (error.message.includes('Post not found')) {
-        return res.status(404).json({ error: 'Post not found' });
-      }
-      res.status(500).json({ error: 'Server error', details: error.message });
-    }
-  },
-
-  getComments: async (req, res) => {
-    try {
-      console.log('=== Get Comments Debug ===');
-      const { postId } = req.params;
-      const userId = req.user?.userId || req.user?.id;
-
-      if (!userId) {
-        return res.status(400).json({ error: "User ID is required." });
-      }
-
-      if (!postId) {
-        return res.status(400).json({ error: "Post ID is required." });
-      }
-
-      console.log('Fetching comments for post:', postId);
-      const comments = await Post.getCommentsByPostId(parseInt(postId));
-      console.log('Comments retrieved:', comments);
-      res.status(200).json(comments);
-    } catch (error) {
-      console.error('Error in getComments:', error);
-      res.status(500).json({ error: 'Server error', details: error.message });
-    }
-  },
-
-  // Corrected createComment method to delegate to postModel.js
-  createComment: async (req, res) => {
-    console.log('=== Create Comment Debug ===');
-    console.log('Request body:', req.body);
-    console.log('Request params:', req.params);
-    console.log('Request headers:', req.headers);
-
-    const { postId } = req.params;
-    const { content } = req.body;
-    const userId = req.user?.userId || req.user?.id;
-
-    if (!userId) {
-      return res.status(400).json({ error: "User ID is required." });
-    }
-
-    if (!postId) {
-      return res.status(400).json({ error: "Post ID is required." });
-    }
-
-    if (!content || content.trim() === '') {
-      return res.status(400).json({ error: "Comment content is required." });
-    }
-
-    console.log('Creating comment for post:', { postId, userId, content });
-
-    try {
-      const newComment = await Post.createComment(parseInt(postId), userId, content);
-      console.log('✅ Comment created:', newComment);
-      res.status(201).json(newComment);
-    } catch (error) {
-      console.error('❌ Error in createComment:', {
-        message: error.message,
-        number: error.number, // SQL error number (if applicable)
-        state: error.state,   // SQL error state
-      });
-      if (error.message.includes('Post not found')) {
-        return res.status(404).json({ error: 'Post not found' });
-      }
-      if (error.message.includes('Foreign key constraint')) {
-        return res.status(400).json({ error: 'Invalid post or user ID.' });
-      }
-      res.status(500).json({ error: 'Server error', details: error.message });
-    }
-  },
-};
-
-module.exports = postController;
+  module.exports = postController;

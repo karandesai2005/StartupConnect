@@ -8,6 +8,7 @@ import {
   Text,
   FlatList,
   SafeAreaView,
+  ActivityIndicator,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import PropTypes from 'prop-types';
@@ -15,55 +16,75 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import PostItem from './PostItem';
 
 const { width } = Dimensions.get('window');
-const FIXED_IMAGE_HEIGHT = width * 5 / 4; // Match PostItem
-const FIXED_VIDEO_HEIGHT = width * 9 / 16; // Match PostItem
+const FIXED_MEDIA_HEIGHT = width * 5 / 4; // Uniform height for both image and video
 const FIXED_CONTENT_HEIGHT = 150; // Approximate height of header, footer, actions, and caption
 
 const PostViewScreen = ({ route }) => {
   const { posts: initialPosts = [], initialIndex = 0 } = route?.params || {};
   const navigation = useNavigation();
   const flatListRef = useRef(null);
-  const hasScrolledToInitialRef = useRef(false); // Track if initial scroll has happened
+  const hasScrolledToInitialRef = useRef(false);
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [expandedItems, setExpandedItems] = useState({});
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [posts, setPosts] = useState(initialPosts.map(post => ({
-    ...post,
-    isLiked: false,
-    likeCount: post.likes || 0,
-    comments: post.comments || [],
-    media_type: post.media_type || (post.image_url?.includes('.mp4') ? 'video' : 'image'),
-  })));
+  const [isLoading, setIsLoading] = useState(true);
+  const [posts, setPosts] = useState([]);
   const [currentUsername, setCurrentUsername] = useState('');
 
   useEffect(() => {
-    const getCurrentUser = async () => {
-      const userDataStr = await AsyncStorage.getItem('userData');
-      if (userDataStr) setCurrentUsername(JSON.parse(userDataStr).username);
+    const initializePosts = () => {
+      setPosts(initialPosts.map(post => ({
+        ...post,
+        isLiked: false,
+        likeCount: post.likes || 0,
+        comments: post.comments || [],
+        media_type: post.media_type || (post.image_url?.includes('.mp4') ? 'video' : 'image'),
+      })));
+      setIsLoading(false);
     };
-    getCurrentUser();
-  }, []);
+    initializePosts();
+  }, [initialPosts]);
 
-  // Preload media for nearby posts
+  useEffect(() => {
+    const checkAuthStatus = async () => {
+      try {
+        const token = await AsyncStorage.getItem('token');
+        if (!token) {
+          navigation.replace('Login');
+          return;
+        }
+        const userDataStr = await AsyncStorage.getItem('userData');
+        if (userDataStr) {
+          const userData = JSON.parse(userDataStr);
+          setCurrentUsername(userData.username);
+        }
+      } catch (error) {
+        console.error('Auth check failed:', error);
+        navigation.replace('Login');
+      }
+    };
+    checkAuthStatus();
+  }, [navigation]);
+
   const preloadMedia = useCallback(() => {
     const preloadRange = 2;
     const start = Math.max(0, currentIndex - preloadRange);
     const end = Math.min(posts.length, currentIndex + preloadRange + 1);
     posts.slice(start, end).forEach(post => {
-      if (post.image_url || post.media_url) {
-        Image.prefetch(post.image_url || post.media_url).catch(e => console.error('Prefetch error:', e));
+      const mediaUrl = post.image_url || post.media_url;
+      if (mediaUrl && typeof mediaUrl === 'string' && mediaUrl.startsWith('http')) {
+        Image.prefetch(mediaUrl).catch(e => console.error('Prefetch error:', e));
       }
     });
   }, [currentIndex, posts]);
 
-  // Initial scroll on mount only
   useEffect(() => {
     if (posts.length > 0 && initialIndex >= 0 && !hasScrolledToInitialRef.current) {
       flatListRef.current?.scrollToIndex({ index: initialIndex, animated: false });
-      hasScrolledToInitialRef.current = true; // Mark as done
+      hasScrolledToInitialRef.current = true;
     }
     preloadMedia();
-  }, [posts, initialIndex, preloadMedia]); // Only runs when posts or initialIndex change on mount
+  }, [posts, initialIndex, preloadMedia]);
 
   const toggleExpand = useCallback((index) => {
     setExpandedItems(prev => ({ ...prev, [index]: !prev[index] }));
@@ -73,19 +94,11 @@ const PostViewScreen = ({ route }) => {
     if (viewableItems.length > 0) setCurrentIndex(viewableItems[0].index);
   }, []);
 
-  const getItemLayout = useCallback((data, index) => {
-    const isVideo = posts[index]?.media_type === 'video';
-    const mediaHeight = isVideo ? FIXED_VIDEO_HEIGHT : FIXED_IMAGE_HEIGHT;
-    const itemHeight = mediaHeight + FIXED_CONTENT_HEIGHT;
-    return {
-      length: itemHeight,
-      offset: posts.slice(0, index).reduce((sum, p) => {
-        const h = p.media_type === 'video' ? FIXED_VIDEO_HEIGHT : FIXED_IMAGE_HEIGHT;
-        return sum + h + FIXED_CONTENT_HEIGHT;
-      }, 0),
-      index,
-    };
-  }, [posts]);
+  const getItemLayout = useCallback((data, index) => ({
+    length: FIXED_MEDIA_HEIGHT + FIXED_CONTENT_HEIGHT,
+    offset: (FIXED_MEDIA_HEIGHT + FIXED_CONTENT_HEIGHT) * index,
+    index,
+  }), []);
 
   const renderHeader = () => (
     <View style={styles.header}>
@@ -96,6 +109,14 @@ const PostViewScreen = ({ route }) => {
       <View style={styles.backButton} />
     </View>
   );
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ActivityIndicator size="large" color="#007AFF" style={styles.loading} />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -122,13 +143,20 @@ const PostViewScreen = ({ route }) => {
           initialNumToRender={3}
           maxToRenderPerBatch={3}
           windowSize={5}
+          removeClippedSubviews={true}
           refreshing={isRefreshing}
           onRefresh={() => {
             setIsRefreshing(true);
-            setPosts(initialPosts);
+            setPosts(initialPosts.map(post => ({
+              ...post,
+              isLiked: false,
+              likeCount: post.likes || 0,
+              comments: post.comments || [],
+              media_type: post.media_type || (post.image_url?.includes('.mp4') ? 'video' : 'image'),
+            })));
             setCurrentIndex(initialIndex);
             setIsRefreshing(false);
-            hasScrolledToInitialRef.current = false; // Reset on refresh
+            hasScrolledToInitialRef.current = false;
           }}
         />
       ) : (
@@ -144,7 +172,7 @@ const PostViewScreen = ({ route }) => {
 PostViewScreen.propTypes = {
   route: PropTypes.shape({
     params: PropTypes.shape({
-      posts: PropTypes.array,
+      posts: PropTypes.arrayOf(PropTypes.object),
       initialIndex: PropTypes.number,
     }),
   }),
@@ -156,6 +184,7 @@ const styles = StyleSheet.create({
   headerText: { fontSize: 16, fontWeight: '600', color: '#212529' },
   backButton: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
   backButtonText: { fontSize: 24, color: '#212529' },
+  loading: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 });
 
 export default PostViewScreen;
