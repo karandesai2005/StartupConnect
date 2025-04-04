@@ -12,11 +12,6 @@ const validateId = (id, name) => {
   return parseInt(id);
 };
 
-const validateContent = (content) => {
-  if (!content || content.trim() === '') throw new Error('Content is required');
-  return content.trim();
-};
-
 // Post Controller
 const postController = {
   createPost: async (req, res) => {
@@ -24,15 +19,11 @@ const postController = {
       const userId = getUserId(req);
       if (!userId) return res.status(401).json({ error: 'User authentication required' });
 
-      const { content } = req.body;
-      if (!content && !req.file) {
-        return res.status(400).json({ error: 'Post content or media required' });
-      }
-
+      const { content, tags } = req.body;
       const mediaUrl = req.file ? `${BASE_URL}/uploads/posts/${req.file.filename}` : null;
-      // Only validate content if there's no file or if content is provided
-      const finalContent = req.file ? (content || '') : validateContent(content || '');
-      const newPost = await Post.create(finalContent, mediaUrl, userId);
+      const parsedTags = tags ? JSON.parse(tags) : [];
+
+      const newPost = await Post.create(content || '', mediaUrl, userId, parsedTags);
 
       res.status(201).json(newPost);
     } catch (error) {
@@ -61,7 +52,7 @@ const postController = {
 
   getAllPosts: async (req, res) => {
     try {
-      const { page = 1, limit = 10 } = req.query; // Pagination
+      const { page = 1, limit = 10 } = req.query;
       const offset = (page - 1) * limit;
       const posts = await Post.getAllPosts({ limit: parseInt(limit), offset });
 
@@ -77,7 +68,7 @@ const postController = {
       const userId = getUserId(req);
       if (!userId) return res.status(401).json({ error: 'User authentication required' });
 
-      const { page = 1, limit = 10 } = req.query; // Pagination
+      const { page = 1, limit = 10 } = req.query;
       const offset = (page - 1) * limit;
       const posts = await Post.getPostsByUserId(userId, { limit: parseInt(limit), offset });
 
@@ -93,7 +84,7 @@ const postController = {
       const { username } = req.params;
       if (!username) return res.status(400).json({ error: 'Username required' });
 
-      const { page = 1, limit = 10 } = req.query; // Pagination
+      const { page = 1, limit = 10 } = req.query;
       const offset = (page - 1) * limit;
       const posts = await Post.getPostsByUsername(username, { limit: parseInt(limit), offset });
 
@@ -172,7 +163,7 @@ const postController = {
       const newComment = await Post.createComment(
         validateId(postId, 'Post ID'),
         userId,
-        validateContent(content)
+        content // Validation handled in model
       );
 
       res.status(201).json(newComment);

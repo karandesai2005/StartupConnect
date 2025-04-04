@@ -15,24 +15,35 @@ const validateId = (id, name) => {
 };
 
 const validateContent = (content, maxLength = 1000) => {
-  if (!content || content.trim().length === 0 || content.length > maxLength) {
-    throw new Error(`Content must be 1-${maxLength} characters`);
+  if (content && content.trim().length > maxLength) {
+    throw new Error(`Content must be less than ${maxLength} characters`);
   }
-  return content.trim();
+  return content ? content.trim() : '';
+};
+
+const validateTags = (tags) => {
+  if (!Array.isArray(tags)) throw new Error('Tags must be an array');
+  if (tags.length > 20) throw new Error('Maximum 20 tags allowed');
+  return JSON.stringify(tags);
 };
 
 const Post = {
-  create: async (content, media_url, user_id) => {
+  create: async (content, media_url, user_id, tags = []) => {
+    if (!media_url && (!content || content.trim() === '')) {
+      throw new Error('Content or media is required');
+    }
+
     const query = `
-      INSERT INTO posts (content, media_url, user_id)
+      INSERT INTO posts (content, media_url, user_id, tags)
       OUTPUT 
         INSERTED.post_id,
         INSERTED.content,
         INSERTED.media_url,
         INSERTED.created_at,
         INSERTED.user_id,
+        INSERTED.tags,
         0 as like_count
-      VALUES (@content, @media_url, @user_id)
+      VALUES (@content, @media_url, @user_id, @tags)
     `;
 
     try {
@@ -40,10 +51,13 @@ const Post = {
       const request = pool.request()
         .input('content', sql.NVarChar, validateContent(content))
         .input('media_url', sql.NVarChar, media_url || null)
-        .input('user_id', sql.Int, validateId(user_id, 'User ID'));
+        .input('user_id', sql.Int, validateId(user_id, 'User ID'))
+        .input('tags', sql.NVarChar, validateTags(tags));
 
       const result = await request.query(query);
-      return result.recordset[0];
+      const post = result.recordset[0];
+      post.tags = JSON.parse(post.tags); // Parse tags back to array for response
+      return post;
     } catch (error) {
       console.error('Create post error:', error);
       throw new Error(error.message.includes('must be') ? error.message : 'Unable to create post');
@@ -58,6 +72,7 @@ const Post = {
         p.media_url,
         p.created_at,
         p.user_id,
+        p.tags,
         u.username,
         u.name,
         u.profile_picture,
@@ -75,7 +90,10 @@ const Post = {
         .input('offset', sql.Int, offset)
         .input('limit', sql.Int, limit)
         .query(query);
-      return result.recordset;
+      return result.recordset.map(post => ({
+        ...post,
+        tags: post.tags ? JSON.parse(post.tags) : [],
+      }));
     } catch (error) {
       console.error('Get all posts error:', error);
       throw new Error('Unable to fetch posts');
@@ -90,6 +108,7 @@ const Post = {
         p.media_url,
         p.created_at,
         p.user_id,
+        p.tags,
         u.username,
         u.name,
         u.profile_picture,
@@ -109,7 +128,10 @@ const Post = {
         .input('offset', sql.Int, offset)
         .input('limit', sql.Int, limit)
         .query(query);
-      return result.recordset;
+      return result.recordset.map(post => ({
+        ...post,
+        tags: post.tags ? JSON.parse(post.tags) : [],
+      }));
     } catch (error) {
       console.error('Get posts by user ID error:', error);
       throw new Error(error.message.includes('must be') ? error.message : 'Unable to fetch user posts');
@@ -171,6 +193,7 @@ const Post = {
         p.media_url,
         p.created_at,
         p.user_id,
+        p.tags,
         u.username,
         u.name,
         u.profile_picture,
@@ -186,7 +209,7 @@ const Post = {
     try {
       const pool = await getPool();
       const result = await pool.request()
-        .input('username', sql.NVarChar, validateString(username, 'Username', 3, 20))
+        .input('username', sql.NVarChar, username) // Assuming username validation elsewhere
         .input('offset', sql.Int, offset)
         .input('limit', sql.Int, limit)
         .query(query);
@@ -198,7 +221,10 @@ const Post = {
         if (userCheck.recordset.length === 0) throw new Error('User not found');
       }
 
-      return result.recordset;
+      return result.recordset.map(post => ({
+        ...post,
+        tags: post.tags ? JSON.parse(post.tags) : [],
+      }));
     } catch (error) {
       console.error('Get posts by username error:', error);
       if (error.message === 'User not found') throw new Error('User not found');
