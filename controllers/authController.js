@@ -173,136 +173,92 @@ const deleteAccount = async (req, res) => {
 };
 
 // Save user details step-by-step
-// Save user details step-by-step
 const saveUserDetails = async (req, res) => {
-  console.log("Request Body:", req.body);
-
   try {
     const { step, data } = req.body;
-
     if (!step || !data) {
-      return res.status(400).json({ message: "Step and data are required." });
+      return res.status(400).json({ message: 'Step and data required' });
     }
 
     let query, params;
-
     switch (step) {
       case 1:
-        // Email step
-        if (!data.email) {
-          return res.status(400).json({ message: "Email is required." });
+        validateInput('Email', data.email, 5, 255, /^[^\s@]+@[^\s@]+\.[^\s@]+$/);
+        const normalizedEmail = normalizeInput(data.email);
+        if ((await queryDB('SELECT user_id FROM users WHERE email = @param1', [normalizedEmail])).length > 0) {
+          return res.status(409).json({ message: 'Email already in use' });
         }
-        const normalizedEmail = data.email.toLowerCase();
-        const existingUsers = await queryDB('SELECT * FROM users WHERE email = @param1', [normalizedEmail]);
-        if (existingUsers.length > 0) {
-          return res.status(400).json({ message: "Email already in use." });
-        }
-        const tempUsername = `user_${Date.now()}`;
-        query = `
-          INSERT INTO users (email, username, created_at)
-          VALUES (@param1, @param2, GETDATE());
-          SELECT SCOPE_IDENTITY() AS user_id;
-        `;
-        params = [normalizedEmail, tempUsername];
+        query = 'INSERT INTO users (email, username, created_at) OUTPUT INSERTED.user_id VALUES (@param1, @param2, GETDATE())';
+        params = [normalizedEmail, `user_${Date.now()}`];
         const resultStep1 = await queryDB(query, params);
-        return res.status(200).json({
-          message: "Email registered, proceed to set password",
+        return res.status(200).json({ 
+          message: 'Email registered, proceed to set password', 
           userId: resultStep1[0].user_id,
-          nextStep: 2
+          nextStep: 2 
         });
 
       case 2:
-        // Password step
-        if (!data.password || !data.userId) {
-          return res.status(400).json({ message: "Password and userId are required." });
+        if (!data.userId || !data.password) {
+          return res.status(400).json({ message: 'User ID and password required' });
         }
-        const passwordHash = await bcrypt.hash(data.password, parseInt(process.env.SALT_ROUNDS, 10));
-        query = `
-          UPDATE users 
-          SET password_hash = @param1 
-          WHERE user_id = @param2;
-          SELECT user_id FROM users WHERE user_id = @param2;
-        `;
-        params = [passwordHash, data.userId];
+        validateInput('Password', data.password, 8, 128);
+        query = 'UPDATE users SET password_hash = @param1 WHERE user_id = @param2 OUTPUT INSERTED.user_id';
+        params = [await bcrypt.hash(data.password, SALT_ROUNDS), data.userId];
         break;
 
       case 3:
-        // Username step
-        if (!data.username || data.username.length < 3 || data.username.length > 20) {
-          return res.status(400).json({ message: "Username must be between 3 and 20 characters." });
+        if (!data.userId || !data.username) {
+          return res.status(400).json({ message: 'User ID and username required' });
         }
-        query = `
-          UPDATE users 
-          SET username = @param1 
-          WHERE user_id = @param2;
-          SELECT user_id FROM users WHERE user_id = @param2;
-        `;
+        validateInput('Username', data.username, 3, 20, /^[a-zA-Z0-9_]+$/);
+        query = 'UPDATE users SET username = @param1 WHERE user_id = @param2 OUTPUT INSERTED.user_id';
         params = [data.username, data.userId];
         break;
 
       case 4:
-        // Preference step
-        if (data.preference !== "personal" && data.preference !== "business") {
-          return res.status(400).json({ message: "Invalid preference." });
+        if (!data.userId || !['personal', 'business'].includes(data.preference)) {
+          return res.status(400).json({ message: 'User ID and valid preference required' });
         }
-        query = `
-          UPDATE users 
-          SET is_personal = @param1, is_business = @param2 
-          WHERE user_id = @param3;
-          SELECT user_id FROM users WHERE user_id = @param3;
-        `;
-        params = [data.preference === "personal" ? 1 : 0, data.preference === "business" ? 1 : 0, data.userId];
+        query = 'UPDATE users SET is_personal = @param1, is_business = @param2 WHERE user_id = @param3 OUTPUT INSERTED.user_id';
+        params = [data.preference === 'personal' ? 1 : 0, data.preference === 'business' ? 1 : 0, data.userId];
         break;
 
       case 5:
-        if (!data.realName || data.realName.trim() === "") {
-          return res.status(400).json({ message: "Real name is required." });
+        if (!data.userId || !data.realName?.trim()) {
+          return res.status(400).json({ message: 'User ID and real name required' });
         }
-        query = `
-          UPDATE users 
-          SET name = @param1 
-          WHERE user_id = @param2;
-          SELECT user_id FROM users WHERE user_id = @param2;
-        `;
+        query = 'UPDATE users SET name = @param1 WHERE user_id = @param2 OUTPUT INSERTED.user_id';
         params = [data.realName.trim(), data.userId];
         break;
 
       case 6:
-        // Interests step and completing registration
-        if (!data.interests || !Array.isArray(data.interests) || data.interests.length < 3) {
-          return res.status(400).json({ message: "At least 3 interests are required." });
-        }
-        if (!data.userId) {
-          return res.status(400).json({ message: "User ID is required." });
+        if (!data.userId || !Array.isArray(data.interests) || data.interests.length < 3) {
+          return res.status(400).json({ message: 'User ID and at least 3 interests required' });
         }
         query = `
-          UPDATE users 
-          SET interests = @param1 
-          WHERE user_id = @param2;
-          SELECT user_id, email, username FROM users WHERE user_id = @param2;
+          UPDATE users SET interests = @param1 
+          WHERE user_id = @param2 
+          OUTPUT INSERTED.user_id, INSERTED.email, INSERTED.username
         `;
         params = [JSON.stringify(data.interests), data.userId];
         const result = await queryDB(query, params);
         const user = result[0];
-
-        // Generate JWT token
-        const token = jwt.sign({ userId: user.user_id }, process.env.JWT_SECRET, { expiresIn: "1h" });
-
+        const token = generateToken(user.user_id);
         return res.status(200).json({
-          message: "Registration completed successfully",
+          message: 'Registration completed',
           user: { user_id: user.user_id, email: user.email, username: user.username },
           token,
         });
 
       default:
-        return res.status(400).json({ message: "Invalid step." });
+        return res.status(400).json({ message: 'Invalid step' });
     }
 
     const result = await queryDB(query, params);
-    res.status(200).json({ message: "Data saved successfully", userId: result[0].user_id });
+    res.status(200).json({ message: 'Data saved', userId: result[0].user_id });
   } catch (err) {
-    console.error("Error saving user details:", err);
-    res.status(500).json({ message: "Internal server error", error: err.message });
+    console.error('Save details error:', err);
+    res.status(err.message.includes('must be') ? 400 : 500).json({ message: err.message });
   }
 };
 
