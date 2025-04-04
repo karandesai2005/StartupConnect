@@ -30,7 +30,9 @@ const postController = {
       }
 
       const mediaUrl = req.file ? `${BASE_URL}/uploads/posts/${req.file.filename}` : null;
-      const newPost = await Post.create(validateContent(content || ''), mediaUrl, userId);
+      // Only validate content if there's no file or if content is provided
+      const finalContent = req.file ? (content || '') : validateContent(content || '');
+      const newPost = await Post.create(finalContent, mediaUrl, userId);
 
       res.status(201).json(newPost);
     } catch (error) {
