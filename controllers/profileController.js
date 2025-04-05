@@ -63,8 +63,10 @@ const profileController = {
       const followerId = getUserId(req);
       if (!followerId) return res.status(401).json({ error: 'User authentication required' });
 
-      const { username } = req.params; // Changed to req.params to match route
+      const { username } = req.params; // Matches /follow/:username route
       validateString(username, 'Username', 3, 20);
+
+      console.log(`Follow request: followerId=${followerId}, username=${username}`);
 
       const followee = await User.getUserByUsername(username);
       if (!followee) return res.status(404).json({ error: 'User not found' });
@@ -76,7 +78,13 @@ const profileController = {
       if (isFollowing) return res.status(400).json({ error: 'Already following this user' });
 
       await User.followUser(followerId, followee.user_id);
-      res.status(200).json({ message: 'Successfully followed user' });
+
+      const updatedUser = await User.getUserByUsername(username);
+      res.status(200).json({
+        message: 'Successfully followed user',
+        isFollowing: true,
+        followers: updatedUser.followers || 0,
+      });
     } catch (error) {
       console.error('Follow user error:', error);
       res.status(error.message.includes('Username') ? 400 : 500).json({ error: error.message });
@@ -88,8 +96,10 @@ const profileController = {
       const followerId = getUserId(req);
       if (!followerId) return res.status(401).json({ error: 'User authentication required' });
 
-      const { username } = req.params; // Changed to req.params to match route
+      const { username } = req.params; // Matches /follow/:username route
       validateString(username, 'Username', 3, 20);
+
+      console.log(`Unfollow request: followerId=${followerId}, username=${username}`);
 
       const followee = await User.getUserByUsername(username);
       if (!followee) return res.status(404).json({ error: 'User not found' });
@@ -101,7 +111,13 @@ const profileController = {
       if (!isFollowing) return res.status(400).json({ error: 'Not following this user' });
 
       await User.unfollowUser(followerId, followee.user_id);
-      res.status(200).json({ message: 'Successfully unfollowed user' });
+
+      const updatedUser = await User.getUserByUsername(username);
+      res.status(200).json({
+        message: 'Successfully unfollowed user',
+        isFollowing: false,
+        followers: updatedUser.followers || 0,
+      });
     } catch (error) {
       console.error('Unfollow user error:', error);
       res.status(error.message.includes('Username') ? 400 : 500).json({ error: error.message });
