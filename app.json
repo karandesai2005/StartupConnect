@@ -4,9 +4,9 @@
     "slug": "StartupConnect",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/PitchIcon.png",
+    "icon": "./assets/PITCH.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "splash": {
       "image": "./assets/PITCH.png",
       "resizeMode": "contain",
@@ -16,15 +16,13 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.croww.StartupConnect",
       "infoPlist": {
-        "UIBackgroundModes": [
-          "remote-notification"
-        ],
+        "UIBackgroundModes": ["remote-notification"],
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "package": "com.croww.StartupConnect",
-      "versionCode": 2,
+      "versionCode": 3,
       "permissions": [
         "CAMERA",
         "ACCESS_FINE_LOCATION",
@@ -32,7 +30,11 @@
         "READ_EXTERNAL_STORAGE",
         "NOTIFICATIONS"
       ],
-      "googleServicesFile": "./google-services.json"
+      "googleServicesFile": "./google-services.json",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/PITCH.png",
+        "backgroundColor": "#ffffff"
+      } 
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -54,7 +56,26 @@
           "mode": "production"
         }
       ],
-      "./plugins/withFirebaseNotificationColorFix"
+      "./plugins/withFirebaseNotificationColorFix",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static",
+            "extraPodFileDefinitions": {
+              "pod 'GoogleUtilities', :modular_headers => true": null,
+              "pod 'FirebaseCoreInternal', :modular_headers => true": null,
+              "pod 'FirebaseCore', :modular_headers => true": null,
+              "pod 'FirebaseCoreExtension', :modular_headers => true": null,
+              "pod 'FirebaseFirestoreInternal', :modular_headers => true": null,
+              "pod 'FirebaseFirestore', :modular_headers => true": null
+            }
+          },
+          "android": {
+            "extraProguardRules": "-keep class com.facebook.react.** { *; }\n-keep class expo.modules.** { *; }\n-dontwarn com.facebook.react.**"
+          }
+        }
+      ]
     ],
     "owner": "startupconnectteam",
     "runtimeVersion": {

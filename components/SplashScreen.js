@@ -8,6 +8,12 @@ const SplashScreen = ({ navigation }) => {
 
     const checkUserStatus = async () => {
       try {
+        // Debug: Check if navigation is valid
+        if (!navigation || typeof navigation.replace !== 'function') {
+          console.error('Navigation is invalid:', navigation);
+          return;
+        }
+
         const isFirstInstall = await AsyncStorage.getItem('isFirstInstall');
         const token = await AsyncStorage.getItem('token');
 
@@ -21,23 +27,35 @@ const SplashScreen = ({ navigation }) => {
           destination = 'Main';
         }
 
+        // Debug: Log destination before navigation
+        console.log('Navigating to:', destination);
+
         timer = setTimeout(() => {
-          navigation.replace(destination);
+          try {
+            navigation.replace(destination);
+          } catch (navError) {
+            console.error('Navigation error:', navError);
+          }
         }, 3000);
       } catch (error) {
         console.error('Error checking user status:', error);
-        navigation.replace('Login');
+        // Fallback navigation with error handling
+        try {
+          navigation.replace('Login');
+        } catch (navError) {
+          console.error('Fallback navigation failed:', navError);
+        }
       }
     };
 
     checkUserStatus();
 
-    return () => clearTimeout(timer); // Prevent memory leak
+    return () => clearTimeout(timer); // Cleanup timer
   }, [navigation]);
 
   return (
     <View style={styles.container}>
-      <Text style={styles.logo}>Pitch</Text>
+      <Text style={styles.logo}>PITCH</Text>
       <ActivityIndicator size="large" color="#000" style={{ marginTop: 20 }} />
     </View>
   );
