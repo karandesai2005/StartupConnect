@@ -11,6 +11,14 @@ import {
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
+// Participation steps
+const participationSteps = [
+  'Click the "Participate" button below.',
+  'On the next screen, post an image related to the event.',
+  'Add relevant tags (e.g., the event title).',
+  'Upload your submission to join the event.',
+];
+
 const EventDetailsScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
@@ -24,7 +32,15 @@ const EventDetailsScreen = () => {
   const handleParticipate = () => {
     navigation.navigate('CreatePost', { eventTag: event.title }); // Pass event title as a tag
   };
-  
+
+  const renderParticipationSteps = () => (
+    <View style={styles.stepsContainer}>
+      <Text style={styles.stepsTitle}>How to Participate:</Text>
+      {participationSteps.map((step, index) => (
+        <Text key={index} style={styles.stepText}>{`${index + 1}. ${step}`}</Text>
+      ))}
+    </View>
+  );
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -52,6 +68,8 @@ const EventDetailsScreen = () => {
             <Text style={styles.detailText}>Location: Tech Hub, Silicon Valley</Text>
             <Text style={styles.detailText}>Time: 9:00 AM - 5:00 PM</Text>
           </View>
+
+          {renderParticipationSteps()}
 
           <TouchableOpacity style={styles.participateButton} onPress={handleParticipate}>
             <Text style={styles.participateButtonText}>Participate</Text>
@@ -114,12 +132,30 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   additionalDetails: {
-    marginBottom: 30,
+    marginBottom: 20, // Reduced from 30 to make room for steps
   },
   detailText: {
     fontSize: 14,
     color: '#333',
     marginBottom: 8,
+  },
+  stepsContainer: {
+    marginBottom: 20,
+    padding: 10,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+  },
+  stepsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    marginBottom: 10,
+  },
+  stepText: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
+    marginBottom: 5,
   },
   participateButton: {
     backgroundColor: '#0095f6',

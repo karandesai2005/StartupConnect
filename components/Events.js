@@ -6,38 +6,38 @@ const eventsData = [
   {
     id: '1',
     title: 'IDEATHON',
-    description: 'Unleash your creativity in a marathon of ideas, where bold thinkers collide to spark the next big thing. To join, click the "Participate" button, where you’ll get a screen to post an image, add tags, and upload.',
-    imageUrl: require('../assets/ideathon.webp')
+    description: 'Unleash your creativity in a marathon of bold ideas and groundbreaking solutions.',
+    imageUrl: require('../assets/ideathon.webp'),
   },
   {
     id: '2',
     title: 'PITCH2025',
-    description: 'Step into the future of pitching, where your vision meets opportunity in a high-stakes showdown. To join, click the "Participate" button, where you’ll get a screen to post an image, add tags, and upload.',
-    imageUrl: require('../assets/startup-pitch.webp')
+    description: 'Step into a high-stakes showdown where your vision meets future opportunities.',
+    imageUrl: require('../assets/startup-pitch.webp'),
   },
   {
     id: '3',
     title: 'STARTMEUP',
-    description: 'Ignite your journey with a burst of energy, collaboration, and the drive to kick things off right. To join, click the "Participate" button, where you’ll get a screen to post an image, add tags, and upload.',
-    imageUrl: require('../assets/startmeup.jpeg')
+    description: 'Ignite your journey with energy, collaboration, and a kickstart to success.',
+    imageUrl: require('../assets/startmeup.jpeg'),
   },
   {
     id: '4',
     title: 'CO-FOUNDER STORY',
-    description: 'Hear the untold tales of partnership, grit, and triumph from those who built success side by side. To join, click the "Participate" button, where you’ll get a screen to post an image, add tags, and upload.',
-    imageUrl: require('../assets/cofounderstory.png.png')
+    description: 'Discover tales of partnership, grit, and triumph from co-founder duos.',
+    imageUrl: require('../assets/cofounderstory.png.png'),
   },
   {
     id: '5',
     title: 'BEST MVP',
-    description: 'Celebrate the champions of minimal brilliance, where lean ideas prove their maximum potential. To join, click the "Participate" button, where you’ll get a screen to post an image, add tags, and upload.',
-    imageUrl: require('../assets/MVP.jpeg')
+    description: 'Celebrate lean ideas that prove their maximum potential with minimal brilliance.',
+    imageUrl: require('../assets/MVP.jpeg'),
   },
   {
     id: '6',
     title: 'WANNA GET FUNDED',
-    description: 'Say yes to your dreams and unlock the cash flow you’ve been chasing—opportunity knocks loud. To join, click the "Participate" button, where you’ll get a screen to post an image, add tags, and upload.',
-    imageUrl: require('../assets/wannagetfunded.webp')
+    description: 'Unlock the cash flow to fuel your dreams—opportunity is calling.',
+    imageUrl: require('../assets/wannagetfunded.webp'),
   },
 ];
 

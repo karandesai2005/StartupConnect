@@ -33,13 +33,24 @@ const PostViewScreen = ({ route }) => {
 
   useEffect(() => {
     const initializePosts = () => {
-      setPosts(initialPosts.map(post => ({
-        ...post,
-        isLiked: false,
-        likeCount: post.likes || 0,
-        comments: post.comments || [],
-        media_type: post.media_type || (post.image_url?.includes('.mp4') ? 'video' : 'image'),
-      })));
+      // Filter out posts with no valid ID and log issues
+      const validPosts = initialPosts
+        .filter(post => {
+          const hasId = post && (post.post_id || post._id || post.id);
+          if (!hasId) {
+            console.warn('Post missing ID:', post);
+          }
+          return hasId;
+        })
+        .map(post => ({
+          ...post,
+          isLiked: false,
+          likeCount: post.likes || 0,
+          comments: post.comments || [],
+          media_type: post.media_type || (post.image_url?.includes('.mp4') ? 'video' : 'image'),
+        }));
+      console.log('Initialized posts:', validPosts.length, validPosts);
+      setPosts(validPosts);
       setIsLoading(false);
     };
     initializePosts();
@@ -134,7 +145,7 @@ const PostViewScreen = ({ route }) => {
               toggleExpand={toggleExpand}
             />
           )}
-          keyExtractor={(item) => (item.post_id || item._id || item.id).toString()}
+          keyExtractor={(item, index) => (item.post_id || item._id || item.id || `fallback-${index}`).toString()}
           ListHeaderComponent={renderHeader}
           showsVerticalScrollIndicator={false}
           onViewableItemsChanged={onViewableItemsChanged}
@@ -147,13 +158,16 @@ const PostViewScreen = ({ route }) => {
           refreshing={isRefreshing}
           onRefresh={() => {
             setIsRefreshing(true);
-            setPosts(initialPosts.map(post => ({
-              ...post,
-              isLiked: false,
-              likeCount: post.likes || 0,
-              comments: post.comments || [],
-              media_type: post.media_type || (post.image_url?.includes('.mp4') ? 'video' : 'image'),
-            })));
+            const refreshedPosts = initialPosts
+              .filter(post => post && (post.post_id || post._id || post.id))
+              .map(post => ({
+                ...post,
+                isLiked: false,
+                likeCount: post.likes || 0,
+                comments: post.comments || [],
+                media_type: post.media_type || (post.image_url?.includes('.mp4') ? 'video' : 'image'),
+              }));
+            setPosts(refreshedPosts);
             setCurrentIndex(initialIndex);
             setIsRefreshing(false);
             hasScrolledToInitialRef.current = false;

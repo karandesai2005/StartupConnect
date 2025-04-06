@@ -5,25 +5,44 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NGROK_URL } from '@env';
 
 const INTERESTS = [
-  "AI & Machine Learning", 
-  "Data Science", 
-  "Web Development", 
-  "Mobile Development", 
-  "Cybersecurity", 
-  "Cloud Computing", 
-  "Blockchain", 
-  "UX/UI Design", 
-  "Digital Marketing", 
-  "Robotics", 
-  "Gaming"
+  // Startup Domains
+  "Healthcare & Wellness",
+  "Mental Health",
+  "Fitness & Nutrition",
+  "Biotech",
+  "Sustainability & Environment",
+  "Renewable Energy",
+  "Recycling & Waste Management",
+  "Climate Tech",
+  "EdTech",
+  "Skill-based Learning",
+  "Gamified Learning",
+  "FinTech",
+  "InsurTech",
+  "SME Tools",
+  "DeFi & Crypto",
+  "Smart Cities",
+  "Real Estate Tech",
+  "Mobility & Transport",
+  "FoodTech",
+  "Restaurant Tech",
+  "Lifestyle Platforms",
+  "Entertainment & Media",
+  "Creator Economy",
+  "Virtual Worlds & Metaverse",
+  "Social Impact",
+  "Nonprofit Tech",
+  "Accessibility Tech",
+  "LegalTech"
 ];
+
 
 const Signup = () => {
   const navigation = useNavigation();
   const [selectedInterests, setSelectedInterests] = useState([]);
 
   const toggleInterest = (interest) => {
-    setSelectedInterests(current => 
+    setSelectedInterests(current =>
       current.includes(interest)
         ? current.filter(item => item !== interest)
         : [...current, interest].slice(0, 3)
@@ -35,7 +54,7 @@ const Signup = () => {
       Alert.alert("Error", "Please select at least 3 interests.");
       return;
     }
-  
+
     try {
       const userId = await AsyncStorage.getItem('userId');
       console.log("userId:", userId);
@@ -44,26 +63,26 @@ const Signup = () => {
         navigation.navigate("Register1");
         return;
       }
-  
+
       const payload = {
         step: 6,
         data: { interests: selectedInterests, userId: parseInt(userId) },
       };
       console.log("Sending payload:", JSON.stringify(payload));
       console.log("NGROK_URL:", NGROK_URL);
-  
+
       const response = await fetch(`${NGROK_URL}/api/auth/save-user-details`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-  
+
       console.log("Response status:", response.status);
       const responseText = await response.text();
       console.log("Response text:", responseText);
-  
+
       const result = await JSON.parse(responseText);
-  
+
       if (response.ok) {
         await AsyncStorage.setItem('token', result.token);
         await AsyncStorage.setItem('useruserData', JSON.stringify(result.user));
@@ -77,9 +96,9 @@ const Signup = () => {
     }
   };
   const renderInterest = ({ item }) => (
-    <Pressable 
+    <Pressable
       style={[
-        styles.fieldContainer, 
+        styles.fieldContainer,
         selectedInterests.includes(item) && styles.selectedField
       ]}
       onPress={() => toggleInterest(item)}
@@ -91,7 +110,7 @@ const Signup = () => {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Choose 3 fields you like</Text>
-      
+
       <FlatList
         data={INTERESTS}
         renderItem={renderInterest}
@@ -100,9 +119,9 @@ const Signup = () => {
         numColumns={2}
       />
 
-      <Pressable 
+      <Pressable
         style={[
-          styles.nextButton, 
+          styles.nextButton,
           selectedInterests.length < 3 && styles.disabledButton
         ]}
         onPress={handleNext}

@@ -1,47 +1,44 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const SplashScreen = ({ navigation }) => {
   useEffect(() => {
+    let timer;
+
     const checkUserStatus = async () => {
       try {
-        // Check if this is the first install
         const isFirstInstall = await AsyncStorage.getItem('isFirstInstall');
         const token = await AsyncStorage.getItem('token');
 
         console.log('isFirstInstall:', isFirstInstall);
         console.log('token:', token);
 
-        let destination;
-
+        let destination = 'Login';
         if (isFirstInstall === null || isFirstInstall === 'true') {
-          // First-time user: always go to Login
-          destination = 'Login';
-          // Mark that the app has been opened at least once
           await AsyncStorage.setItem('isFirstInstall', 'false');
-        } else {
-          // Returning user: check token
-          destination = token ? 'Main' : 'Login';
+        } else if (token) {
+          destination = 'Main';
         }
 
-        const timer = setTimeout(() => {
+        timer = setTimeout(() => {
           navigation.replace(destination);
         }, 3000);
-
-        return () => clearTimeout(timer);
       } catch (error) {
         console.error('Error checking user status:', error);
-        navigation.replace('Login'); // Fallback to Login on error
+        navigation.replace('Login');
       }
     };
 
     checkUserStatus();
+
+    return () => clearTimeout(timer); // Prevent memory leak
   }, [navigation]);
 
   return (
     <View style={styles.container}>
       <Text style={styles.logo}>Pitch</Text>
+      <ActivityIndicator size="large" color="#000" style={{ marginTop: 20 }} />
     </View>
   );
 };
