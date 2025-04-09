@@ -64,9 +64,9 @@ const EventDetailsScreen = () => {
           <Text style={styles.eventDescription}>{event.description || 'No description available'}</Text>
 
           <View style={styles.additionalDetails}>
-            <Text style={styles.detailText}>Date: March 25, 2025</Text>
-            <Text style={styles.detailText}>Location: Tech Hub, Silicon Valley</Text>
-            <Text style={styles.detailText}>Time: 9:00 AM - 5:00 PM</Text>
+            <Text style={styles.detailText}>Deadline: 1st May 2025</Text>
+            <Text style={styles.detailText}>Location: India</Text>
+            <Text style={styles.detailText}>Time: 24/7</Text>
           </View>
 
           {renderParticipationSteps()}

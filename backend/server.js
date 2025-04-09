@@ -38,6 +38,20 @@ app.use((req, res) => {
   res.status(404).json({ message: `Route ${req.url} not found` });
 });
 
+// Function to send dummy request to keep database alive
+async function keepDatabaseAlive() {
+  try {
+    const db = await connectDB();
+    await db.query("SELECT 1"); // Lightweight dummy query
+    console.log("✅ Sent dummy request to keep database alive");
+  } catch (err) {
+    console.error("❌ Error sending dummy request:", err);
+  }
+}
+
+// Start the database alive check every 2 minutes
+setInterval(keepDatabaseAlive, 2 * 60 * 1000); // 2 minutes in milliseconds
+
 // Server startup
 async function startServer() {
   try {

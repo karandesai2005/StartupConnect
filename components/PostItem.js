@@ -21,7 +21,7 @@ import { debounce } from 'lodash';
 
 const { width } = Dimensions.get('window');
 const NGROK_URL = 'https://pitch-backend-avb7geahhvfteqf9.centralindia-01.azurewebsites.net/';
-const FIXED_MEDIA_HEIGHT = width * 5 / 4; // Same as PostViewScreen
+const FIXED_MEDIA_HEIGHT = width * 5 / 4;
 
 const formatTimestamp = (timestamp) => {
   if (!timestamp) return 'Just now';
@@ -37,7 +37,7 @@ const formatTimestamp = (timestamp) => {
   return postDate.toLocaleDateString();
 };
 
-const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems, toggleExpand }) => {
+const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems, toggleExpand, onDelete }) => {
   const navigation = useNavigation();
   const videoRef = useRef(null);
   const animatedScale = useRef(new Animated.Value(1)).current;
@@ -48,6 +48,7 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
   const [comments, setComments] = useState(item.comments || []);
   const [isCommentsLoading, setIsCommentsLoading] = useState(false);
   const [isCommentModalVisible, setIsCommentModalVisible] = useState(false);
+  const [isMoreModalVisible, setIsMoreModalVisible] = useState(false); // New state for more options modal
   const [newComment, setNewComment] = useState('');
   const [isVideo, setIsVideo] = useState(item.media_type === 'video');
   const [isMeasured, setIsMeasured] = useState(false);
@@ -148,6 +149,24 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
     }
   };
 
+  const handleDeletePost = async () => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      const postId = getPostId();
+      if (!token || !postId) return;
+
+      await axios.delete(`${NGROK_URL}/api/posts/${postId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      setIsMoreModalVisible(false);
+      if (onDelete) onDelete(postId); // Notify parent component to remove post from list
+    } catch (error) {
+      console.error('Error deleting post:', error);
+      alert('Failed to delete post. Please try again.');
+    }
+  };
+
   const debouncedHandleLike = debounce(handleLike, 300);
   const debouncedHandleAddComment = debounce(async () => {
     if (!newComment.trim()) return;
@@ -170,6 +189,7 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
   const handleProfilePress = () => navigation.navigate('Profile', { username: item.username, isOtherUser: true });
   const handleChatPress = () => console.log('Chat/Share pressed');
   const toggleCommentModal = () => setIsCommentModalVisible((prev) => !prev);
+  const toggleMoreModal = () => setIsMoreModalVisible((prev) => !prev);
   const handleDoubleTap = () => debouncedHandleLike();
   const handlePressIn = () => Animated.spring(animatedScale, { toValue: 0.98, useNativeDriver: true }).start();
   const handlePressOut = () => Animated.spring(animatedScale, { toValue: 1, useNativeDriver: true }).start();
@@ -202,18 +222,13 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
               <Text style={styles.timeStamp}>{formatTimestamp(item.created_at)}</Text>
             </View>
           </View>
-          <TouchableOpacity
-            style={styles.moreButton}
-            onPress={(e) => {
-              e.stopPropagation();
-              console.log('More button pressed for post:', getPostId());
-            }}
-          >
+          <TouchableOpacity style={styles.moreButton} onPress={toggleMoreModal}>
             <Text style={styles.moreButtonText}>•••</Text>
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
 
+      {/* Media content remains the same */}
       <TouchableOpacity
         activeOpacity={0.95}
         onPressIn={handlePressIn}
@@ -318,6 +333,7 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
         )}
       </View>
 
+      {/* Comment Modal */}
       <Modal
         isVisible={isCommentModalVisible}
         onBackdropPress={toggleCommentModal}
@@ -346,7 +362,7 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
                 <View style={styles.commentItem}>
                   <Text style={styles.commentUsername}>{item.username || 'User'}</Text>
                   <Text style={styles.commentText}>{item.content}</Text>
-                  <Text style={styles.commentTimestamp}>{formatTimestamp(item.created_at)}</Text>
+                  <Text style тебя={styles.commentTimestamp}>{formatTimestamp(item.created_at)}</Text>
                 </View>
               )}
               keyExtractor={(item) => item.comment_id.toString()}
@@ -368,6 +384,31 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
               <Text style={styles.postCommentText}>Post</Text>
             </TouchableOpacity>
           </View>
+        </View>
+      </Modal>
+
+      {/* More Options Modal */}
+      <Modal
+        isVisible={isMoreModalVisible}
+        onBackdropPress={toggleMoreModal}
+        onSwipeComplete={toggleMoreModal}
+        swipeDirection="down"
+        backdropOpacity={0.5}
+        backdropColor="#000"
+        style={styles.moreModal}
+        animationIn="slideInUp"
+        animationOut="slideOutDown"
+        useNativeDriver={true}
+      >
+        <View style={styles.moreModalContent}>
+          {isUserPost && (
+            <TouchableOpacity style={styles.moreOption} onPress={handleDeletePost}>
+              <Text style={styles.deleteText}>Delete</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity style={styles.moreOption} onPress={toggleMoreModal}>
+            <Text style={styles.optionText}>Cancel</Text>
+          </TouchableOpacity>
         </View>
       </Modal>
     </Animated.View>
@@ -393,9 +434,11 @@ PostItem.propTypes = {
   isVisible: PropTypes.bool.isRequired,
   expandedItems: PropTypes.object.isRequired,
   toggleExpand: PropTypes.func.isRequired,
+  onDelete: PropTypes.func, // New prop to handle post deletion in parent component
 };
 
 const styles = StyleSheet.create({
+  // Existing styles remain unchanged
   card: { backgroundColor: '#fff', width: width, marginBottom: 10 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12 },
   userInfo: { flexDirection: 'row', alignItems: 'center' },
@@ -436,6 +479,31 @@ const styles = StyleSheet.create({
   postCommentText: { color: '#fff', fontSize: 14, fontWeight: '600' },
   commentLoader: { marginVertical: 20 },
   noCommentsText: { fontSize: 14, color: '#868E96', textAlign: 'center', marginVertical: 20 },
+
+  // New styles for more options modal
+  moreModal: { justifyContent: 'flex-end', margin: 0 },
+  moreModalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 15,
+    borderTopRightRadius: 15,
+    padding: 10,
+  },
+  moreOption: {
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  deleteText: {
+    fontSize: 16,
+    color: '#FF3B30', // Red color for delete
+    fontWeight: '600',
+  },
+  optionText: {
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '600',
+  },
 });
 
 export default PostItem;

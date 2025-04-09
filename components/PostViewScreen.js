@@ -16,8 +16,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import PostItem from './PostItem';
 
 const { width } = Dimensions.get('window');
-const FIXED_MEDIA_HEIGHT = width * 5 / 4; // Uniform height for both image and video
-const FIXED_CONTENT_HEIGHT = 150; // Approximate height of header, footer, actions, and caption
+const FIXED_MEDIA_HEIGHT = width * 5 / 4;
+const FIXED_CONTENT_HEIGHT = 150;
 
 const PostViewScreen = ({ route }) => {
   const { posts: initialPosts = [], initialIndex = 0 } = route?.params || {};
@@ -33,7 +33,6 @@ const PostViewScreen = ({ route }) => {
 
   useEffect(() => {
     const initializePosts = () => {
-      // Filter out posts with no valid ID and log issues
       const validPosts = initialPosts
         .filter(post => {
           const hasId = post && (post.post_id || post._id || post.id);
@@ -101,6 +100,15 @@ const PostViewScreen = ({ route }) => {
     setExpandedItems(prev => ({ ...prev, [index]: !prev[index] }));
   }, []);
 
+  const handleDelete = useCallback((postId) => {
+    setPosts(prevPosts => prevPosts.filter(post => (post.post_id || post._id || post.id) !== postId));
+    // Adjust currentIndex if necessary
+    setCurrentIndex(prevIndex => {
+      if (prevIndex >= posts.length - 1) return Math.max(0, prevIndex - 1);
+      return prevIndex;
+    });
+  }, [posts.length]);
+
   const onViewableItemsChanged = useCallback(({ viewableItems }) => {
     if (viewableItems.length > 0) setCurrentIndex(viewableItems[0].index);
   }, []);
@@ -143,6 +151,7 @@ const PostViewScreen = ({ route }) => {
               isVisible={index === currentIndex}
               expandedItems={expandedItems}
               toggleExpand={toggleExpand}
+              onDelete={handleDelete} // Pass the handleDelete function
             />
           )}
           keyExtractor={(item, index) => (item.post_id || item._id || item.id || `fallback-${index}`).toString()}
