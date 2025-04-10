@@ -18,7 +18,7 @@ const authenticateJWT = async (req, res, next) => {
   try {
     // Check if token is blacklisted
     const blacklistQuery = `
-      SELECT * FROM token_blacklist WHERE token = @param1
+      SELECT * FROM public.token_blacklist WHERE token = $1
     `;
     const blacklistResult = await queryDB(blacklistQuery, [token]);
     console.log('Blacklist check result:', blacklistResult);

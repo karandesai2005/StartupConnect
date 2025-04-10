@@ -1,4 +1,4 @@
-const { connectDB } = require('../config/db');
+const { queryDB } = require('../config/db'); // Use queryDB instead of connectDB
 
 // Validation Functions
 const validateId = (id, name) => {
@@ -26,19 +26,19 @@ const Post = {
     }
 
     const query = `
-      INSERT INTO posts (content, media_url, user_id, tags, created_at)
+      INSERT INTO public.posts (content, media_url, user_id, tags, created_at)
       VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
       RETURNING post_id, content, media_url, created_at, user_id, tags, 0 AS like_count;
     `;
 
     try {
-      const result = await connectDB().query(query, [
+      const result = await queryDB(query, [
         validateContent(content),
         media_url || null,
         validateId(user_id, 'User ID'),
         validateTags(tags)
       ]);
-      const post = result.rows[0];
+      const post = result[0]; // queryDB returns rows array
       post.tags = JSON.parse(post.tags); // Parse tags back to array for response
       return post;
     } catch (error) {
@@ -59,17 +59,17 @@ const Post = {
         u.username,
         u.name,
         u.profile_picture,
-        (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.post_id) AS like_count,
-        (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.post_id) AS comment_count
-      FROM posts p
-      JOIN users u ON p.user_id = u.user_id
+        (SELECT COUNT(*) FROM public.likes l WHERE l.post_id = p.post_id) AS like_count,
+        (SELECT COUNT(*) FROM public.comments c WHERE c.post_id = p.post_id) AS comment_count
+      FROM public.posts p
+      JOIN public.users u ON p.user_id = u.user_id
       ORDER BY p.created_at DESC
       LIMIT $2 OFFSET $1;
     `;
 
     try {
-      const result = await connectDB().query(query, [offset, limit]);
-      return result.rows.map(post => ({
+      const result = await queryDB(query, [offset, limit]);
+      return result.map(post => ({
         ...post,
         tags: post.tags ? JSON.parse(post.tags) : [],
       }));
@@ -91,22 +91,22 @@ const Post = {
         u.username,
         u.name,
         u.profile_picture,
-        (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.post_id) AS like_count,
-        (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.post_id) AS comment_count
-      FROM posts p
-      JOIN users u ON p.user_id = u.user_id
+        (SELECT COUNT(*) FROM public.likes l WHERE l.post_id = p.post_id) AS like_count,
+        (SELECT COUNT(*) FROM public.comments c WHERE c.post_id = p.post_id) AS comment_count
+      FROM public.posts p
+      JOIN public.users u ON p.user_id = u.user_id
       WHERE p.user_id = $1
       ORDER BY p.created_at DESC
       LIMIT $3 OFFSET $2;
     `;
 
     try {
-      const result = await connectDB().query(query, [
+      const result = await queryDB(query, [
         validateId(userId, 'User ID'),
         offset,
         limit
       ]);
-      return result.rows.map(post => ({
+      return result.map(post => ({
         ...post,
         tags: post.tags ? JSON.parse(post.tags) : [],
       }));
@@ -118,35 +118,31 @@ const Post = {
 
   deletePost: async (postId, userId) => {
     const queries = [
-      'DELETE FROM likes WHERE post_id = $1',
-      'DELETE FROM comments WHERE post_id = $1',
-      'DELETE FROM posts WHERE post_id = $1 AND user_id = $2'
+      'DELETE FROM public.likes WHERE post_id = $1',
+      'DELETE FROM public.comments WHERE post_id = $1',
+      'DELETE FROM public.posts WHERE post_id = $1 AND user_id = $2'
     ];
 
     try {
-      const client = await connectDB();
-      try {
-        const postIdValidated = validateId(postId, 'Post ID');
-        const userIdValidated = validateId(userId, 'User ID');
+      const client = await queryDB; // No need for client if using queryDB directly
+      const postIdValidated = validateId(postId, 'Post ID');
+      const userIdValidated = validateId(userId, 'User ID');
 
-        // Verify ownership
-        const verifyResult = await client.query(
-          'SELECT COUNT(*) AS count FROM posts WHERE post_id = $1 AND user_id = $2',
-          [postIdValidated, userIdValidated]
-        );
-        if (verifyResult.rows[0].count === 0) {
-          throw new Error('Post not found or unauthorized');
-        }
-
-        // Execute deletes sequentially
-        for (const query of queries) {
-          await client.query(query, [postIdValidated, userIdValidated]);
-        }
-
-        return { deleted: true };
-      } catch (error) {
-        throw error;
+      // Verify ownership
+      const verifyResult = await queryDB(
+        'SELECT COUNT(*) AS count FROM public.posts WHERE post_id = $1 AND user_id = $2',
+        [postIdValidated, userIdValidated]
+      );
+      if (verifyResult[0].count === 0) {
+        throw new Error('Post not found or unauthorized');
       }
+
+      // Execute deletes sequentially
+      for (const query of queries) {
+        await queryDB(query, [postIdValidated, userIdValidated]);
+      }
+
+      return { deleted: true };
     } catch (error) {
       console.error('Delete post error:', error);
       if (error.message.includes('not found') || error.message.includes('unauthorized')) {
@@ -168,27 +164,27 @@ const Post = {
         u.username,
         u.name,
         u.profile_picture,
-        (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.post_id) AS like_count,
-        (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.post_id) AS comment_count
-      FROM posts p
-      JOIN users u ON p.user_id = u.user_id
+        (SELECT COUNT(*) FROM public.likes l WHERE l.post_id = p.post_id) AS like_count,
+        (SELECT COUNT(*) FROM public.comments c WHERE c.post_id = p.post_id) AS comment_count
+      FROM public.posts p
+      JOIN public.users u ON p.user_id = u.user_id
       WHERE u.username = $1
       ORDER BY p.created_at DESC
       LIMIT $3 OFFSET $2;
     `;
 
     try {
-      const result = await connectDB().query(query, [username, offset, limit]);
+      const result = await queryDB(query, [username, offset, limit]);
 
-      if (result.rows.length === 0) {
-        const userCheck = await connectDB().query(
-          'SELECT 1 FROM users WHERE username = $1',
+      if (result.length === 0) {
+        const userCheck = await queryDB(
+          'SELECT 1 FROM public.users WHERE username = $1',
           [username]
         );
-        if (userCheck.rows.length === 0) throw new Error('User not found');
+        if (userCheck.length === 0) throw new Error('User not found');
       }
 
-      return result.rows.map(post => ({
+      return result.map(post => ({
         ...post,
         tags: post.tags ? JSON.parse(post.tags) : [],
       }));
@@ -200,39 +196,38 @@ const Post = {
   },
 
   toggleLike: async (postId, userId) => {
-    const checkPostQuery = 'SELECT 1 FROM posts WHERE post_id = $1';
+    const checkPostQuery = 'SELECT 1 FROM public.posts WHERE post_id = $1';
     const toggleQuery = `
-      INSERT INTO likes (post_id, user_id)
+      INSERT INTO public.likes (post_id, user_id)
       ON CONFLICT (post_id, user_id) DO
       UPDATE SET user_id = EXCLUDED.user_id
       WHERE FALSE
-      RETURNING (SELECT COUNT(*) FROM likes WHERE post_id = $1) AS like_count, TRUE AS liked;
+      RETURNING (SELECT COUNT(*) FROM public.likes WHERE post_id = $1) AS like_count, TRUE AS liked;
     `;
     const unlikeQuery = `
-      DELETE FROM likes WHERE post_id = $1 AND user_id = $2
-      RETURNING (SELECT COUNT(*) FROM likes WHERE post_id = $1) AS like_count, FALSE AS liked;
+      DELETE FROM public.likes WHERE post_id = $1 AND user_id = $2
+      RETURNING (SELECT COUNT(*) FROM public.likes WHERE post_id = $1) AS like_count, FALSE AS liked;
     `;
 
     try {
-      const client = await connectDB();
       const postIdValidated = validateId(postId, 'Post ID');
       const userIdValidated = validateId(userId, 'User ID');
 
       // Verify post exists
-      const postCheck = await client.query(checkPostQuery, [postIdValidated]);
-      if (postCheck.rows.length === 0) throw new Error('Post not found');
+      const postCheck = await queryDB(checkPostQuery, [postIdValidated]);
+      if (postCheck.length === 0) throw new Error('Post not found');
 
       // Check if like exists
-      const likeCheck = await client.query(
-        'SELECT 1 FROM likes WHERE post_id = $1 AND user_id = $2',
+      const likeCheck = await queryDB(
+        'SELECT 1 FROM public.likes WHERE post_id = $1 AND user_id = $2',
         [postIdValidated, userIdValidated]
       );
 
-      const result = likeCheck.rows.length > 0
-        ? await client.query(unlikeQuery, [postIdValidated, userIdValidated])
-        : await client.query(toggleQuery, [postIdValidated, userIdValidated]);
+      const result = likeCheck.length > 0
+        ? await queryDB(unlikeQuery, [postIdValidated, userIdValidated])
+        : await queryDB(toggleQuery, [postIdValidated, userIdValidated]);
 
-      return result.rows[0];
+      return result[0];
     } catch (error) {
       console.error('Toggle like error:', error);
       if (error.message.includes('Post not found')) throw new Error('Post not found');
@@ -243,20 +238,20 @@ const Post = {
   getLikeStatus: async (postId, userId) => {
     const query = `
       SELECT 
-        (SELECT COUNT(*) FROM likes WHERE post_id = $1) AS like_count,
-        CASE WHEN EXISTS (SELECT 1 FROM likes WHERE post_id = $1 AND user_id = $2)
+        (SELECT COUNT(*) FROM public.likes WHERE post_id = $1) AS like_count,
+        CASE WHEN EXISTS (SELECT 1 FROM public.likes WHERE post_id = $1 AND user_id = $2)
           THEN 1 ELSE 0 END AS is_liked
-      WHERE EXISTS (SELECT 1 FROM posts WHERE post_id = $1);
+      WHERE EXISTS (SELECT 1 FROM public.posts WHERE post_id = $1);
     `;
 
     try {
-      const result = await connectDB().query(query, [
+      const result = await queryDB(query, [
         validateId(postId, 'Post ID'),
         validateId(userId, 'User ID')
       ]);
 
-      if (result.rows.length === 0) throw new Error('Post not found');
-      return result.rows[0];
+      if (result.length === 0) throw new Error('Post not found');
+      return result[0];
     } catch (error) {
       console.error('Get like status error:', error);
       if (error.message.includes('Post not found')) throw new Error('Post not found');
@@ -272,20 +267,20 @@ const Post = {
         c.created_at,
         c.user_id,
         u.username
-      FROM comments c
-      JOIN users u ON c.user_id = u.user_id
+      FROM public.comments c
+      JOIN public.users u ON c.user_id = u.user_id
       WHERE c.post_id = $1
       ORDER BY c.created_at DESC
       LIMIT $3 OFFSET $2;
     `;
 
     try {
-      const result = await connectDB().query(query, [
+      const result = await queryDB(query, [
         validateId(postId, 'Post ID'),
         offset,
         limit
       ]);
-      return result.rows;
+      return result;
     } catch (error) {
       console.error('Get comments error:', error);
       throw new Error(error.message.includes('must be') ? error.message : 'Unable to fetch comments');
@@ -294,18 +289,18 @@ const Post = {
 
   createComment: async (postId, userId, content) => {
     const query = `
-      INSERT INTO comments (post_id, user_id, content, created_at)
+      INSERT INTO public.comments (post_id, user_id, content, created_at)
       VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
       RETURNING comment_id, content, created_at, user_id;
     `;
 
     try {
-      const result = await connectDB().query(query, [
+      const result = await queryDB(query, [
         validateId(postId, 'Post ID'),
         validateId(userId, 'User ID'),
         validateContent(content)
       ]);
-      return result.rows[0];
+      return result[0];
     } catch (error) {
       console.error('Create comment error:', error);
       throw new Error(error.message.includes('must be') ? error.message : 'Unable to create comment');

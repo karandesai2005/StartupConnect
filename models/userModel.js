@@ -1,45 +1,43 @@
-const { connectDB } = require('../config/db');
+const { queryDB } = require('../config/db'); // Use queryDB instead of connectDB
 
 // SQL query templates
 const QUERIES = {
-  GET_BY_EMAIL: 'SELECT * FROM users WHERE email = $1',
+  GET_BY_EMAIL: 'SELECT * FROM public.users WHERE email = $1',
   GET_USER_DETAILS: `
     SELECT u.*, 
-           (SELECT COUNT(*) FROM followers WHERE followee_id = u.user_id) AS followers,
-           (SELECT COUNT(*) FROM followers WHERE follower_id = u.user_id) AS following
-    FROM users u
+           (SELECT COUNT(*) FROM public.followers WHERE followee_id = u.user_id) AS followers,
+           (SELECT COUNT(*) FROM public.followers WHERE follower_id = u.user_id) AS following
+    FROM public.users u
     WHERE `,
   CREATE_USER: `
-    INSERT INTO users (username, email, password_hash, is_founder, is_investor, created_at)
+    INSERT INTO public.users (username, email, password_hash, is_founder, is_investor, created_at)
     VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
     RETURNING user_id`,
   FOLLOW: `
-    INSERT INTO followers (follower_id, followee_id, followed_at)
+    INSERT INTO public.followers (follower_id, followee_id, followed_at)
     VALUES ($1, $2, CURRENT_TIMESTAMP)`,
   UNFOLLOW: `
-    DELETE FROM followers
+    DELETE FROM public.followers
     WHERE follower_id = $1 AND followee_id = $2`,
   IS_FOLLOWING: `
     SELECT COUNT(*) AS count
-    FROM followers
+    FROM public.followers
     WHERE follower_id = $1 AND followee_id = $2`,
   GET_FOLLOWERS: `
     SELECT u.user_id, u.username, u.profile_picture
-    FROM users u
-    JOIN followers f ON u.user_id = f.follower_id
+    FROM public.users u
+    JOIN public.followers f ON u.user_id = f.follower_id
     WHERE f.followee_id = $1`,
   GET_FOLLOWING: `
     SELECT u.user_id, u.username, u.profile_picture
-    FROM users u
-    JOIN followers f ON u.user_id = f.followee_id
+    FROM public.users u
+    JOIN public.followers f ON u.user_id = f.followee_id
     WHERE f.follower_id = $1`
 };
 
 // Utility function to execute queries
 async function executeQuery(query, params = []) {
-  const client = await connectDB();
-  const result = await client.query(query, params);
-  return result;
+  return await queryDB(query, params); // Use queryDB directly
 }
 
 // Error handling wrapper
@@ -56,21 +54,21 @@ const User = {
   async getUserByEmail(email) {
     return withErrorHandling(async () => {
       const result = await executeQuery(QUERIES.GET_BY_EMAIL, [email]);
-      return result.rows[0] || null;
+      return result[0] || null; // queryDB returns rows array
     }, 'getUserByEmail');
   },
 
   async getUserByUsername(username) {
     return withErrorHandling(async () => {
       const result = await executeQuery(`${QUERIES.GET_USER_DETAILS} u.username = $1`, [username]);
-      return result.rows[0] || null;
+      return result[0] || null; // queryDB returns rows array
     }, 'getUserByUsername');
   },
 
   async getUserById(userId) {
     return withErrorHandling(async () => {
       const result = await executeQuery(`${QUERIES.GET_USER_DETAILS} u.user_id = $1`, [userId]);
-      return result.rows[0] || null;
+      return result[0] || null; // queryDB returns rows array
     }, 'getUserById');
   },
 
@@ -83,7 +81,7 @@ const User = {
         isFounder ? 1 : 0,
         isInvestor ? 1 : 0
       ]);
-      const newUserId = result.rows[0].user_id;
+      const newUserId = result[0].user_id;
       return this.getUserById(newUserId);
     }, 'createUser');
   },
@@ -112,21 +110,21 @@ const User = {
         followerId,
         followeeId
       ]);
-      return result.rows[0].count > 0;
+      return result[0].count > 0;
     }, 'isFollowing');
   },
 
   async getFollowers(userId) {
     return withErrorHandling(async () => {
       const result = await executeQuery(QUERIES.GET_FOLLOWERS, [userId]);
-      return result.rows;
+      return result;
     }, 'getFollowers');
   },
 
   async getFollowing(userId) {
     return withErrorHandling(async () => {
       const result = await executeQuery(QUERIES.GET_FOLLOWING, [userId]);
-      return result.rows;
+      return result;
     }, 'getFollowing');
   },
 };
