@@ -1,9 +1,7 @@
-require('dotenv').config(); // Load .env file
+require('dotenv').config();
 
-// Use pg package for PostgreSQL (Supabase)
 const { Pool } = require('pg');
 
-// Log environment variables for debugging
 console.log("🔍 Checking Environment Variables:");
 console.log("🔹 DB_USER:", process.env.DB_USER || "❌ Not Set");
 console.log("🔹 DB_PASSWORD:", process.env.DB_PASSWORD ? "✔️ Set" : "❌ Not Set");
@@ -16,11 +14,10 @@ const pool = new Pool({
   host: process.env.DB_HOST,
   database: process.env.DB_NAME,
   password: process.env.DB_PASSWORD,
-  port: parseInt(process.env.DB_PORT, 10) || 5432, // Default PostgreSQL port
-  ssl: {
-    rejectUnauthorized: false // For development; use certificates in production
-  },
-  max: 10, // Pool settings
+  port: parseInt(process.env.DB_PORT, 10) || 5432,
+  ssl: { rejectUnauthorized: false }, // For development
+  family: 4, // Force IPv4
+  max: 10,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,
 });
@@ -28,7 +25,7 @@ const pool = new Pool({
 async function connectDB() {
   try {
     const client = await pool.connect();
-    await client.query('SELECT 1'); // Test connection
+    await client.query('SELECT 1');
     console.log("✅ Connected to Supabase successfully!");
     client.release();
     return pool;
@@ -42,7 +39,7 @@ async function queryDB(query, params = []) {
   const client = await pool.connect();
   try {
     const result = await client.query(query, params);
-    return result.rows; // pg returns rows instead of recordset
+    return result.rows;
   } catch (error) {
     console.error("❌ Query execution failed:", error);
     throw error;
@@ -51,7 +48,4 @@ async function queryDB(query, params = []) {
   }
 }
 
-module.exports = {
-  connectDB,
-  queryDB,
-};
+module.exports = { connectDB, queryDB };
