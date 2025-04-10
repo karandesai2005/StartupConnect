@@ -1,571 +1,184 @@
-const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
-const { queryDB } = require("../config/db");
-const upload = require("../config/multerConfig"); // Adjust path to your Multer config
+require('dotenv').config();
+const Post = require('../models/postModel');
 
-// Register user
-const register = async (req, res) => {
-  try {
-    const { username, email, password, isFounder, isInvestor } = req.body;
+// Constants
+const BASE_URL = process.env.NGROK_URL || 'https://pitch-backend-avb7geahhvfteqf9.centralindia-01.azurewebsites.net';
 
-    if (!username || !email || !password) {
-      return res.status(400).json({ message: "Username, email, and password are required." });
+// Utility Functions
+const getUserId = (req) => req.user?.userId || req.user?.id;
+
+const validateId = (id, name) => {
+  if (!id || isNaN(id)) throw new Error(`${name} must be a valid number`);
+  return parseInt(id);
+};
+
+// Post Controller
+const postController = {
+  createPost: async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: 'User authentication required' });
+
+      const { content, tags } = req.body;
+      const mediaUrl = req.file ? `${BASE_URL}/uploads/posts/${req.file.filename}` : null;
+      const parsedTags = Array.isArray(tags) ? tags : (tags ? JSON.parse(tags) : []);
+
+      const newPost = await Post.create(content || '', mediaUrl, userId, parsedTags);
+
+      res.status(201).json(newPost);
+    } catch (error) {
+      console.error('Create post error:', error);
+      res.status(error.message.includes('required') ? 400 : 500).json({ error: error.message });
     }
+  },
 
-    const normalizedEmail = email.toLowerCase();
+  deletePost: async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: 'User authentication required' });
 
-    const existingUsers = await queryDB(
-      "SELECT * FROM users WHERE email = $1",
-      [normalizedEmail]
-    );
+      const { postId } = req.params;
+      const result = await Post.deletePost(validateId(postId, 'Post ID'), userId);
 
-    if (existingUsers.length > 0) {
-      return res.status(400).json({ message: "Email already in use" });
-    }
-
-    const passwordHash = await bcrypt.hash(password, parseInt(process.env.SALT_ROUNDS, 10));
-
-    const query = `
-      INSERT INTO users (username, email, password_hash, is_founder, is_investor, created_at)
-      VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
-      RETURNING user_id;
-    `;
-
-    const result = await queryDB(query, [
-      username,
-      normalizedEmail,
-      passwordHash,
-      isFounder ? 1 : 0,
-      isInvestor ? 1 : 0
-    ]);
-
-    res.status(201).json({
-      message: "User registered successfully",
-      user: {
-        user_id: result[0].user_id,
-        username,
-        email: normalizedEmail
+      res.status(200).json({ message: 'Post deleted successfully', result });
+    } catch (error) {
+      console.error('Delete post error:', error);
+      if (error.message.includes('not found') || error.message.includes('unauthorized')) {
+        return res.status(403).json({ error: 'Post not found or unauthorized' });
       }
-    });
-  } catch (err) {
-    console.error("Registration error:", err);
-    res.status(500).json({ message: "Internal server error", error: err.message });
-  }
-};
-
-// Login user
-const login = async (req, res) => {
-  try {
-    const { email, username, password } = req.body;
-    console.log("Login attempt with:", { email, username });
-
-    if (!email && !username) {
-      return res.status(400).json({ message: "Email or username is required." });
+      res.status(error.message.includes('valid number') ? 400 : 500).json({ error: error.message });
     }
+  },
 
-    let query = email ? "SELECT * FROM users WHERE email = $1" : "SELECT * FROM users WHERE username = $1";
-    let paramValue = (email || username).toLowerCase();
+  getAllPosts: async (req, res) => {
+    try {
+      const { page = 1, limit = 10 } = req.query;
+      const offset = (page - 1) * limit;
+      const posts = await Post.getAllPosts({ limit: parseInt(limit), offset });
 
-    const users = await queryDB(query, [paramValue]);
-    console.log("Query result:", users);
-
-    if (users.length === 0) {
-      return res.status(400).json({ message: "Invalid email/username or password" });
+      res.status(200).json(posts);
+    } catch (error) {
+      console.error('Get all posts error:', error);
+      res.status(500).json({ error: 'Server error' });
     }
+  },
 
-    const user = users[0];
-    console.log("Found user:", { userId: user.user_id });
+  getUserPosts: async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: 'User authentication required' });
 
-    const isMatch = await bcrypt.compare(password, user.password_hash);
-    console.log("Password match:", isMatch);
+      const { page = 1, limit = 10 } = req.query;
+      const offset = (page - 1) * limit;
+      const posts = await Post.getPostsByUserId(userId, { limit: parseInt(limit), offset });
 
-    if (!isMatch) {
-      return res.status(400).json({ message: "Invalid email/username or password" });
+      res.status(200).json(posts);
+    } catch (error) {
+      console.error('Get user posts error:', error);
+      res.status(500).json({ error: 'Server error' });
     }
+  },
 
-    console.log("JWT_SECRET:", process.env.JWT_SECRET);
-    const token = jwt.sign({ userId: user.user_id }, process.env.JWT_SECRET, {
-      expiresIn: "1h",
-    });
-    console.log("Generated token:", token);
+  getPostsByUsername: async (req, res) => {
+    try {
+      const { username } = req.params;
+      if (!username) return res.status(400).json({ error: 'Username required' });
 
-    res.status(200).json({ message: "Login successful!", token });
-  } catch (err) {
-    console.error("Login error:", err);
-    res.status(500).json({ message: "Internal server error", error: err.message });
-  }
-};
+      const { page = 1, limit = 10 } = req.query;
+      const offset = (page - 1) * limit;
+      const posts = await Post.getPostsByUsername(username, { limit: parseInt(limit), offset });
 
-// Logout user
-const logout = async (req, res) => {
-  try {
-    const token = req.headers.authorization?.split(" ")[1]; // Extract token from "Bearer <token>"
-    if (!token) {
-      return res.status(400).json({ message: "No token provided" });
-    }
-
-    // Decode the token to get its expiration time
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const expiresAt = new Date(decoded.exp * 1000); // Convert expiration time to Date object
-
-    // Add the token to the blacklist
-    const query = `
-      INSERT INTO token_blacklist (token, expires_at)
-      VALUES ($1, $2)
-    `;
-    await queryDB(query, [token, expiresAt]);
-
-    res.status(200).json({ message: "Logged out successfully" });
-  } catch (err) {
-    console.error("Logout error:", err);
-    res.status(500).json({ message: "Internal server error", error: err.message });
-  }
-};
-
-// Middleware to check if token is blacklisted
-const checkTokenBlacklist = async (req, res, next) => {
-  try {
-    const token = req.headers.authorization?.split(" ")[1];
-    if (!token) {
-      return res.status(401).json({ message: "No token provided" });
-    }
-
-    // Check if token is in the blacklist
-    const query = `
-      SELECT * FROM token_blacklist WHERE token = $1
-    `;
-    const result = await queryDB(query, [token]);
-
-    if (result.length > 0) {
-      return res.status(401).json({ message: "Token has been invalidated" });
-    }
-
-    next();
-  } catch (err) {
-    console.error("Token blacklist check error:", err);
-    res.status(500).json({ message: "Internal server error", error: err.message });
-  }
-};
-
-// Delete user account
-const deleteAccount = async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    const token = req.headers.authorization?.split(" ")[1]; // Extract token for blacklisting
-
-    // Begin transaction-like behavior (note: PostgreSQL doesn't use BEGIN/END in this context with pg)
-    const transactionQueries = [
-      // Delete user's comments
-      {
-        query: `
-          DELETE FROM comments WHERE user_id = $1
-        `,
-        params: [userId]
-      },
-      // Delete user's likes
-      {
-        query: `
-          DELETE FROM likes WHERE user_id = $1
-        `,
-        params: [userId]
-      },
-      // Delete user's posts
-      {
-        query: `
-          DELETE FROM posts WHERE user_id = $1
-        `,
-        params: [userId]
-      },
-      // Delete user
-      {
-        query: `
-          DELETE FROM users WHERE user_id = $1
-        `,
-        params: [userId]
+      res.status(200).json(posts);
+    } catch (error) {
+      console.error('Get posts by username error:', error);
+      if (error.message.includes('User not found')) {
+        return res.status(404).json({ error: 'User not found' });
       }
-    ];
-
-    // Execute all delete queries sequentially
-    for (const { query, params } of transactionQueries) {
-      await queryDB(query, params);
+      res.status(500).json({ error: 'Server error' });
     }
+  },
 
-    // Blacklist the token
-    if (token) {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      const expiresAt = new Date(decoded.exp * 1000);
-      const blacklistQuery = `
-        INSERT INTO token_blacklist (token, expires_at)
-        VALUES ($1, $2)
-      `;
-      await queryDB(blacklistQuery, [token, expiresAt]);
+  toggleLike: async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: 'User authentication required' });
+
+      const { postId } = req.params;
+      const result = await Post.toggleLike(validateId(postId, 'Post ID'), userId);
+
+      res.status(200).json(result);
+    } catch (error) {
+      console.error('Toggle like error:', error);
+      if (error.message.includes('Post not found')) {
+        return res.status(404).json({ error: 'Post not found' });
+      }
+      res.status(error.message.includes('valid number') ? 400 : 500).json({ error: error.message });
     }
+  },
 
-    res.status(200).json({ message: "Account deleted successfully" });
-  } catch (err) {
-    console.error("Delete account error:", err);
-    res.status(500).json({ message: "Internal server error", error: err.message });
-  }
+  getLikeStatus: async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: 'User authentication required' });
+
+      const { postId } = req.params;
+      const status = await Post.getLikeStatus(validateId(postId, 'Post ID'), userId);
+
+      res.status(200).json(status);
+    } catch (error) {
+      console.error('Get like status error:', error);
+      if (error.message.includes('Post not found')) {
+        return res.status(404).json({ error: 'Post not found' });
+      }
+      res.status(error.message.includes('valid number') ? 400 : 500).json({ error: error.message });
+    }
+  },
+
+  getComments: async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: 'User authentication required' });
+
+      const { postId } = req.params;
+      const { limit = 10, offset = 0 } = req.query;
+      const comments = await Post.getCommentsByPostId(validateId(postId, 'Post ID'), { limit: parseInt(limit), offset });
+
+      res.status(200).json(comments);
+    } catch (error) {
+      console.error('Get comments error:', error);
+      if (error.message.includes('Post not found')) {
+        return res.status(404).json({ error: 'Post not found' });
+      }
+      res.status(error.message.includes('valid number') ? 400 : 500).json({ error: error.message });
+    }
+  },
+
+  createComment: async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: 'User authentication required' });
+
+      const { postId } = req.params;
+      const { content } = req.body;
+
+      const newComment = await Post.createComment(
+        validateId(postId, 'Post ID'),
+        userId,
+        content // Validation handled in model
+      );
+
+      res.status(201).json(newComment);
+    } catch (error) {
+      console.error('Create comment error:', error);
+      if (error.message.includes('Post not found')) {
+        return res.status(404).json({ error: 'Post not found' });
+      }
+      if (error.message.includes('Foreign key') || error.message.includes('required')) {
+        return res.status(400).json({ error: error.message });
+      }
+      res.status(500).json({ error: 'Server error' });
+    }
+  },
 };
 
-// Save user details step-by-step
-const saveUserDetails = async (req, res) => {
-  console.log("Request Body:", req.body);
-
-  try {
-    const { step, data } = req.body;
-
-    if (!step || !data) {
-      return res.status(400).json({ message: "Step and data are required." });
-    }
-
-    let query, params;
-
-    switch (step) {
-      case 1:
-        // Existing email step
-        if (!data.email) {
-          return res.status(400).json({ message: "Email is required." });
-        }
-        const normalizedEmail = data.email.toLowerCase();
-        const existingUsers = await queryDB('SELECT * FROM users WHERE email = $1', [normalizedEmail]);
-        if (existingUsers.length > 0) {
-          return res.status(400).json({ message: "Email already in use." });
-        }
-        const tempUsername = `user_${Date.now()}`;
-        query = `
-          INSERT INTO users (email, username, created_at)
-          VALUES ($1, $2, CURRENT_TIMESTAMP)
-          RETURNING user_id;
-        `;
-        params = [normalizedEmail, tempUsername];
-        break;
-
-      case 2:
-        // Existing password step
-        if (!data.password || !data.userId) {
-          return res.status(400).json({ message: "Password and userId are required." });
-        }
-        const passwordHash = await bcrypt.hash(data.password, parseInt(process.env.SALT_ROUNDS, 10));
-        query = `
-          UPDATE users 
-          SET password_hash = $1 
-          WHERE user_id = $2
-          RETURNING user_id;
-        `;
-        params = [passwordHash, data.userId];
-        break;
-
-      case 3:
-        // Existing username step
-        if (!data.username || data.username.length < 3 || data.username.length > 20) {
-          return res.status(400).json({ message: "Username must be between 3 and 20 characters." });
-        }
-        query = `
-          UPDATE users 
-          SET username = $1 
-          WHERE user_id = $2
-          RETURNING user_id;
-        `;
-        params = [data.username, data.userId];
-        break;
-
-      case 4:
-        // Existing preference step
-        if (data.preference !== "personal" && data.preference !== "business") {
-          return res.status(400).json({ message: "Invalid preference." });
-        }
-        query = `
-          UPDATE users 
-          SET is_personal = $1, is_business = $2 
-          WHERE user_id = $3
-          RETURNING user_id;
-        `;
-        params = [data.preference === "personal" ? 1 : 0, data.preference === "business" ? 1 : 0, data.userId];
-        break;
-
-      case 5:
-        if (!data.realName || data.realName.trim() === "") {
-          return res.status(400).json({ message: "Real name is required." });
-        }
-        query = `
-          UPDATE users 
-          SET name = $1 
-          WHERE user_id = $2
-          RETURNING user_id;
-        `;
-        params = [data.realName.trim(), data.userId];
-        break;
-
-      case 6:
-        if (!data.interests || !Array.isArray(data.interests) || data.interests.length < 3) {
-          return res.status(400).json({ message: "At least 3 interests are required." });
-        }
-        if (!data.userId) {
-          return res.status(400).json({ message: "User ID is required." });
-        }
-
-        // Save interests (assuming a JSON column 'interests' in the users table)
-        query = `
-          UPDATE users 
-          SET interests = $1 
-          WHERE user_id = $2
-          RETURNING user_id, email, username;
-        `;
-        params = [JSON.stringify(data.interests), data.userId];
-
-        const result = await queryDB(query, params);
-        const user = result[0];
-
-        // Generate JWT token
-        const token = jwt.sign({ userId: user.user_id }, process.env.JWT_SECRET, { expiresIn: "1h" });
-
-        return res.status(200).json({
-          message: "Registration completed successfully",
-          user: { user_id: user.user_id, email: user.email, username: user.username },
-          token,
-        });
-
-      default:
-        return res.status(400).json({ message: "Invalid step." });
-    }
-
-    const result = await queryDB(query, params);
-    res.status(200).json({ message: "Data saved successfully", result });
-  } catch (err) {
-    console.error("Error saving user details:", err);
-    res.status(500).json({ message: "Internal server error", error: err.message });
-  }
-};
-
-// Validate username availability
-const validateUsername = async (req, res) => {
-  try {
-    const { username } = req.body;
-    console.log("Validating username:", username);
-
-    if (username.length < 3 || username.length > 20) {
-      return res.status(400).json({
-        available: false,
-        message: "Username must be between 3 and 20 characters",
-      });
-    }
-
-    const existingUsers = await queryDB(
-      "SELECT * FROM users WHERE username = $1",
-      [username]
-    );
-
-    console.log("Query result:", existingUsers);
-
-    if (existingUsers.length > 0) {
-      return res.status(200).json({
-        available: false,
-        message: "Username already exists",
-      });
-    }
-
-    res.status(200).json({
-      available: true,
-      message: "Username is available",
-    });
-  } catch (err) {
-    console.error("Error validating username:", err);
-    res.status(500).json({
-      available: false,
-      message: "Error validating username",
-      error: err.message,
-    });
-  }
-};
-
-// Get current user's profile
-const getUserProfile = async (req, res) => {
-  try {
-    const userId = req.user.userId;
-
-    const query = `
-      SELECT user_id, username, email, name, bio, profile_picture, is_personal, is_business, reel_url 
-      FROM users 
-      WHERE user_id = $1
-    `;
-
-    const result = await queryDB(query, [userId]);
-
-    if (result.length === 0) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    res.status(200).json(result[0]);
-  } catch (err) {
-    console.error("Error fetching user profile:", err.message);
-    res.status(500).json({ message: "Internal server error", error: err.message });
-  }
-};
-
-// Update current user's profile
-const updateProfile = async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    const { bio } = req.body;
-    const profilePicture = req.file;
-
-    console.log("Received bio:", bio);
-    console.log("Received file:", profilePicture);
-
-    let updates = [];
-    let values = [userId]; // Start with userId as the last parameter
-    let paramCount = 2; // Start with 2 since userId is $1
-
-    if (bio) {
-      updates.push(`bio = $${paramCount}`);
-      values.unshift(bio); // Add bio as the first parameter
-      paramCount++;
-    }
-
-    if (profilePicture) {
-      // Always use HTTPS for the URL
-      const profilePicturePath = `https://pitch-backend-avb7geahhvfteqf9.centralindia-01.azurewebsites.net/uploads/profile_pictures/${profilePicture.filename}`;
-      updates.push(`profile_picture = $${paramCount}`);
-      values.unshift(profilePicturePath); // Add profilePicturePath as the first parameter
-      paramCount++;
-    }
-
-    if (updates.length === 0) {
-      return res.status(400).json({ message: "No fields to update." });
-    }
-
-    const query = `
-      UPDATE users 
-      SET ${updates.join(", ")}
-      WHERE user_id = $1
-      RETURNING user_id, username, email, name, bio, profile_picture, is_personal, is_business;
-    `;
-
-    const result = await queryDB(query, values);
-    console.log("Updated user:", result[0]);
-
-    return res.status(200).json(result[0]);
-  } catch (err) {
-    console.error("Update error:", err);
-    return res.status(500).json({ message: "Internal server error", error: err.message });
-  }
-};
-
-// Fix profile picture URLs
-const fixProfilePictureURLs = async (req, res) => {
-  try {
-    const query = `
-      UPDATE users
-      SET profile_picture = REPLACE(profile_picture, 'http://pitch-backend-avb7geahhvfteqf9.centralindia-01.azurewebsites.net', 'https://pitch-backend-avb7geahhvfteqf9.centralindia-01.azurewebsites.net')
-      WHERE profile_picture LIKE 'http://pitch-backend-avb7geahhvfteqf9.centralindia-01.azurewebsites.net%';
-    `;
-    await queryDB(query, []);
-    res.status(200).json({ message: "Profile picture URLs updated to HTTPS" });
-  } catch (err) {
-    console.error("Error updating profile picture URLs:", err);
-    res.status(500).json({ message: "Internal server error", error: err.message });
-  }
-};
-
-// Get user profile by username
-const getUserProfileByUsername = async (req, res) => {
-  try {
-    const { username } = req.params;
-
-    const query = `
-      SELECT user_id, username, email, name, bio, profile_picture, is_personal, is_business 
-      FROM users 
-      WHERE username = $1
-    `;
-
-    const result = await queryDB(query, [username]);
-
-    if (result.length === 0) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    res.status(200).json(result[0]);
-  } catch (err) {
-    console.error("Error fetching user profile by username:", err.message);
-    res.status(500).json({ message: "Internal server error", error: err.message });
-  }
-};
-
-// Get user posts by username
-const getUserPostsByUsername = async (req, res) => {
-  try {
-    const { username } = req.params;
-
-    // First, get the user_id from the username
-    const userQuery = `
-      SELECT user_id 
-      FROM users 
-      WHERE username = $1
-    `;
-    const userResult = await queryDB(userQuery, [username]);
-
-    if (userResult.length === 0) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    const userId = userResult[0].user_id;
-
-    // Then, fetch posts for that user_id
-    const postsQuery = `
-      SELECT p.post_id, p.user_id, u.username, p.media_url, p.content, p.created_at, p.media_type,
-             (SELECT COUNT(*) FROM likes WHERE post_id = p.post_id) AS like_count
-      FROM posts p
-      JOIN users u ON p.user_id = u.user_id
-      WHERE p.user_id = $1
-      ORDER BY p.created_at DESC
-    `;
-    const posts = await queryDB(postsQuery, [userId]);
-
-    res.status(200).json(posts);
-  } catch (err) {
-    console.error("Error fetching user posts by username:", err.message);
-    res.status(500).json({ message: "Internal server error", error: err.message });
-  }
-};
-
-// Search users
-const searchUsers = async (req, res) => {
-  try {
-    const { q } = req.query; // Query parameter 'q' for search term
-    if (!q || q.length < 1) {
-      return res.status(400).json({ message: "Search query is required." });
-    }
-
-    const query = `
-      SELECT user_id, username, profile_picture
-      FROM users
-      WHERE LOWER(username) LIKE $1
-      ORDER BY username
-    `;
-    const searchTerm = `%${q.toLowerCase()}%`;
-    const result = await queryDB(query, [searchTerm]);
-
-    res.status(200).json(result);
-  } catch (err) {
-    console.error("Error searching users:", err.message);
-    res.status(500).json({ message: "Internal server error", error: err.message });
-  }
-};
-
-// Updated exports
-module.exports = {
-  register,
-  login,
-  logout,
-  deleteAccount,
-  validateUsername,
-  saveUserDetails,
-  getUserProfile,
-  updateProfile,
-  getUserProfileByUsername,
-  getUserPostsByUsername,
-  searchUsers,
-  checkTokenBlacklist,
-  fixProfilePictureURLs
-};
+module.exports = postController;
