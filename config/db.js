@@ -16,7 +16,6 @@ const pool = new Pool({
   password: process.env.DB_PASSWORD,
   port: parseInt(process.env.DB_PORT, 10) || 5432,
   ssl: { rejectUnauthorized: false }, // For development
-  family: 4, // Force IPv4
   max: 10,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,
