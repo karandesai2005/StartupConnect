@@ -1,35 +1,29 @@
-require('dotenv').config();
-
 const { Pool } = require('pg');
 
-console.log("🔍 Checking Environment Variables:");
-console.log("🔹 DB_USER:", process.env.DB_USER || "❌ Not Set");
-console.log("🔹 DB_PASSWORD:", process.env.DB_PASSWORD ? "✔️ Set" : "❌ Not Set");
-console.log("🔹 DB_HOST:", process.env.DB_HOST || "❌ Not Set");
-console.log("🔹 DB_NAME:", process.env.DB_NAME || "❌ Not Set");
-console.log("🔹 DB_PORT:", process.env.DB_PORT || "❌ Not Set");
-
 const pool = new Pool({
-  user: process.env.DB_USER,
-  host: process.env.DB_HOST,
-  database: process.env.DB_NAME,
-  password: process.env.DB_PASSWORD,
-  port: parseInt(process.env.DB_PORT, 10) || 5432,
-  ssl: { rejectUnauthorized: false }, // For development
+  user: 'postgres.audurwojdksjrfcjdzuh', // Use the full user from the pooler config
+  host: 'aws-0-ap-south-1.pooler.supabase.com',
+  database: 'postgres',
+  password: process.env.DB_PASSWORD, // Set this in Azure env vars
+  port: 6543,
+  ssl: {
+    rejectUnauthorized: true, // Supabase requires SSL
+  },
+  family: 4, // Force IPv4 to match pooler and Free tier compatibility
+  connectionTimeoutMillis: 10000, // Increased timeout for reliability
   max: 10,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
 });
 
 async function connectDB() {
   try {
     const client = await pool.connect();
-    await client.query('SELECT 1');
-    console.log("✅ Connected to Supabase successfully!");
+    const res = await client.query('SELECT NOW()');
+    console.log('✅ Connected to Supabase Pooler:', res.rows[0].now);
     client.release();
     return pool;
   } catch (err) {
-    console.error("❌ Supabase connection failed:", err);
+    console.error('❌ Supabase Pooler connection failed:', err.stack);
     throw err;
   }
 }
@@ -40,7 +34,7 @@ async function queryDB(query, params = []) {
     const result = await client.query(query, params);
     return result.rows;
   } catch (error) {
-    console.error("❌ Query execution failed:", error);
+    console.error('❌ Query execution failed:', error.stack);
     throw error;
   } finally {
     client.release();
@@ -48,3 +42,6 @@ async function queryDB(query, params = []) {
 }
 
 module.exports = { connectDB, queryDB };
+
+// Test the connection on startup
+connectDB().catch(() => process.exit(1));
