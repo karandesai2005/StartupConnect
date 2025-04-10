@@ -15,33 +15,37 @@ const Signup = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const [username, setUsername] = useState("");
-  const [isUsernameAvailable, setIsUsernameAvailable] = useState(null); // Null to handle initial state
-  const [showPopup, setShowPopup] = useState(false); // Popup visibility
-  const [checkingAvailability, setCheckingAvailability] = useState(false); // Prevent multiple API calls
+  const [isUsernameAvailable, setIsUsernameAvailable] = useState(null);
+  const [showPopup, setShowPopup] = useState(false);
+  const [checkingAvailability, setCheckingAvailability] = useState(false);
+  const [hasUppercase, setHasUppercase] = useState(false);
 
   const handleBack = () => {
     navigation.goBack();
   };
 
   const handleUsernameChange = async (text) => {
-    const lowercaseUsername = text.toLowerCase();
-    setUsername(lowercaseUsername);
-    setIsUsernameAvailable(null); // Reset availability when typing
+    setUsername(text);
+    setIsUsernameAvailable(null);
+    // Check for uppercase letters
+    const containsUppercase = /[A-Z]/.test(text);
+    setHasUppercase(containsUppercase);
 
-    if (!text.trim()) return; // Avoid empty requests
-    if (text.length < 3 || text.length > 20) return; // Ignore invalid lengths early
+    if (!text.trim()) return;
+    if (text.length < 3 || text.length > 20) return;
+    if (containsUppercase) return; // Don't check availability if uppercase exists
 
-    setCheckingAvailability(true); // Indicate checking status
+    setCheckingAvailability(true);
 
     try {
       const response = await fetch(`${NGROK_URL}/api/auth/validate-username`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: lowercaseUsername }),
+        body: JSON.stringify({ username: text }),
       });
 
       const result = await response.json();
-      console.log("Username validation response:", result); // Debugging
+      console.log("Username validation response:", result);
 
       setIsUsernameAvailable(result.available);
     } catch (error) {
@@ -58,13 +62,18 @@ const Signup = () => {
       return;
     }
 
+    if (hasUppercase) {
+      setShowPopup(true);
+      return;
+    }
+
     if (isUsernameAvailable === null) {
       Alert.alert("Error", "Please check username availability first.");
       return;
     }
 
     if (!isUsernameAvailable) {
-      setShowPopup(true); // Show popup only on submission
+      setShowPopup(true);
       return;
     }
 
@@ -113,10 +122,13 @@ const Signup = () => {
             autoCorrect={false}
           />
         </View>
-        {isUsernameAvailable === false && (
-          <Text style={styles.errorText}>Username is already taken.</Text>
+        {hasUppercase && (
+          <Text style={styles.errorText}>Please use lowercase letters only</Text>
         )}
-        {checkingAvailability && (
+        {isUsernameAvailable === false && !hasUppercase && (
+          <Text style={styles.errorText}>Username is already taken</Text>
+        )}
+        {checkingAvailability && !hasUppercase && (
           <Text style={styles.loadingText}>Checking availability...</Text>
         )}
         <View style={styles.buttonContainer}>
@@ -126,11 +138,14 @@ const Signup = () => {
         </View>
       </View>
 
-      {/* Popup Component */}
       {showPopup && (
         <Popup
-          message="Username already exists. Please choose a different one."
-          onClose={() => setShowPopup(false)} // Close the popup
+          message={
+            hasUppercase
+              ? "Please use lowercase letters only"
+              : "Username already exists. Please choose a different one."
+          }
+          onClose={() => setShowPopup(false)}
         />
       )}
     </View>
