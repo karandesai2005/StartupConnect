@@ -1,10 +1,7 @@
-require('dotenv').config();  // Load .env file
+require('dotenv').config(); // Load .env file
 
-// For Azure SQL Database, it's better to use the mssql package instead of pg.
-// (Azure SQL is a Microsoft SQL Server, not a PostgreSQL database.)
-// Ensure you have installed mssql with: npm install mssql
-
-const sql = require('mssql');
+// Use pg package for PostgreSQL (Supabase)
+const { Pool } = require('pg');
 
 // Log environment variables for debugging
 console.log("🔍 Checking Environment Variables:");
@@ -14,54 +11,43 @@ console.log("🔹 DB_HOST:", process.env.DB_HOST || "❌ Not Set");
 console.log("🔹 DB_NAME:", process.env.DB_NAME || "❌ Not Set");
 console.log("🔹 DB_PORT:", process.env.DB_PORT || "❌ Not Set");
 
-const config = {
+const pool = new Pool({
   user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  server: process.env.DB_HOST,
+  host: process.env.DB_HOST,
   database: process.env.DB_NAME,
-  port: parseInt(process.env.DB_PORT, 10) || 1433,
-  options: {
-    encrypt: true,               // Required for Azure SQL
-    trustServerCertificate: false,
-    enableArithAbort: true,
+  password: process.env.DB_PASSWORD,
+  port: parseInt(process.env.DB_PORT, 10) || 5432, // Default PostgreSQL port
+  ssl: {
+    rejectUnauthorized: false // For development; use certificates in production
   },
-  pool: {
-    max: 10,
-    min: 0,
-    idleTimeoutMillis: 30000,
-  }
-};
-
-let poolPromise;
+  max: 10, // Pool settings
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
+});
 
 async function connectDB() {
-  if (!poolPromise) {
-    poolPromise = sql.connect(config)
-      .then(pool => {
-        console.log("✅ Connection established successfully!");
-        return pool;
-      })
-      .catch(err => {
-        console.error("❌ Database connection failed:", err);
-        poolPromise = null;
-        throw err;
-      });
+  try {
+    const client = await pool.connect();
+    await client.query('SELECT 1'); // Test connection
+    console.log("✅ Connected to Supabase successfully!");
+    client.release();
+    return pool;
+  } catch (err) {
+    console.error("❌ Supabase connection failed:", err);
+    throw err;
   }
-  return poolPromise;
 }
 
 async function queryDB(query, params = []) {
+  const client = await pool.connect();
   try {
-    const pool = await connectDB();
-    const request = pool.request();
-    params.forEach((param, index) => {
-      request.input(`param${index + 1}`, param);
-    });
-    const result = await request.query(query);
-    return result.recordset;
+    const result = await client.query(query, params);
+    return result.rows; // pg returns rows instead of recordset
   } catch (error) {
     console.error("❌ Query execution failed:", error);
     throw error;
+  } finally {
+    client.release();
   }
 }
 
