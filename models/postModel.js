@@ -188,30 +188,20 @@ const Post = {
     }
   },
 
-  toggleLike: async (postId, userId) => {
+  toggleLike: async (postId, user_id) => {
     const checkPostQuery = 'SELECT 1 FROM public.posts WHERE post_id = $1';
-    const insertQuery = `
-      INSERT INTO public.likes (post_id, user_id)
-      ON CONFLICT (post_id, user_id) DO NOTHING
-      RETURNING TRUE AS liked;
-    `;
-    const deleteQuery = `
-      DELETE FROM public.likes WHERE post_id = $1 AND user_id = $2
-      RETURNING FALSE AS liked;
-    `;
-    const countQuery = `
-      SELECT COUNT(*) AS like_count FROM public.likes WHERE post_id = $1;
-    `;
+    const insertQuery = 'INSERT INTO public.likes (post_id, user_id) VALUES ($1, $2) ON CONFLICT (post_id, user_id) DO NOTHING RETURNING TRUE AS liked';
+    const deleteQuery = 'DELETE FROM public.likes WHERE post_id = $1 AND user_id = $2 RETURNING FALSE AS liked';
+    const countQuery = 'SELECT COUNT(*) AS like_count FROM public.likes WHERE post_id = $1';
 
     try {
       const postIdValidated = validateId(postId, 'Post ID');
-      const userIdValidated = validateId(userId, 'User ID');
+      const userIdValidated = validateId(user_id, 'User ID');
 
-      // Verify post exists
+      console.log('Insert Query:', insertQuery); // Debug log
       const postCheck = await queryDB(checkPostQuery, [postIdValidated]);
       if (postCheck.length === 0) throw new Error('Post not found');
 
-      // Check if like exists
       const likeCheck = await queryDB(
         'SELECT 1 FROM public.likes WHERE post_id = $1 AND user_id = $2',
         [postIdValidated, userIdValidated]
@@ -224,7 +214,6 @@ const Post = {
         result = await queryDB(insertQuery, [postIdValidated, userIdValidated]);
       }
 
-      // Get the updated like count
       const countResult = await queryDB(countQuery, [postIdValidated]);
       result[0].like_count = countResult[0].like_count;
 
@@ -242,7 +231,8 @@ const Post = {
         (SELECT COUNT(*) FROM public.likes WHERE post_id = $1) AS like_count,
         CASE WHEN EXISTS (SELECT 1 FROM public.likes WHERE post_id = $1 AND user_id = $2)
           THEN 1 ELSE 0 END AS is_liked
-      WHERE EXISTS (SELECT 1 FROM public.posts WHERE post_id = $1);
+      FROM public.posts
+      WHERE post_id = $1;
     `;
 
     try {
