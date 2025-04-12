@@ -117,17 +117,10 @@ const Post = {
   },
 
   deletePost: async (postId, userId) => {
-    const queries = [
-      'DELETE FROM public.likes WHERE post_id = $1',
-      'DELETE FROM public.comments WHERE post_id = $1',
-      'DELETE FROM public.posts WHERE post_id = $1 AND user_id = $2'
-    ];
+    const postIdValidated = validateId(postId, 'Post ID');
+    const userIdValidated = validateId(userId, 'User ID');
 
     try {
-      const client = await queryDB; // No need for client if using queryDB directly
-      const postIdValidated = validateId(postId, 'Post ID');
-      const userIdValidated = validateId(userId, 'User ID');
-
       // Verify ownership
       const verifyResult = await queryDB(
         'SELECT COUNT(*) AS count FROM public.posts WHERE post_id = $1 AND user_id = $2',
@@ -137,10 +130,10 @@ const Post = {
         throw new Error('Post not found or unauthorized');
       }
 
-      // Execute deletes sequentially
-      for (const query of queries) {
-        await queryDB(query, [postIdValidated, userIdValidated]);
-      }
+      // Execute deletes
+      await queryDB('DELETE FROM public.likes WHERE post_id = $1', [postIdValidated]);
+      await queryDB('DELETE FROM public.comments WHERE post_id = $1', [postIdValidated]);
+      await queryDB('DELETE FROM public.posts WHERE post_id = $1 AND user_id = $2', [postIdValidated, userIdValidated]);
 
       return { deleted: true };
     } catch (error) {
@@ -197,16 +190,17 @@ const Post = {
 
   toggleLike: async (postId, userId) => {
     const checkPostQuery = 'SELECT 1 FROM public.posts WHERE post_id = $1';
-    const toggleQuery = `
+    const insertQuery = `
       INSERT INTO public.likes (post_id, user_id)
-      ON CONFLICT (post_id, user_id) DO
-      UPDATE SET user_id = EXCLUDED.user_id
-      WHERE FALSE
-      RETURNING (SELECT COUNT(*) FROM public.likes WHERE post_id = $1) AS like_count, TRUE AS liked;
+      ON CONFLICT (post_id, user_id) DO NOTHING
+      RETURNING TRUE AS liked;
     `;
-    const unlikeQuery = `
+    const deleteQuery = `
       DELETE FROM public.likes WHERE post_id = $1 AND user_id = $2
-      RETURNING (SELECT COUNT(*) FROM public.likes WHERE post_id = $1) AS like_count, FALSE AS liked;
+      RETURNING FALSE AS liked;
+    `;
+    const countQuery = `
+      SELECT COUNT(*) AS like_count FROM public.likes WHERE post_id = $1;
     `;
 
     try {
@@ -223,9 +217,16 @@ const Post = {
         [postIdValidated, userIdValidated]
       );
 
-      const result = likeCheck.length > 0
-        ? await queryDB(unlikeQuery, [postIdValidated, userIdValidated])
-        : await queryDB(toggleQuery, [postIdValidated, userIdValidated]);
+      let result;
+      if (likeCheck.length > 0) {
+        result = await queryDB(deleteQuery, [postIdValidated, userIdValidated]);
+      } else {
+        result = await queryDB(insertQuery, [postIdValidated, userIdValidated]);
+      }
+
+      // Get the updated like count
+      const countResult = await queryDB(countQuery, [postIdValidated]);
+      result[0].like_count = countResult[0].like_count;
 
       return result[0];
     } catch (error) {
