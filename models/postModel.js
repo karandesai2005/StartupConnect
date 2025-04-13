@@ -42,7 +42,7 @@ const Post = {
       post.tags = JSON.parse(post.tags); // Parse tags back to array for response
       return post;
     } catch (error) {
-      console.error('Create post error:', error);
+      console.error('Create post error:', error.stack);
       throw new Error(error.message.includes('must be') ? error.message : 'Unable to create post');
     }
   },
@@ -74,7 +74,7 @@ const Post = {
         tags: post.tags ? JSON.parse(post.tags) : [],
       }));
     } catch (error) {
-      console.error('Get all posts error:', error);
+      console.error('Get all posts error:', error.stack);
       throw new Error('Unable to fetch posts');
     }
   },
@@ -111,7 +111,7 @@ const Post = {
         tags: post.tags ? JSON.parse(post.tags) : [],
       }));
     } catch (error) {
-      console.error('Get posts by user ID error:', error);
+      console.error('Get posts by user ID error:', error.stack);
       throw new Error(error.message.includes('must be') ? error.message : 'Unable to fetch user posts');
     }
   },
@@ -137,7 +137,7 @@ const Post = {
 
       return { deleted: true };
     } catch (error) {
-      console.error('Delete post error:', error);
+      console.error('Delete post error:', error.stack);
       if (error.message.includes('not found') || error.message.includes('unauthorized')) {
         throw new Error('Post not found or unauthorized');
       }
@@ -182,7 +182,7 @@ const Post = {
         tags: post.tags ? JSON.parse(post.tags) : [],
       }));
     } catch (error) {
-      console.error('Get posts by username error:', error);
+      console.error('Get posts by username error:', error.stack);
       if (error.message === 'User not found') throw new Error('User not found');
       throw new Error(error.message.includes('must be') ? error.message : 'Unable to fetch posts by username');
     }
@@ -198,7 +198,11 @@ const Post = {
       const postIdValidated = validateId(postId, 'Post ID');
       const userIdValidated = validateId(user_id, 'User ID');
 
-      console.log('Insert Query:', insertQuery); // Debug log
+      console.log('ToggleLike - Post ID:', postIdValidated);
+      console.log('ToggleLike - User ID:', userIdValidated);
+      console.log('ToggleLike - Insert Query:', insertQuery);
+      console.log('ToggleLike - Parameters:', [postIdValidated, userIdValidated]);
+
       const postCheck = await queryDB(checkPostQuery, [postIdValidated]);
       if (postCheck.length === 0) throw new Error('Post not found');
 
@@ -219,7 +223,7 @@ const Post = {
 
       return result[0];
     } catch (error) {
-      console.error('Toggle like error:', error);
+      console.error('Toggle like error:', error.stack); // Include stack trace
       if (error.message.includes('Post not found')) throw new Error('Post not found');
       throw new Error(error.message.includes('must be') ? error.message : 'Unable to toggle like');
     }
@@ -244,7 +248,7 @@ const Post = {
       if (result.length === 0) throw new Error('Post not found');
       return result[0];
     } catch (error) {
-      console.error('Get like status error:', error);
+      console.error('Get like status error:', error.stack);
       if (error.message.includes('Post not found')) throw new Error('Post not found');
       throw new Error(error.message.includes('must be') ? error.message : 'Unable to get like status');
     }
@@ -273,7 +277,7 @@ const Post = {
       ]);
       return result;
     } catch (error) {
-      console.error('Get comments error:', error);
+      console.error('Get comments error:', error.stack);
       throw new Error(error.message.includes('must be') ? error.message : 'Unable to fetch comments');
     }
   },
@@ -293,7 +297,7 @@ const Post = {
       ]);
       return result[0];
     } catch (error) {
-      console.error('Create comment error:', error);
+      console.error('Create comment error:', error.stack);
       throw new Error(error.message.includes('must be') ? error.message : 'Unable to create comment');
     }
   },

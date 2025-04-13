@@ -27,7 +27,7 @@ const postController = {
 
       res.status(201).json(newPost);
     } catch (error) {
-      console.error('Create post error:', error);
+      console.error('Create post error:', error.stack);
       res.status(error.message.includes('required') ? 400 : 500).json({ error: error.message });
     }
   },
@@ -42,7 +42,7 @@ const postController = {
 
       res.status(200).json({ message: 'Post deleted successfully', result });
     } catch (error) {
-      console.error('Delete post error:', error);
+      console.error('Delete post error:', error.stack);
       if (error.message.includes('not found') || error.message.includes('unauthorized')) {
         return res.status(403).json({ error: 'Post not found or unauthorized' });
       }
@@ -58,7 +58,7 @@ const postController = {
 
       res.status(200).json(posts);
     } catch (error) {
-      console.error('Get all posts error:', error);
+      console.error('Get all posts error:', error.stack);
       res.status(500).json({ error: 'Server error' });
     }
   },
@@ -74,7 +74,7 @@ const postController = {
 
       res.status(200).json(posts);
     } catch (error) {
-      console.error('Get user posts error:', error);
+      console.error('Get user posts error:', error.stack);
       res.status(500).json({ error: 'Server error' });
     }
   },
@@ -90,7 +90,7 @@ const postController = {
 
       res.status(200).json(posts);
     } catch (error) {
-      console.error('Get posts by username error:', error);
+      console.error('Get posts by username error:', error.stack);
       if (error.message.includes('User not found')) {
         return res.status(404).json({ error: 'User not found' });
       }
@@ -108,7 +108,7 @@ const postController = {
 
       res.status(200).json(result);
     } catch (error) {
-      console.error('Toggle like error:', error);
+      console.error('Toggle like error:', error.stack);
       if (error.message.includes('Post not found')) {
         return res.status(404).json({ error: 'Post not found' });
       }
@@ -126,7 +126,7 @@ const postController = {
 
       res.status(200).json(status);
     } catch (error) {
-      console.error('Get like status error:', error);
+      console.error('Get like status error:', error.stack);
       if (error.message.includes('Post not found')) {
         return res.status(404).json({ error: 'Post not found' });
       }
@@ -145,7 +145,7 @@ const postController = {
 
       res.status(200).json(comments);
     } catch (error) {
-      console.error('Get comments error:', error);
+      console.error('Get comments error:', error.stack);
       if (error.message.includes('Post not found')) {
         return res.status(404).json({ error: 'Post not found' });
       }
@@ -169,7 +169,7 @@ const postController = {
 
       res.status(201).json(newComment);
     } catch (error) {
-      console.error('Create comment error:', error);
+      console.error('Create comment error:', error.stack);
       if (error.message.includes('Post not found')) {
         return res.status(404).json({ error: 'Post not found' });
       }
