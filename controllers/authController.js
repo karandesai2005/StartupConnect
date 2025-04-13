@@ -2,7 +2,7 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const { getUserByEmail, createUser } = require("../models/userModel");
 const { queryDB } = require("../config/db");
-const upload = require("../config/multerConfig"); // Adjust path to your Multer config
+const upload = require("../config/multerConfig");
 
 // Register user
 const register = async (req, res) => {
@@ -179,7 +179,7 @@ const deleteAccount = async (req, res) => {
   }
 };
 
-// Save user details step-by-step (partial update, apply the same $1, $2 pattern to all cases)
+// Save user details step-by-step
 const saveUserDetails = async (req, res) => {
   console.log("Request Body:", req.body);
 
@@ -194,60 +194,96 @@ const saveUserDetails = async (req, res) => {
 
     switch (step) {
       case 1:
-        if (!data.email) return res.status(400).json({ message: "Email is required." });
+        // Email step
+        if (!data.email) {
+          return res.status(400).json({ message: "Email is required." });
+        }
         const normalizedEmail = data.email.toLowerCase();
         const existingUsers = await queryDB("SELECT * FROM public.users WHERE email = $1", [normalizedEmail]);
-        if (existingUsers.length > 0) return res.status(400).json({ message: "Email already in use." });
+        if (existingUsers.length > 0) {
+          return res.status(400).json({ message: "Email already in use." });
+        }
         const tempUsername = `user_${Date.now()}`;
+        // Generate a temporary password hash (overwritten in step 2)
+        const tempPasswordHash = await bcrypt.hash('temp_' + Date.now(), parseInt(process.env.SALT_ROUNDS, 10));
         query = `
-          INSERT INTO public.users (email, username, created_at)
-          VALUES ($1, $2, CURRENT_TIMESTAMP)
+          INSERT INTO public.users (email, username, password_hash, created_at)
+          VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
           RETURNING user_id;
         `;
-        params = [normalizedEmail, tempUsername];
+        params = [normalizedEmail, tempUsername, tempPasswordHash];
         break;
 
       case 2:
-        if (!data.password || !data.userId) return res.status(400).json({ message: "Password and userId are required." });
+        // Password step
+        if (!data.password || !data.userId) {
+          return res.status(400).json({ message: "Password and userId are required." });
+        }
         const passwordHash = await bcrypt.hash(data.password, parseInt(process.env.SALT_ROUNDS, 10));
         query = `
-          UPDATE public.users SET password_hash = $1 WHERE user_id = $2 RETURNING user_id;
+          UPDATE public.users 
+          SET password_hash = $1 
+          WHERE user_id = $2
+          RETURNING user_id;
         `;
         params = [passwordHash, data.userId];
         break;
 
       case 3:
-        if (!data.username || data.username.length < 3 || data.username.length > 20)
+        // Username step
+        if (!data.username || data.username.length < 3 || data.username.length > 20) {
           return res.status(400).json({ message: "Username must be between 3 and 20 characters." });
+        }
         query = `
-          UPDATE public.users SET username = $1 WHERE user_id = $2 RETURNING user_id;
+          UPDATE public.users 
+          SET username = $1 
+          WHERE user_id = $2
+          RETURNING user_id;
         `;
         params = [data.username, data.userId];
         break;
 
       case 4:
-        if (data.preference !== "personal" && data.preference !== "business")
+        // Preference step
+        if (data.preference !== "personal" && data.preference !== "business") {
           return res.status(400).json({ message: "Invalid preference." });
+        }
         query = `
-          UPDATE public.users SET is_personal = $1, is_business = $2 WHERE user_id = $3 RETURNING user_id;
+          UPDATE public.users 
+          SET is_personal = $1, is_business = $2 
+          WHERE user_id = $3
+          RETURNING user_id;
         `;
         params = [data.preference === "personal" ? 1 : 0, data.preference === "business" ? 1 : 0, data.userId];
         break;
 
       case 5:
-        if (!data.realName || data.realName.trim() === "") return res.status(400).json({ message: "Real name is required." });
+        // Real name step
+        if (!data.realName || data.realName.trim() === "") {
+          return res.status(400).json({ message: "Real name is required." });
+        }
         query = `
-          UPDATE public.users SET name = $1 WHERE user_id = $2 RETURNING user_id;
+          UPDATE public.users 
+          SET name = $1 
+          WHERE user_id = $2
+          RETURNING user_id;
         `;
         params = [data.realName.trim(), data.userId];
         break;
 
       case 6:
-        if (!data.interests || !Array.isArray(data.interests) || data.interests.length < 3)
+        // Interests and completion step
+        if (!data.interests || !Array.isArray(data.interests) || data.interests.length < 3) {
           return res.status(400).json({ message: "At least 3 interests are required." });
-        if (!data.userId) return res.status(400).json({ message: "User ID is required." });
+        }
+        if (!data.userId) {
+          return res.status(400).json({ message: "User ID is required." });
+        }
         query = `
-          UPDATE public.users SET interests = $1 WHERE user_id = $2 RETURNING user_id, email, username;
+          UPDATE public.users 
+          SET interests = $1 
+          WHERE user_id = $2
+          RETURNING user_id, email, username;
         `;
         params = [JSON.stringify(data.interests), data.userId];
         const result = await queryDB(query, params);
@@ -267,6 +303,9 @@ const saveUserDetails = async (req, res) => {
     res.status(200).json({ message: "Data saved successfully", result });
   } catch (err) {
     console.error("Error saving user details:", err);
+    if (err.code === '23502') {
+      return res.status(400).json({ message: "Missing required user data." });
+    }
     res.status(500).json({ message: "Internal server error", error: err.message });
   }
 };
@@ -401,7 +440,7 @@ const fixProfilePictureURLs = async (req, res) => {
   }
 };
 
-// New endpoint: Get user profile by username
+// Get user profile by username
 const getUserProfileByUsername = async (req, res) => {
   try {
     const { username } = req.params;
@@ -425,7 +464,7 @@ const getUserProfileByUsername = async (req, res) => {
   }
 };
 
-// New endpoint: Get user posts by username
+// Get user posts by username
 const getUserPostsByUsername = async (req, res) => {
   try {
     const { username } = req.params;
