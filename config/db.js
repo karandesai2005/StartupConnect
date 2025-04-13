@@ -39,11 +39,17 @@ async function connectDB() {
 
 async function queryDB(query, params = []) {
   const client = await pool.connect();
+  console.log('Executing query in queryDB:', { query, params });
+  if (!Array.isArray(params)) {
+    console.error('❌ Parameters must be an array:', params);
+    throw new Error('Invalid parameters format');
+  }
   try {
     const result = await client.query(query, params);
+    console.log('Query executed successfully:', result.rows);
     return result.rows;
   } catch (error) {
-    console.error("❌ Query execution failed:", error.stack);
+    console.error('❌ Query execution failed:', error.stack);
     throw error;
   } finally {
     client.release();
