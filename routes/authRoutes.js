@@ -14,7 +14,7 @@ const {
   searchUsers
 } = require('../controllers/authController');
 const {
-  validateUsernameInput, // Corrected from validateUsernameInputcipher
+  validateUsernameInput,
   validateSaveUserDetailsInput
 } = require('../middleware/validator');
 const authenticateJWT = require('../middleware/authenticateJWT');
@@ -56,5 +56,10 @@ router.route('/posts/user/:username')
 
 router.route('/search-users')
   .get(authenticateJWT, searchUsers);
+
+// Safeguard: Ensure no stray code follows
+if (typeof module.exports === 'undefined') {
+  console.error('Module export failed');
+}
 
 module.exports = router;
