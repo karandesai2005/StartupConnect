@@ -57,7 +57,6 @@ router.route('/posts/user/:username')
 router.route('/search-users')
   .get(authenticateJWT, searchUsers);
 
-// Safeguard to detect undefined exports
 console.log('Loaded routes:', {
   register, login, logout, deleteAccount, validateUsername, saveUserDetails,
   getUserProfile, updateProfile, getUserProfileByUsername, getUserPostsByUsername, searchUsers
