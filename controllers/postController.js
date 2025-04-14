@@ -104,7 +104,9 @@ const postController = {
       if (!userId) return res.status(401).json({ error: 'User authentication required' });
 
       const { postId } = req.params;
+      console.log('ToggleLike attempt - Post ID:', postId, 'User ID:', userId);
       const result = await Post.toggleLike(validateId(postId, 'Post ID'), userId);
+      console.log('ToggleLike result:', result);
 
       res.status(200).json(result);
     } catch (error) {
@@ -140,8 +142,10 @@ const postController = {
       if (!userId) return res.status(401).json({ error: 'User authentication required' });
 
       const { postId } = req.params;
+      console.log('Get comments for Post ID:', postId);
       const { limit = 10, offset = 0 } = req.query;
       const comments = await Post.getCommentsByPostId(validateId(postId, 'Post ID'), { limit: parseInt(limit), offset });
+      console.log('Comments fetched:', comments);
 
       res.status(200).json(comments);
     } catch (error) {
@@ -160,12 +164,14 @@ const postController = {
 
       const { postId } = req.params;
       const { content } = req.body;
+      console.log('Create comment for Post ID:', postId, 'Content:', content);
 
       const newComment = await Post.createComment(
         validateId(postId, 'Post ID'),
         userId,
         content // Validation handled in model
       );
+      console.log('New comment created:', newComment);
 
       res.status(201).json(newComment);
     } catch (error) {

@@ -1,4 +1,4 @@
-const { queryDB } = require('../config/db'); // Use queryDB instead of connectDB
+const { queryDB } = require('../config/db');
 
 // Validation Functions
 const validateId = (id, name) => {
@@ -38,8 +38,8 @@ const Post = {
         validateId(user_id, 'User ID'),
         validateTags(tags)
       ]);
-      const post = result[0]; // queryDB returns rows array
-      post.tags = JSON.parse(post.tags); // Parse tags back to array for response
+      const post = result[0];
+      post.tags = JSON.parse(post.tags);
       return post;
     } catch (error) {
       console.error('Create post error:', error.stack);
@@ -202,6 +202,7 @@ const Post = {
       console.log('ToggleLike - User ID:', userIdValidated);
       console.log('ToggleLike - Insert Query:', insertQuery);
       console.log('ToggleLike - Parameters:', [postIdValidated, userIdValidated]);
+      console.log('Executing toggleLike query in queryDB:', { checkPostQuery, params: [postIdValidated] });
 
       const postCheck = await queryDB(checkPostQuery, [postIdValidated]);
       if (postCheck.length === 0) throw new Error('Post not found');
@@ -213,8 +214,10 @@ const Post = {
 
       let result;
       if (likeCheck.length > 0) {
+        console.log('Executing deleteQuery:', { deleteQuery, params: [postIdValidated, userIdValidated] });
         result = await queryDB(deleteQuery, [postIdValidated, userIdValidated]);
       } else {
+        console.log('Executing insertQuery:', { insertQuery, params: [postIdValidated, userIdValidated] });
         result = await queryDB(insertQuery, [postIdValidated, userIdValidated]);
       }
 
@@ -223,7 +226,7 @@ const Post = {
 
       return result[0];
     } catch (error) {
-      console.error('Toggle like error:', error.stack); // Include stack trace
+      console.error('Toggle like error:', error.stack);
       if (error.message.includes('Post not found')) throw new Error('Post not found');
       throw new Error(error.message.includes('must be') ? error.message : 'Unable to toggle like');
     }
@@ -270,11 +273,13 @@ const Post = {
     `;
 
     try {
+      console.log('Executing getCommentsByPostId:', { query, params: [validateId(postId, 'Post ID'), offset, limit] });
       const result = await queryDB(query, [
         validateId(postId, 'Post ID'),
         offset,
         limit
       ]);
+      console.log('Comments fetched successfully:', result);
       return result;
     } catch (error) {
       console.error('Get comments error:', error.stack);
@@ -290,11 +295,13 @@ const Post = {
     `;
 
     try {
+      console.log('Executing createComment:', { query, params: [validateId(postId, 'Post ID'), validateId(userId, 'User ID'), validateContent(content)] });
       const result = await queryDB(query, [
         validateId(postId, 'Post ID'),
         validateId(userId, 'User ID'),
         validateContent(content)
       ]);
+      console.log('Comment created successfully:', result[0]);
       return result[0];
     } catch (error) {
       console.error('Create comment error:', error.stack);
