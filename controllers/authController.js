@@ -2,7 +2,7 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const { getUserByEmail, createUser } = require("../models/userModel");
 const { queryDB } = require("../config/db");
-const upload = require("../config/multerConfig"); // Adjust path to your Multer config
+const { uploadAndConvertPostMedia } = require("../config/multerConfig"); // Import the correct middleware
 
 // Register user
 const register = async (req, res) => {
@@ -560,7 +560,7 @@ module.exports = {
   logout, // Added logout endpoint
   deleteAccount, // Updated deleteAccount endpoint
   validateUsername,
-  saveUserDetails: [uploadAndConvertReelMedia, saveUserDetails], // Use the new middleware
+  saveUserDetails: [uploadAndConvertPostMedia, saveUserDetails], // Use the upload middleware for media
   updateProfile,
   getUserProfileByUsername,
   getUserPostsByUsername,
