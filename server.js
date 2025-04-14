@@ -1,60 +1,66 @@
-require("dotenv").config();
-const express = require("express");
-const path = require("path");
-const cors = require("cors");
-const { connectDB } = require("./config/db"); // Import db functions
-const postRoutes = require("./routes/postRoutes");
-const authRoutes = require("./routes/authRoutes");
-const profileRoutes = require("./routes/profileRoutes");
+const express = require('express');
+const router = express.Router();
+const {
+  register,
+  login,
+  logout,
+  deleteAccount,
+  validateUsername,
+  saveUserDetails,
+  getUserProfile,
+  updateProfile,
+  getUserProfileByUsername,
+  getUserPostsByUsername,
+  searchUsers
+} = require('../controllers/authController');
+const {
+  validateUsernameInput,
+  validateSaveUserDetailsInput
+} = require('../middleware/validator');
+const authenticateJWT = require('../middleware/authenticateJWT');
+const { uploadProfilePicture } = require('../config/multerConfig');
 
-const app = express();
-const PORT = process.env.PORT || 8080;
+// Authentication Routes
+router.route('/register')
+  .post(validateSaveUserDetailsInput, register);
 
-// Middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(cors());
+router.route('/login')
+  .post(login);
 
-// Static files
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+router.route('/logout')
+  .post(authenticateJWT, logout);
 
-// Health check route
-app.get("/", (req, res) => {
-  res.send("Welcome to the PITCH-backend server!");
+// User Management Routes
+router.route('/validate-username')
+  .post(validateUsernameInput, validateUsername);
+
+router.route('/save-user-details')
+  .post(validateSaveUserDetailsInput, saveUserDetails);
+
+router.route('/delete-account')
+  .delete(authenticateJWT, deleteAccount);
+
+// Profile Routes
+router.route('/profile')
+  .get(authenticateJWT, getUserProfile);
+
+router.route('/update-profile')
+  .put(authenticateJWT, uploadProfilePicture.single('profile_picture'), updateProfile);
+
+router.route('/users/:username')
+  .get(authenticateJWT, getUserProfileByUsername);
+
+// User Content Routes
+router.route('/posts/user/:username')
+  .get(authenticateJWT, getUserPostsByUsername);
+
+router.route('/search-users')
+  .get(authenticateJWT, searchUsers);
+
+// Safeguard to detect undefined exports
+console.log('Loaded routes:', {
+  register, login, logout, deleteAccount, validateUsername, saveUserDetails,
+  getUserProfile, updateProfile, getUserProfileByUsername, getUserPostsByUsername, searchUsers
 });
 
-// API Routes
-app.use("/api", postRoutes);
-app.use("/api/auth", authRoutes);
-app.use("/api/profile", profileRoutes);
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ message: "Something went wrong!", error: err.message });
-});
-
-// Handle 404s
-app.use((req, res) => {
-  res.status(404).json({ message: `Route ${req.url} not found` });
-});
-
-// Server startup
-async function startServer() {
-  try {
-    await connectDB();
-    app.listen(PORT, "0.0.0.0", () => {
-      console.log(`🚀 Server running on http://0.0.0.0:${PORT}`);
-    });
-  } catch (err) {
-    console.error("❌ Failed to start server:", err.stack);
-    process.exit(1);
-  }
-}
-
-startServer().catch(console.error);
-
-process.on("unhandledRejection", (err) => {
-  console.error("Unhandled rejection:", err.stack);
-  process.exit(1);
-});
+module.exports = router;
