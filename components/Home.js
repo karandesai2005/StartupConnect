@@ -116,11 +116,7 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
   }, [isVisible, isVideo]);
 
   useEffect(() => {
-    console.log('Comments state updated:', comments);
-  }, [comments]);
-
-  useEffect(() => {
-    console.log('isCommentModalVisible changed:', isCommentModalVisible);
+    // console.log('isCommentModalVisible changed:', isCommentModalVisible);
   }, [isCommentModalVisible]);
 
   useEffect(() => {
@@ -463,14 +459,13 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
               <Text style={styles.closeButtonText}>Close</Text>
             </TouchableOpacity>
           </View>
-          {console.log('Rendering comment modal with comments:', comments)}
           {isCommentsLoading ? (
             <ActivityIndicator size="large" color="#007AFF" style={styles.commentLoader} />
           ) : (
             <FlatList
               data={comments}
               renderItem={({ item }) => {
-                console.log('Rendering comment:', item);
+                // console.log('Rendering comment:', item);
                 return (
                   <View style={styles.commentItem}>
                     <Text style={styles.commentUsername}>{item.username || 'User'}</Text>
@@ -784,7 +779,7 @@ export default function Home() {
               expandedItems={expandedItems}
               isVisible={viewableItems.includes(index)}
               navigation={navigation}
-              fetchAllPosts={fetchAllPosts} // Pass the function
+              fetchAllPosts={fetchAllPosts}
             />
           )}
           keyExtractor={keyExtractor}
@@ -975,7 +970,7 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     marginBottom: Platform.OS === 'ios' ? 3 : 0,
-    tintColor: '#000000', // Default black for all icons
+    tintColor: '#000000',
   },
   captionContainer: {
     paddingHorizontal: 12,

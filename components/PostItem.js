@@ -37,7 +37,7 @@ const formatTimestamp = (timestamp) => {
   return postDate.toLocaleDateString();
 };
 
-const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems, toggleExpand, onDelete }) => {
+const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems, toggleExpand, onDelete, fetchAllPosts }) => {
   const navigation = useNavigation();
   const videoRef = useRef(null);
   const animatedScale = useRef(new Animated.Value(1)).current;
@@ -48,7 +48,7 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
   const [comments, setComments] = useState(item.comments || []);
   const [isCommentsLoading, setIsCommentsLoading] = useState(false);
   const [isCommentModalVisible, setIsCommentModalVisible] = useState(false);
-  const [isMoreModalVisible, setIsMoreModalVisible] = useState(false); // New state for more options modal
+  const [isMoreModalVisible, setIsMoreModalVisible] = useState(false);
   const [newComment, setNewComment] = useState('');
   const [isVideo, setIsVideo] = useState(item.media_type === 'video');
   const [isMeasured, setIsMeasured] = useState(false);
@@ -129,6 +129,7 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
       const postId = getPostId();
       if (!token || !postId) return;
       setIsLikeLoading(true);
+      console.log('Optimistic update - isLiked:', !isLiked, 'likeCount:', isLiked ? likeCount - 1 : likeCount + 1);
       setIsLiked((prev) => !prev);
       setLikeCount((prev) => (isLiked ? prev - 1 : prev + 1));
       const response = await axios.post(
@@ -136,9 +137,11 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      if (response.data) {
-        setIsLiked(response.data.liked === 1);
-        setLikeCount(response.data.likeCount);
+      if (response.data && response.data.success) {
+        console.log('Response update - liked:', response.data.liked, 'like_count:', response.data.like_count);
+        setIsLiked(response.data.liked);
+        setLikeCount(response.data.like_count);
+        if (fetchAllPosts) await fetchAllPosts(); // Sync with parent state if provided
       }
     } catch (error) {
       console.error('Error updating like:', error);
@@ -160,7 +163,7 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
       });
 
       setIsMoreModalVisible(false);
-      if (onDelete) onDelete(postId); // Notify parent component to remove post from list
+      if (onDelete) onDelete(postId);
     } catch (error) {
       console.error('Error deleting post:', error);
       alert('Failed to delete post. Please try again.');
@@ -228,7 +231,6 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
         </View>
       </TouchableOpacity>
 
-      {/* Media content remains the same */}
       <TouchableOpacity
         activeOpacity={0.95}
         onPressIn={handlePressIn}
@@ -262,8 +264,8 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
                 typeof item.image_url === 'string' && item.image_url.startsWith('http')
                   ? { uri: item.image_url }
                   : typeof item.media_url === 'string' && item.media_url.startsWith('http')
-                  ? { uri: item.media_url }
-                  : require('../assets/PITCH.png')
+                    ? { uri: item.media_url }
+                    : require('../assets/PITCH.png')
               }
               style={[styles.postImage, { height: FIXED_MEDIA_HEIGHT }]}
               onLoad={() => setIsLoading(false)}
@@ -333,7 +335,6 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
         )}
       </View>
 
-      {/* Comment Modal */}
       <Modal
         isVisible={isCommentModalVisible}
         onBackdropPress={toggleCommentModal}
@@ -362,7 +363,7 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
                 <View style={styles.commentItem}>
                   <Text style={styles.commentUsername}>{item.username || 'User'}</Text>
                   <Text style={styles.commentText}>{item.content}</Text>
-                  <Text style тебя={styles.commentTimestamp}>{formatTimestamp(item.created_at)}</Text>
+                  <Text style={styles.commentTimestamp}>{formatTimestamp(item.created_at)}</Text>
                 </View>
               )}
               keyExtractor={(item) => item.comment_id.toString()}
@@ -387,7 +388,6 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
         </View>
       </Modal>
 
-      {/* More Options Modal */}
       <Modal
         isVisible={isMoreModalVisible}
         onBackdropPress={toggleMoreModal}
@@ -434,11 +434,11 @@ PostItem.propTypes = {
   isVisible: PropTypes.bool.isRequired,
   expandedItems: PropTypes.object.isRequired,
   toggleExpand: PropTypes.func.isRequired,
-  onDelete: PropTypes.func, // New prop to handle post deletion in parent component
+  onDelete: PropTypes.func,
+  fetchAllPosts: PropTypes.func, // Added prop to sync with parent
 };
 
 const styles = StyleSheet.create({
-  // Existing styles remain unchanged
   card: { backgroundColor: '#fff', width: width, marginBottom: 10 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12 },
   userInfo: { flexDirection: 'row', alignItems: 'center' },
@@ -479,8 +479,6 @@ const styles = StyleSheet.create({
   postCommentText: { color: '#fff', fontSize: 14, fontWeight: '600' },
   commentLoader: { marginVertical: 20 },
   noCommentsText: { fontSize: 14, color: '#868E96', textAlign: 'center', marginVertical: 20 },
-
-  // New styles for more options modal
   moreModal: { justifyContent: 'flex-end', margin: 0 },
   moreModalContent: {
     backgroundColor: '#fff',
@@ -496,7 +494,7 @@ const styles = StyleSheet.create({
   },
   deleteText: {
     fontSize: 16,
-    color: '#FF3B30', // Red color for delete
+    color: '#FF3B30',
     fontWeight: '600',
   },
   optionText: {
