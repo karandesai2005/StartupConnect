@@ -56,4 +56,5 @@ router.route('/posts/user/:username')
 
 router.route('/search-users')
   .get(authenticateJWT, searchUsers);
+
 module.exports = router;
