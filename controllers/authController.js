@@ -553,18 +553,18 @@ const searchUsers = async (req, res) => {
   }
 };
 
-// Updated exports
 module.exports = {
   register,
   login,
-  logout, // Added logout endpoint
-  deleteAccount, // Updated deleteAccount endpoint
+  logout,
+  deleteAccount,
   validateUsername,
-  saveUserDetails: [uploadAndConvertPostMedia, saveUserDetails], // Use the upload middleware for media
+  saveUserDetails,
+  getUserProfile, // Added
   updateProfile,
   getUserProfileByUsername,
   getUserPostsByUsername,
   searchUsers,
-  checkTokenBlacklist, // Middleware for token blacklist checking
+  checkTokenBlacklist,
   fixProfilePictureURLs
 };
