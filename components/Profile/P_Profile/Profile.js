@@ -34,8 +34,10 @@ const ProfileHeader = React.memo(({ userData, navigation, isOwnProfile, onFollow
         if (!userData?.profile_picture) return null;
         return userData.profile_picture.startsWith('https')
             ? userData.profile_picture
-            : `${NGROK_URL}/uploads/${userData.profile_picture}`;
+            : `${NGROK_URL}/Uploads/${userData.profile_picture}`;
     }, [userData?.profile_picture]);
+
+    console.log('ProfileHeader rendering:', { isOwnProfile, username: userData?.username });
 
     return (
         <View style={styles.profile}>
@@ -90,7 +92,6 @@ const ProfileHeader = React.memo(({ userData, navigation, isOwnProfile, onFollow
         </View>
     );
 }, (prevProps, nextProps) => {
-    // Custom comparison for React.memo to ensure re-render on userData changes
     return prevProps.userData?.isFollowing === nextProps.userData?.isFollowing &&
            prevProps.userData?.followers === nextProps.userData?.followers &&
            prevProps.isOwnProfile === nextProps.isOwnProfile;
@@ -106,12 +107,14 @@ const Profile = ({ route }) => {
     const { width: screenWidth } = Dimensions.get('window');
     const itemSize = useMemo(() => (screenWidth - 32 - 4) / 3, [screenWidth]);
 
-    // Load current user and fetch data immediately
     const fetchInitialData = useCallback(async () => {
         let mounted = true;
         try {
+            setIsLoading(true);
             const userDataStr = await AsyncStorage.getItem('userData');
             const token = await AsyncStorage.getItem('token');
+            console.log('AsyncStorage fetched:', { userDataStr, token });
+
             if (!token) {
                 navigation.navigate('Login');
                 return;
@@ -119,6 +122,7 @@ const Profile = ({ route }) => {
 
             const parsedUser = userDataStr ? JSON.parse(userDataStr) : null;
             if (mounted) {
+                console.log('Setting currentUser:', parsedUser);
                 setCurrentUser(parsedUser);
             }
 
@@ -154,10 +158,11 @@ const Profile = ({ route }) => {
                 ...profileData,
                 profile_picture: profileData.profile_picture?.startsWith('https')
                     ? profileData.profile_picture
-                    : profileData.profile_picture ? `${NGROK_URL}/uploads/${profileData.profile_picture}` : null,
+                    : profileData.profile_picture ? `${NGROK_URL}/Uploads/${profileData.profile_picture}` : null,
             };
 
             if (mounted) {
+                console.log('Setting userData:', formattedUserData);
                 setUserData(formattedUserData);
                 if (!isViewingOtherUser && formattedUserData) {
                     await AsyncStorage.setItem('userData', JSON.stringify(formattedUserData));
@@ -166,8 +171,8 @@ const Profile = ({ route }) => {
                 const mappedPosts = Array.isArray(postsData) ? postsData.map(post => ({
                     _id: post.post_id || post.id,
                     username: post.username,
-                    profile_picture: post.profile_picture?.startsWith('https') ? post.profile_picture : post.profile_picture ? `${NGROK_URL}/uploads/${post.profile_picture}` : null,
-                    image_url: post.media_url?.startsWith('https') ? post.media_url : post.media_url ? `${NGROK_URL}/uploads/${post.media_url}` : null,
+                    profile_picture: post.profile_picture?.startsWith('https') ? post.profile_picture : post.profile_picture ? `${NGROK_URL}/Uploads/${post.profile_picture}` : null,
+                    image_url: post.media_url?.startsWith('https') ? post.media_url : post.media_url ? `${NGROK_URL}/Uploads/${post.media_url}` : null,
                     content: post.content,
                     created_at: post.created_at,
                     likes: post.like_count || 0,
@@ -198,10 +203,26 @@ const Profile = ({ route }) => {
         fetchInitialData();
     }, [fetchInitialData]);
 
+    // Hack: Force isOwnProfile to wait for currentUser and userData
     const isOwnProfile = useMemo(() => {
+        if (!currentUser || !userData) {
+            console.log('isOwnProfile: Waiting for data', { currentUser, userData });
+            return false;
+        }
         const { username } = route.params || {};
-        return !username || (currentUser && username === currentUser.username);
-    }, [currentUser, route.params]);
+        const result = !username || username === currentUser.username || userData.username === currentUser.username;
+        console.log('isOwnProfile calculated:', { routeUsername: username, currentUser: currentUser?.username, userData: userData?.username, result });
+        return result;
+    }, [currentUser, userData, route.params]);
+
+    // Force re-render after currentUser is set
+    useEffect(() => {
+        if (currentUser && userData && !isLoading) {
+            console.log('Data loaded, forcing re-render:', { currentUser: currentUser.username, userData: userData.username });
+            // Trigger a state update to force re-render
+            setIsLoading(false);
+        }
+    }, [currentUser, userData, isLoading]);
 
     const handleRefresh = useCallback(() => {
         setRefreshing(true);
@@ -243,18 +264,10 @@ const Profile = ({ route }) => {
         </TouchableOpacity>
     ), [itemSize, navigation, userPosts]);
 
-    if (isLoading) {
+    if (isLoading || !currentUser || !userData) {
         return (
             <SafeAreaView style={styles.safeArea}>
                 <ActivityIndicator size="large" color="#007BFF" />
-            </SafeAreaView>
-        );
-    }
-
-    if (!userData) {
-        return (
-            <SafeAreaView style={styles.safeArea}>
-                <Text style={{ textAlign: 'center', padding: 20 }}>Failed to load profile data</Text>
             </SafeAreaView>
         );
     }
@@ -288,7 +301,6 @@ const Profile = ({ route }) => {
                                     const result = await response.json();
                                     console.log("Response:", result);
                                     if (response.ok) {
-                                        // Ensure a new object is created to trigger re-render
                                         setUserData(prev => ({
                                             ...prev,
                                             isFollowing: result.isFollowing,
