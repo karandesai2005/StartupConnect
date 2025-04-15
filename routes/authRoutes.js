@@ -20,6 +20,23 @@ const {
 const authenticateJWT = require('../middleware/authenticateJWT');
 const { uploadProfilePicture } = require('../config/multerConfig');
 
+// Debug imports
+console.log('authController imports:', {
+  register: typeof register,
+  login: typeof login,
+  logout: typeof logout,
+  deleteAccount: typeof deleteAccount,
+  validateUsername: typeof validateUsername,
+  saveUserDetails: typeof saveUserDetails,
+  getUserProfile: typeof getUserProfile,
+  updateProfile: typeof updateProfile,
+  getUserProfileByUsername: typeof getUserProfileByUsername,
+  getUserPostsByUsername: typeof getUserPostsByUsername,
+  searchUsers: typeof searchUsers
+});
+console.log('authenticateJWT:', typeof authenticateJWT);
+console.log('uploadProfilePicture:', typeof uploadProfilePicture);
+
 // Authentication Routes
 router.route('/register')
   .post(validateSaveUserDetailsInput, register);
