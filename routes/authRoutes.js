@@ -56,8 +56,4 @@ router.route('/posts/user/:username')
 
 router.route('/search-users')
   .get(authenticateJWT, searchUsers);
-
-// POSSIBLE STRAY CODE CAUSING ERROR (LINE 45?)
-router.get('/some-route', undefinedFunction); // This would trigger the error
-
 module.exports = router;
