@@ -52,7 +52,7 @@ router.route('/validate-username')
   .post(validateUsernameInput, validateUsername);
 
   router.route('/save-user-details')
-  .post(uploadAndConvertPostMedia, validateSaveUserDetailsInput, saveUserDetails);
+  .post(validateSaveUserDetailsInput, saveUserDetails);
 
 router.route('/delete-account')
   .delete(authenticateJWT, deleteAccount);
