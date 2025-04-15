@@ -189,46 +189,62 @@ const Post = {
   },
 
   toggleLike: async (postId, user_id) => {
-    const checkPostQuery = 'SELECT 1 FROM public.posts WHERE post_id = $1';
-    const insertQuery = 'INSERT INTO public.likes (post_id, user_id) VALUES ($1, $2) ON CONFLICT (post_id, user_id) DO NOTHING RETURNING TRUE AS liked';
-    const deleteQuery = 'DELETE FROM public.likes WHERE post_id = $1 AND user_id = $2 RETURNING FALSE AS liked';
-    const countQuery = 'SELECT COUNT(*) AS like_count FROM public.likes WHERE post_id = $1';
-
     try {
       const postIdValidated = validateId(postId, 'Post ID');
       const userIdValidated = validateId(user_id, 'User ID');
-
+  
       console.log('ToggleLike - Post ID:', postIdValidated);
       console.log('ToggleLike - User ID:', userIdValidated);
-      console.log('ToggleLike - Insert Query:', insertQuery);
-      console.log('ToggleLike - Parameters:', [postIdValidated, userIdValidated]);
-      console.log('Executing toggleLike query in queryDB:', { checkPostQuery, params: [postIdValidated] });
-
-      const postCheck = await queryDB(checkPostQuery, [postIdValidated]);
+  
+      // Check if post exists
+      const postCheck = await queryDB(
+        'SELECT 1 FROM public.posts WHERE post_id = $1',
+        [postIdValidated]
+      );
       if (postCheck.length === 0) throw new Error('Post not found');
-
+  
+      // Check if like exists
       const likeCheck = await queryDB(
         'SELECT 1 FROM public.likes WHERE post_id = $1 AND user_id = $2',
         [postIdValidated, userIdValidated]
       );
-
+  
       let result;
       if (likeCheck.length > 0) {
-        console.log('Executing deleteQuery:', { deleteQuery, params: [postIdValidated, userIdValidated] });
-        result = await queryDB(deleteQuery, [postIdValidated, userIdValidated]);
+        // Unlike
+        console.log('ToggleLike - Deleting like');
+        await queryDB(
+          'DELETE FROM public.likes WHERE post_id = $1 AND user_id = $2',
+          [postIdValidated, userIdValidated]
+        );
+        result = { liked: false };
       } else {
-        console.log('Executing insertQuery:', { insertQuery, params: [postIdValidated, userIdValidated] });
-        result = await queryDB(insertQuery, [postIdValidated, userIdValidated]);
+        // Like
+        console.log('ToggleLike - Inserting like');
+        const insertQuery = `
+          INSERT INTO public.likes (post_id, user_id)
+          VALUES ($1, $2)
+          ON CONFLICT ON CONSTRAINT likes_post_id_user_id_key
+          DO NOTHING
+          RETURNING post_id
+        `;
+        const insertResult = await queryDB(insertQuery, [postIdValidated, userIdValidated]);
+        result = { liked: insertResult.length > 0 };
       }
-
-      const countResult = await queryDB(countQuery, [postIdValidated]);
-      result[0].like_count = countResult[0].like_count;
-
-      return result[0];
+  
+      // Get like count
+      const countResult = await queryDB(
+        'SELECT COUNT(*) AS like_count FROM public.likes WHERE post_id = $1',
+        [postIdValidated]
+      );
+      result.like_count = parseInt(countResult[0].like_count);
+  
+      console.log('ToggleLike - Result:', result);
+      return result;
     } catch (error) {
       console.error('Toggle like error:', error.stack);
       if (error.message.includes('Post not found')) throw new Error('Post not found');
-      throw new Error(error.message.includes('must be') ? error.message : 'Unable to toggle like');
+      throw new Error('Unable to toggle like');
     }
   },
 

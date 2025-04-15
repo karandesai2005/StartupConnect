@@ -102,13 +102,13 @@ const postController = {
     try {
       const userId = getUserId(req);
       if (!userId) return res.status(401).json({ error: 'User authentication required' });
-
+  
       const { postId } = req.params;
       console.log('ToggleLike attempt - Post ID:', postId, 'User ID:', userId);
       const result = await Post.toggleLike(validateId(postId, 'Post ID'), userId);
       console.log('ToggleLike result:', result);
-
-      res.status(200).json(result);
+  
+      res.status(200).json({ success: true, liked: result.liked, like_count: result.like_count });
     } catch (error) {
       console.error('Toggle like error:', error.stack);
       if (error.message.includes('Post not found')) {
