@@ -51,7 +51,7 @@ router.route('/logout')
 router.route('/validate-username')
   .post(validateUsernameInput, validateUsername);
 
-  router.route('/save-user-details')
+router.route('/save-user-details')
   .post(validateSaveUserDetailsInput, saveUserDetails);
 
 router.route('/delete-account')

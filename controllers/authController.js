@@ -1,52 +1,53 @@
-const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
-const { getUserByEmail, createUser } = require("../models/userModel");
-const { queryDB } = require("../config/db");
-const { uploadAndConvertPostMedia } = require("../config/multerConfig"); // Import the correct middleware
+const { supabase } = require('../services/supabase');
+const { queryDB } = require('../config/db');
+const { uploadAndConvertPostMedia } = require('../config/multerConfig');
 
-// Register user
+// Register user (creates users table entry after Supabase auth)
 const register = async (req, res) => {
   try {
-    const { username, email, password, isFounder, isInvestor } = req.body;
+    const { username, email, supabase_uid, isFounder, isInvestor } = req.body;
 
-    if (!username || !email || !password) {
-      return res.status(400).json({ message: "Username, email, and password are required." });
+    if (!username || !email || !supabase_uid) {
+      return res.status(400).json({ message: "Username, email, and supabase_uid are required." });
     }
 
     const normalizedEmail = email.toLowerCase();
 
-    const existingUsers = await queryDB(
-      'SELECT * FROM users WHERE email = $1',
-      [normalizedEmail]
-    );
-
+    const { data: existingUsers, error: checkError } = await supabase
+      .from('users')
+      .select('user_id')
+      .eq('email', normalizedEmail);
+    if (checkError) throw checkError;
     if (existingUsers.length > 0) {
       return res.status(400).json({ message: "Email already in use" });
     }
 
-    const passwordHash = await bcrypt.hash(password, parseInt(process.env.SALT_ROUNDS, 10));
+    const { data: maxId } = await supabase
+      .from('users')
+      .select('user_id')
+      .order('user_id', { ascending: false })
+      .limit(1)
+      .single();
+    const newUserId = maxId ? maxId.user_id + 1 : 1;
 
-    const query = `
-      INSERT INTO users (username, email, password_hash, is_founder, is_investor)
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING user_id;
-    `;
-
-    const result = await queryDB(query, [
-      username,
-      normalizedEmail,
-      passwordHash,
-      isFounder ? 1 : 0,
-      isInvestor ? 1 : 0
-    ]);
+    const { data, error } = await supabase
+      .from('users')
+      .insert({
+        user_id: newUserId,
+        username,
+        email: normalizedEmail,
+        supabase_uid,
+        is_founder: isFounder ? 1 : 0,
+        is_investor: isInvestor ? 1 : 0,
+        created_at: new Date().toISOString(),
+      })
+      .select('user_id')
+      .single();
+    if (error) throw error;
 
     res.status(201).json({
       message: "User registered successfully",
-      user: {
-        user_id: result[0].user_id,
-        username,
-        email: normalizedEmail
-      }
+      user: { user_id: data.user_id, username, email: normalizedEmail },
     });
   } catch (err) {
     console.error("Registration error:", err.stack);
@@ -54,96 +55,22 @@ const register = async (req, res) => {
   }
 };
 
-// Login user
+// Login user (handled by frontend)
 const login = async (req, res) => {
   try {
-    const { email, username, password } = req.body;
-    console.log("Login attempt with:", { email, username });
-
-    if (!email && !username) {
-      return res.status(400).json({ message: "Email or username is required." });
-    }
-
-    let query = email ? "SELECT * FROM users WHERE email = $1" : "SELECT * FROM users WHERE username = $1";
-    let paramValue = (email || username).toLowerCase();
-
-    const users = await queryDB(query, [paramValue]);
-    console.log("Query result:", users);
-
-    if (users.length === 0) {
-      return res.status(400).json({ message: "Invalid email/username or password" });
-    }
-
-    const user = users[0];
-    console.log("Found user:", { userId: user.user_id });
-
-    const isMatch = await bcrypt.compare(password, user.password_hash);
-    console.log("Password match:", isMatch);
-
-    if (!isMatch) {
-      return res.status(400).json({ message: "Invalid email/username or password" });
-    }
-
-    console.log("JWT_SECRET:", process.env.JWT_SECRET);
-    const token = jwt.sign({ userId: user.user_id }, process.env.JWT_SECRET, {
-      expiresIn: "1h",
-    });
-    console.log("Generated token:", token);
-
-    res.status(200).json({ message: "Login successful!", token });
+    res.status(200).json({ message: "Login handled by Supabase client-side. Use /profile to verify." });
   } catch (err) {
     console.error("Login error:", err.stack);
     res.status(500).json({ message: "Internal server error", error: err.message });
   }
 };
 
-// Logout user
+// Logout user (handled by frontend)
 const logout = async (req, res) => {
   try {
-    const token = req.headers.authorization?.split(" ")[1]; // Extract token from "Bearer <token>"
-    if (!token) {
-      return res.status(400).json({ message: "No token provided" });
-    }
-
-    // Decode the token to get its expiration time
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const expiresAt = new Date(decoded.exp * 1000); // Convert expiration time to Date object
-
-    // Add the token to the blacklist
-    const query = `
-      INSERT INTO token_blacklist (token, expires_at)
-      VALUES ($1, $2)
-    `;
-    await queryDB(query, [token, expiresAt]);
-
-    res.status(200).json({ message: "Logged out successfully" });
+    res.status(200).json({ message: "Logout handled by Supabase client-side" });
   } catch (err) {
     console.error("Logout error:", err.stack);
-    res.status(500).json({ message: "Internal server error", error: err.message });
-  }
-};
-
-// Middleware to check if token is blacklisted
-const checkTokenBlacklist = async (req, res, next) => {
-  try {
-    const token = req.headers.authorization?.split(" ")[1];
-    if (!token) {
-      return res.status(401).json({ message: "No token provided" });
-    }
-
-    // Check if token is in the blacklist
-    const query = `
-      SELECT * FROM token_blacklist WHERE token = $1
-    `;
-    const result = await queryDB(query, [token]);
-
-    if (result.length > 0) {
-      return res.status(401).json({ message: "Token has been invalidated" });
-    }
-
-    next();
-  } catch (err) {
-    console.error("Token blacklist check error:", err.stack);
     res.status(500).json({ message: "Internal server error", error: err.message });
   }
 };
@@ -151,56 +78,31 @@ const checkTokenBlacklist = async (req, res, next) => {
 // Delete user account
 const deleteAccount = async (req, res) => {
   try {
-    const userId = req.user.userId;
-    const token = req.headers.authorization?.split(" ")[1]; // Extract token for blacklisting
+    const supabase_uid = req.user.id;
 
-    // Begin transaction to ensure data integrity
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('user_id')
+      .eq('supabase_uid', supabase_uid)
+      .single();
+    if (userError || !user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
     const transactionQueries = [
-      // Delete user's comments
-      {
-        query: `
-          DELETE FROM comments WHERE user_id = $1
-        `,
-        params: [userId]
-      },
-      // Delete user's likes
-      {
-        query: `
-          DELETE FROM likes WHERE user_id = $1
-        `,
-        params: [userId]
-      },
-      // Delete user's posts
-      {
-        query: `
-          DELETE FROM posts WHERE user_id = $1
-        `,
-        params: [userId]
-      },
-      // Delete user
-      {
-        query: `
-          DELETE FROM users WHERE user_id = $1
-        `,
-        params: [userId]
-      }
+      { query: `DELETE FROM comments WHERE user_id = $1`, params: [user.user_id] },
+      { query: `DELETE FROM likes WHERE user_id = $1`, params: [user.user_id] },
+      { query: `DELETE FROM posts WHERE user_id = $1`, params: [user.user_id] },
+      { query: `DELETE FROM users WHERE user_id = $1`, params: [user.user_id] },
     ];
 
-    // Execute all delete queries in a transaction
     for (const { query, params } of transactionQueries) {
       await queryDB(query, params);
     }
 
-    // Blacklist the token
-    if (token) {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      const expiresAt = new Date(decoded.exp * 1000);
-      const blacklistQuery = `
-        INSERT INTO token_blacklist (token, expires_at)
-        VALUES ($1, $2)
-      `;
-      await queryDB(blacklistQuery, [token, expiresAt]);
-    }
+    // Optionally delete from auth.users (requires admin privileges)
+    const { error: authError } = await supabase.auth.admin.deleteUser(supabase_uid);
+    if (authError) console.warn('Failed to delete auth user:', authError.message);
 
     res.status(200).json({ message: "Account deleted successfully" });
   } catch (err) {
@@ -216,124 +118,84 @@ const saveUserDetails = async (req, res) => {
   try {
     const { step, data } = req.body;
 
-    if (!step || !data) {
-      return res.status(400).json({ message: "Step and data are required." });
+    if (!step || !data || !data.supabase_uid) {
+      return res.status(400).json({ message: "Step, data, and supabase_uid are required." });
     }
-
-    let query, params;
 
     switch (step) {
       case 1:
-        // Existing email step
-        if (!data.email) {
-          return res.status(400).json({ message: "Email is required." });
-        }
-        const normalizedEmail = data.email.toLowerCase();
-        const existingUsers = await queryDB('SELECT * FROM users WHERE email = $1', [normalizedEmail]);
-        if (existingUsers.length > 0) {
-          return res.status(400).json({ message: "Email already in use." });
-        }
-        const tempUsername = `user_${Date.now()}`;
-        query = `
-          INSERT INTO users (email, username, created_at)
-          VALUES ($1, $2, CURRENT_TIMESTAMP)
-          RETURNING user_id;
-        `;
-        params = [normalizedEmail, tempUsername];
-        break;
+        // Email (handled by Supabase auth)
+        return res.status(200).json({ message: "Email handled by Supabase auth" });
 
       case 2:
-        // Existing password step
-        if (!data.password || !data.userId) {
-          return res.status(400).json({ message: "Password and userId are required." });
-        }
-        const passwordHash = await bcrypt.hash(data.password, parseInt(process.env.SALT_ROUNDS, 10));
-        query = `
-          UPDATE users 
-          SET password_hash = $1 
-          WHERE user_id = $2
-          RETURNING user_id;
-        `;
-        params = [passwordHash, data.userId];
-        break;
+        // Password (handled by Supabase auth)
+        return res.status(200).json({ message: "Password handled by Supabase auth" });
 
       case 3:
-        // Existing username step
+        // Username
         if (!data.username || data.username.length < 3 || data.username.length > 20) {
           return res.status(400).json({ message: "Username must be between 3 and 20 characters." });
         }
-        query = `
-          UPDATE users 
-          SET username = $1 
-          WHERE user_id = $2
-          RETURNING user_id;
-        `;
-        params = [data.username, data.userId];
+        const { error: usernameError } = await supabase
+          .from('users')
+          .update({ username: data.username })
+          .eq('supabase_uid', data.supabase_uid)
+          .select('user_id')
+          .single();
+        if (usernameError) throw usernameError;
         break;
 
       case 4:
-        // Existing preference step
+        // Preference
         if (data.preference !== "personal" && data.preference !== "business") {
           return res.status(400).json({ message: "Invalid preference." });
         }
-        query = `
-          UPDATE users 
-          SET is_personal = $1, is_business = $2 
-          WHERE user_id = $3
-          RETURNING user_id;
-        `;
-        params = [data.preference === "personal" ? 1 : 0, data.preference === "business" ? 1 : 0, data.userId];
+        const { error: prefError } = await supabase
+          .from('users')
+          .update({
+            is_personal: data.preference === "personal" ? 1 : 0,
+            is_business: data.preference === "business" ? 1 : 0,
+          })
+          .eq('supabase_uid', data.supabase_uid)
+          .select('user_id')
+          .single();
+        if (prefError) throw prefError;
         break;
 
       case 5:
         if (!data.realName || data.realName.trim() === "") {
           return res.status(400).json({ message: "Real name is required." });
         }
-        query = `
-          UPDATE users 
-          SET name = $1 
-          WHERE user_id = $2
-          RETURNING user_id;
-        `;
-        params = [data.realName.trim(), data.userId];
+        const { error: nameError } = await supabase
+          .from('users')
+          .update({ name: data.realName.trim() })
+          .eq('supabase_uid', data.supabase_uid)
+          .select('user_id')
+          .single();
+        if (nameError) throw nameError;
         break;
 
-      case 6: // New step for interests and completing registration
+      case 6:
         if (!data.interests || !Array.isArray(data.interests) || data.interests.length < 3) {
           return res.status(400).json({ message: "At least 3 interests are required." });
         }
-        if (!data.userId) {
-          return res.status(400).json({ message: "User ID is required." });
-        }
-
-        // Save interests (assuming you have an interests table or column)
-        // For simplicity, let's assume a JSON column 'interests' in the users table
-        query = `
-          UPDATE users 
-          SET interests = $1 
-          WHERE user_id = $2
-          RETURNING user_id, email, username;
-        `;
-        params = [JSON.stringify(data.interests), data.userId];
-
-        const result = await queryDB(query, params);
-        const user = result[0];
-
-        // Generate JWT token
-        const token = jwt.sign({ userId: user.user_id }, process.env.JWT_SECRET, { expiresIn: "1h" });
-
+        const { data: userData, error: interestsError } = await supabase
+          .from('users')
+          .update({ interests: data.interests })
+          .eq('supabase_uid', data.supabase_uid)
+          .select('user_id, email, username')
+          .single();
+        if (interestsError) throw interestsError;
         return res.status(200).json({
           message: "Registration completed successfully",
-          user: { user_id: user.user_id, email: user.email, username: user.username },
-          token,
+          user: { user_id: userData.user_id, email: userData.email, username: userData.username },
         });
 
       default:
         return res.status(400).json({ message: "Invalid step." });
     }
 
-    const result = await queryDB(query, params);
-    res.status(200).json({ message: "Data saved successfully", result });
+    res.status(200).json({ message: "Data saved successfully" });
   } catch (err) {
     console.error("Error saving user details:", err.stack);
     res.status(500).json({ message: "Internal server error", error: err.message });
@@ -353,10 +215,11 @@ const validateUsername = async (req, res) => {
       });
     }
 
-    const existingUsers = await queryDB(
-      'SELECT * FROM users WHERE username = $1',
-      [username]
-    );
+    const { data: existingUsers, error } = await supabase
+      .from('users')
+      .select('username')
+      .eq('username', username);
+    if (error) throw error;
 
     console.log("Query result:", existingUsers);
 
@@ -384,21 +247,18 @@ const validateUsername = async (req, res) => {
 // Get current user's profile
 const getUserProfile = async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const supabase_uid = req.user.id;
 
-    const query = `
-      SELECT user_id, username, email, name, bio, profile_picture, is_personal, is_business, reel_url 
-      FROM users 
-      WHERE user_id = $1
-    `;
-
-    const result = await queryDB(query, [userId]);
-
-    if (result.length === 0) {
+    const { data, error } = await supabase
+      .from('users')
+      .select('user_id, username, email, name, bio, profile_picture, is_personal, is_business, reel_url')
+      .eq('supabase_uid', supabase_uid)
+      .single();
+    if (error || !data) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    res.status(200).json(result[0]);
+    res.status(200).json(data);
   } catch (err) {
     console.error("Error fetching user profile:", err.stack);
     res.status(500).json({ message: "Internal server error", error: err.message });
@@ -408,52 +268,40 @@ const getUserProfile = async (req, res) => {
 // Update current user's profile
 const updateProfile = async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const supabase_uid = req.user.id;
     const { bio } = req.body;
     const profilePicture = req.file;
 
     console.log("Received bio:", bio);
     console.log("Received file:", profilePicture);
 
-    let updates = [];
-    let values = [];
-
-    if (bio) {
-      updates.push("bio = $1");
-      values.push(bio);
-    }
-
+    let updates = {};
+    if (bio) updates.bio = bio;
     if (profilePicture) {
-      // Always use HTTPS for the URL
-      const profilePicturePath = `https://pitch-backend-avb7geahhvfteqf9.centralindia-01.azurewebsites.net/uploads/profile_pictures/${profilePicture.filename}`;
-      updates.push("profile_picture = $2");
-      values.push(profilePicturePath);
+      updates.profile_picture = `https://pitch-backend-avb7geahhvfteqf9.centralindia-01.azurewebsites.net/uploads/profile_pictures/${profilePicture.filename}`;
     }
 
-    values.push(userId);
-
-    if (updates.length === 0) {
+    if (Object.keys(updates).length === 0) {
       return res.status(400).json({ message: "No fields to update." });
     }
 
-    const query = `
-      UPDATE users 
-      SET ${updates.join(", ")}
-      WHERE user_id = $${values.length}
-      RETURNING user_id, username, email, name, bio, profile_picture, is_personal, is_business;
-    `;
+    const { data, error } = await supabase
+      .from('users')
+      .update(updates)
+      .eq('supabase_uid', supabase_uid)
+      .select('user_id, username, email, name, bio, profile_picture, is_personal, is_business')
+      .single();
+    if (error) throw error;
 
-    const result = await queryDB(query, values);
-    console.log("Updated user:", result[0]);
-
-    return res.status(200).json(result[0]);
+    console.log("Updated user:", data);
+    res.status(200).json(data);
   } catch (err) {
     console.error("Update error:", err.stack);
-    return res.status(500).json({ message: "Internal server error", error: err.message });
+    res.status(500).json({ message: "Internal server error", error: err.message });
   }
 };
 
-// Fix profile picture URLs
+// Fix profile picture URLs (optional, may not be needed with Supabase)
 const fixProfilePictureURLs = async (req, res) => {
   try {
     const query = `
@@ -474,19 +322,16 @@ const getUserProfileByUsername = async (req, res) => {
   try {
     const { username } = req.params;
 
-    const query = `
-      SELECT user_id, username, email, name, bio, profile_picture, is_personal, is_business 
-      FROM users 
-      WHERE username = $1
-    `;
-
-    const result = await queryDB(query, [username]);
-
-    if (result.length === 0) {
+    const { data, error } = await supabase
+      .from('users')
+      .select('user_id, username, email, name, bio, profile_picture, is_personal, is_business')
+      .eq('username', username)
+      .single();
+    if (error || !data) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    res.status(200).json(result[0]);
+    res.status(200).json(data);
   } catch (err) {
     console.error("Error fetching user profile by username:", err.stack);
     res.status(500).json({ message: "Internal server error", error: err.message });
@@ -498,21 +343,15 @@ const getUserPostsByUsername = async (req, res) => {
   try {
     const { username } = req.params;
 
-    // First, get the user_id from the username
-    const userQuery = `
-      SELECT user_id 
-      FROM users 
-      WHERE username = $1
-    `;
-    const userResult = await queryDB(userQuery, [username]);
-
-    if (userResult.length === 0) {
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('user_id')
+      .eq('username', username)
+      .single();
+    if (userError || !user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    const userId = userResult[0].user_id;
-
-    // Then, fetch posts for that user_id
     const postsQuery = `
       SELECT p.post_id, p.user_id, u.username, p.media_url, p.content, p.created_at, p.media_type,
              (SELECT COUNT(*) FROM likes WHERE post_id = p.post_id) AS like_count
@@ -521,7 +360,7 @@ const getUserPostsByUsername = async (req, res) => {
       WHERE p.user_id = $1
       ORDER BY p.created_at DESC
     `;
-    const posts = await queryDB(postsQuery, [userId]);
+    const posts = await queryDB(postsQuery, [user.user_id]);
 
     res.status(200).json(posts);
   } catch (err) {
@@ -532,21 +371,19 @@ const getUserPostsByUsername = async (req, res) => {
 
 const searchUsers = async (req, res) => {
   try {
-    const { q } = req.query; // Query parameter 'q' for search term
+    const { q } = req.query;
     if (!q || q.length < 1) {
       return res.status(400).json({ message: "Search query is required." });
     }
 
-    const query = `
-      SELECT user_id, username, profile_picture
-      FROM users
-      WHERE username LIKE $1
-      ORDER BY username
-    `;
-    const searchTerm = `%${q.toLowerCase()}%`;
-    const result = await queryDB(query, [searchTerm]);
+    const { data, error } = await supabase
+      .from('users')
+      .select('user_id, username, profile_picture')
+      .ilike('username', `%${q.toLowerCase()}%`)
+      .order('username');
+    if (error) throw error;
 
-    res.status(200).json(result);
+    res.status(200).json(data);
   } catch (err) {
     console.error("Error searching users:", err.stack);
     res.status(500).json({ message: "Internal server error", error: err.message });
@@ -560,11 +397,10 @@ module.exports = {
   deleteAccount,
   validateUsername,
   saveUserDetails,
-  getUserProfile, // Added
+  getUserProfile,
   updateProfile,
   getUserProfileByUsername,
   getUserPostsByUsername,
   searchUsers,
-  checkTokenBlacklist,
-  fixProfilePictureURLs
+  fixProfilePictureURLs,
 };
