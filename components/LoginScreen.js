@@ -1,4 +1,3 @@
-// screens/LoginScreen.js
 import React, { useState } from "react";
 import {
   View,
@@ -19,6 +18,7 @@ import { FontAwesome } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import Popup from "./Popup";
 import { supabase } from '../services/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage'; // Add this import
 
 const LoginScreen = () => {
   const [usernameOrEmail, setUsernameOrEmail] = useState("");
@@ -42,14 +42,27 @@ const LoginScreen = () => {
     setIsLoading(true);
 
     try {
+      let emailToUse = usernameOrEmail;
+      if (!usernameOrEmail.includes('@')) {
+        const { data, error } = await supabase
+          .from('users')
+          .select('email')
+          .eq('username', usernameOrEmail)
+          .single();
+        if (error || !data) throw new Error('Username not found');
+        emailToUse = data.email;
+      }
+
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: usernameOrEmail.includes('@') ? usernameOrEmail : '',
+        email: emailToUse,
         password,
       });
       if (error) throw error;
 
       if (data.session) {
-        navigation.replace("Main"); // Replace with your main screen
+        // Store token in AsyncStorage
+        await AsyncStorage.setItem('authToken', data.session.access_token);
+        navigation.replace("Main");
       }
     } catch (err) {
       console.error("Login error:", err);

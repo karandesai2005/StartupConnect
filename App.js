@@ -30,6 +30,7 @@ import PostItem from './components/PostItem';
 import HandlePersonal from './components/Profile/P_Profile/handlePersonal';
 import HandleBusiness from './components/Profile/B_Profile/handleBusiness';
 import { supabase } from './services/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage'; // Add this import
 
 const Stack = createStackNavigator();
 
@@ -40,12 +41,27 @@ const App = () => {
   useEffect(() => {
     const checkAuthStatus = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        console.log('App.js: Auth session:', session ? 'Logged in' : 'Not logged in');
-        setInitialRoute(session ? 'Main' : 'Splash');
+        const storedToken = await AsyncStorage.getItem('authToken');
+        console.log('App.js: Stored token:', storedToken ? 'Found' : 'Not found');
+
+        if (storedToken) {
+          const { data, error } = await supabase.auth.setSession({ access_token: storedToken });
+          if (!error && data.session) {
+            console.log('App.js: Auth session restored:', data.session);
+            setInitialRoute('Main');
+          } else {
+            console.error('App.js: Session restore error:', error?.message);
+            await AsyncStorage.removeItem('authToken'); // Clear invalid token
+            setInitialRoute('Login');
+          }
+        } else {
+          console.log('App.js: No stored token, checking session');
+          const { data: { session } } = await supabase.auth.getSession();
+          setInitialRoute(session ? 'Main' : 'Login');
+        }
       } catch (error) {
         console.error('App.js: Error checking auth status:', error);
-        setInitialRoute('Splash');
+        setInitialRoute('Login');
       } finally {
         setIsLoading(false);
       }
@@ -70,7 +86,7 @@ const App = () => {
                 headerShown: false,
                 cardStyle: { backgroundColor: 'white' },
                 transitionSpec: {
-                  open: { animation: 'timing', config: { duration: 200 } }, // Reduced duration for performance
+                  open: { animation: 'timing', config: { duration: 200 } },
                   close: { animation: 'timing', config: { duration: 200 } },
                 },
                 cardStyleInterpolator: ({ current }) => ({
