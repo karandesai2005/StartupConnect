@@ -54,6 +54,9 @@ router.route('/validate-username')
 router.route('/save-user-details')
   .post(validateSaveUserDetailsInput, saveUserDetails);
 
+  router.route('/test-supabase-admin')
+  .get(testSupabaseAdmin);
+
 router.route('/delete-account')
   .delete(authenticateJWT, deleteAccount);
 

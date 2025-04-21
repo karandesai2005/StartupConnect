@@ -233,6 +233,21 @@ const saveUserDetails = async (req, res) => {
   }
 };
 
+const testSupabaseAdmin = async (req, res) => {
+  try {
+    console.log("Testing Supabase admin client with URL:", process.env.SUPABASE_URL);
+    console.log("Service key starts with:", process.env.SUPABASE_SERVICE_KEY.substring(0, 10) + "...");
+    const { data, error } = await supabase.auth.admin.getUserById('17139052-480b-4897-998b-065d524739e6');
+    if (error) {
+      console.error("Admin test error:", error.message, error.stack);
+      throw error;
+    }
+    res.status(200).json({ message: "Admin test successful", user: data });
+  } catch (err) {
+    console.error("Admin test failed:", err.message, err.stack);
+    res.status(500).json({ message: "Admin test failed", error: err.message });
+  }
+};
 // Validate username availability
 const validateUsername = async (req, res) => {
   try {
@@ -434,4 +449,5 @@ module.exports = {
   getUserPostsByUsername,
   searchUsers,
   fixProfilePictureURLs,
+  testSupabaseAdmin,
 };
