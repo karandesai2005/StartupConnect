@@ -11,7 +11,8 @@ const {
   updateProfile,
   getUserProfileByUsername,
   getUserPostsByUsername,
-  searchUsers
+  searchUsers,
+  testSupabaseAdmin
 } = require('../controllers/authController');
 const {
   validateUsernameInput,
