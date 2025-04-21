@@ -1,10 +1,12 @@
 import * as React from "react";
-import { Text, StyleSheet, View, TextInput, Pressable, Alert } from "react-native";
+import { Text, StyleSheet, View, TextInput, Pressable, ActivityIndicator, Alert } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { supabase } from '../../../services/supabase';
 
 const SetupBusinessProfile = () => {
   const [companyName, setCompanyName] = React.useState("");
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [error, setError] = React.useState("");
   const navigation = useNavigation();
   const route = useRoute();
   const { supabase_uid } = route.params || {};
@@ -15,23 +17,39 @@ const SetupBusinessProfile = () => {
 
   const handleNext = async () => {
     try {
+      setIsLoading(true);
+      setError("");
+
+      // Validate company name
       if (!companyName.trim()) {
-        Alert.alert("Error", "Please enter your company's name");
+        setError("Company name cannot be empty.");
         return;
       }
 
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user || user.id !== supabase_uid) {
+      // Check user session
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user || user.id !== supabase_uid) {
+        console.error("User session error:", userError?.message);
         throw new Error("User session not found. Please try again.");
       }
 
-      const { error } = await supabase.from('users').update({ company_name: companyName.trim() }).eq('supabase_uid', user.id);
-      if (error) throw error;
+      // Update name in users table (changed from company_name to name)
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ name: companyName.trim() })
+        .eq('supabase_uid', user.id);
+      if (updateError) {
+        console.error("Supabase update error:", updateError.message);
+        throw updateError;
+      }
 
+      Alert.alert("Success", "Company name saved successfully.");
       navigation.navigate("field", { supabase_uid: user.id });
     } catch (error) {
       console.error("Error saving company name:", error.message);
-      Alert.alert("Error", "Something went wrong. Please try again.");
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -52,9 +70,18 @@ const SetupBusinessProfile = () => {
         value={companyName}
         onChangeText={(text) => setCompanyName(text)}
       />
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-      <Pressable style={styles.signupButton} onPress={handleNext}>
-        <Text style={styles.signupButtonText}>Next</Text>
+      <Pressable
+        style={[styles.nextButton, isLoading ? styles.disabledButton : null]}
+        onPress={handleNext}
+        disabled={isLoading}
+      >
+        {isLoading ? (
+          <ActivityIndicator color="#fff" size="small" />
+        ) : (
+          <Text style={styles.nextButtonText}>Next</Text>
+        )}
       </Pressable>
 
       <Text style={styles.termsText}>
@@ -106,9 +133,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 10,
     fontSize: 16,
-    marginBottom: 30,
+    marginBottom: 10,
   },
-  signupButton: {
+  nextButton: {
     width: "100%",
     backgroundColor: "#535353",
     paddingVertical: 12,
@@ -116,10 +143,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 20,
   },
-  signupButtonText: {
+  disabledButton: {
+    opacity: 0.7,
+  },
+  nextButtonText: {
     color: "#fff",
     fontSize: 16,
     fontWeight: "600",
+  },
+  errorText: {
+    color: "#ff0000",
+    fontSize: 14,
+    marginBottom: 10,
+    textAlign: "center",
   },
   termsText: {
     fontSize: 12,

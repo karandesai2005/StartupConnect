@@ -17,6 +17,14 @@ const FIELDS = [
   "Blockchain",
   "Design",
   "Data Science",
+  "Entrepreneurship",
+  "Startups",
+  "Venture Capital",
+  "Business Strategy",
+  "Innovation",
+  "E-commerce",
+  "Social Enterprise",
+  "Product Management",
 ];
 
 const Field = () => {
@@ -29,13 +37,13 @@ const Field = () => {
     setSelectedFields(current =>
       current.includes(field)
         ? current.filter(item => item !== field)
-        : [...current, field].slice(0, 3)
+        : [...current, field]
     );
   };
 
   const handleNext = async () => {
-    if (selectedFields.length < 1) {
-      Alert.alert("Error", "Please select at least 1 field.");
+    if (selectedFields.length < 3) {
+      Alert.alert("Error", "Please select at least 3 fields.");
       return;
     }
 
@@ -56,7 +64,6 @@ const Field = () => {
         throw error;
       }
 
-      // Persist session and store token
       await supabase.auth.setSession(session);
       await AsyncStorage.setItem('token', session.access_token);
       console.log('Session persisted and token stored, navigating to Main with Home tab');
@@ -74,7 +81,8 @@ const Field = () => {
     <Pressable
       style={[
         styles.fieldContainer,
-        selectedFields.includes(item) && styles.selectedField
+        selectedFields.includes(item) && styles.selectedField,
+        { transform: [{ scale: selectedFields.includes(item) ? 0.98 : 1 }] }, // Subtle press feedback
       ]}
       onPress={() => toggleField(item)}
     >
@@ -84,21 +92,22 @@ const Field = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Select up to 3 fields</Text>
+      <Text style={styles.title}>Select at least 3 fields</Text>
       <FlatList
         data={FIELDS}
         renderItem={renderField}
         keyExtractor={item => item}
         contentContainerStyle={styles.interestsList}
         numColumns={2}
+        columnWrapperStyle={styles.columnWrapper}
       />
       <Pressable
         style={[
           styles.nextButton,
-          selectedFields.length < 1 && styles.disabledButton
+          selectedFields.length < 3 && styles.disabledButton,
         ]}
         onPress={handleNext}
-        disabled={selectedFields.length < 1}
+        disabled={selectedFields.length < 3}
       >
         <Text style={styles.nextButtonText}>Next</Text>
       </Pressable>
@@ -120,8 +129,10 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   interestsList: {
-    justifyContent: "center",
     paddingHorizontal: 20,
+  },
+  columnWrapper: {
+    justifyContent: "space-between",
   },
   fieldContainer: {
     margin: 10,

@@ -4,7 +4,7 @@
     "slug": "StartupConnect",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/PITCH.png",
+    "icon": "./assets/PITCH1.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
@@ -32,7 +32,7 @@
       ],
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/PITCH.png",
+        "foregroundImage": "./assets/PITCH1.png",
         "backgroundColor": "#ffffff"
       } 
     },
@@ -51,7 +51,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/PITCH.png",
+          "icon": "./assets/PITCH1.png",
           "color": "#ffffff",
           "mode": "production"
         }

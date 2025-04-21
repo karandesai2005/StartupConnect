@@ -19,9 +19,8 @@ import {
   StatusBar,
   Alert,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import axios from 'axios';
-import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NGROK_URL } from '@env';
 import { Video } from 'expo-av';
@@ -519,15 +518,8 @@ export default function Home() {
       setPostsError(null);
       const token = await AsyncStorage.getItem('token');
       if (!token) {
-        console.log('No token in AsyncStorage, refreshing session');
-        const { data: { session }, error } = await supabase.auth.refreshSession();
-        if (error || !session) {
-          console.error('Session refresh failed:', error?.message);
-          navigation.reset({ index: 0, routes: [{ name: 'Register1' }] });
-          return;
-        }
-        await AsyncStorage.setItem('token', session.access_token);
-        token = session.access_token;
+        console.log('No token in AsyncStorage');
+        return;
       }
       const baseUrl = NGROK_URL.replace(/\/+$/, '');
       const response = await axios.get(`${baseUrl}/api/posts/all`, {
@@ -536,6 +528,7 @@ export default function Home() {
           Authorization: `Bearer ${token}`,
         },
       });
+      console.log('Posts API response:', response.data); // Debug log
       if (response.data && Array.isArray(response.data)) {
         const mappedPosts = response.data.map((post) => ({
           _id: post.post_id,
@@ -553,53 +546,15 @@ export default function Home() {
           .filter((post) => post.image_url && !post.image_url.includes('undefined'))
           .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
         setMyPosts(sortedPosts);
+      } else {
+        console.warn('Invalid posts data:', response.data);
+        setPostsError('Invalid data from server');
       }
     } catch (error) {
-      console.error('Error fetching posts:', error);
+      console.error('Error fetching posts:', error.response?.data || error.message);
       setPostsError(error.message);
     }
   }, []);
-
-  useEffect(() => {
-    const checkAuthStatus = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        console.log('No session, attempting refresh');
-        const { data, error } = await supabase.auth.refreshSession();
-        if (error || !data.session) {
-          console.error('Refresh failed:', error?.message);
-          navigation.reset({ index: 0, routes: [{ name: 'Register1' }] });
-          return;
-        }
-        await AsyncStorage.setItem('token', data.session.access_token);
-      }
-      await Promise.all([fetchUserData(), loadUsers(), fetchAllPosts()]);
-    };
-    checkAuthStatus();
-  }, [navigation, fetchUserData, loadUsers, fetchAllPosts]);
-
-  useEffect(() => {
-    loadUsers();
-    fetchAllPosts();
-  }, [currentPage]);
-
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    setCurrentPage(1);
-    loadUsers(true);
-    fetchAllPosts();
-  }, []);
-
-  const toggleExpand = useCallback((index) => {
-    setExpandedItems((prev) => ({ ...prev, [index]: !prev[index] }));
-  }, []);
-
-  const renderFooter = () =>
-    loading && (
-      <View style={styles.loaderContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
-      </View>
-    );
 
   const fetchUserData = useCallback(async () => {
     try {
@@ -633,8 +588,35 @@ export default function Home() {
 
   useFocusEffect(
     useCallback(() => {
-      fetchUserData();
-    }, [fetchUserData])
+      const checkAuthAndFetch = async () => {
+        try {
+          setLoading(true);
+          // Check authentication status
+          let token = await AsyncStorage.getItem('token');
+          if (!token) {
+            console.log('No token, refreshing session');
+            const { data: { session }, error } = await supabase.auth.refreshSession();
+            if (error || !session) {
+              console.error('Session refresh failed:', error?.message);
+              navigation.reset({ index: 0, routes: [{ name: 'Register1' }] });
+              return;
+            }
+            token = session.access_token;
+            await AsyncStorage.setItem('token', token);
+          }
+
+          // Fetch user data, posts, and users concurrently
+          await Promise.all([fetchUserData(), fetchAllPosts(), loadUsers(true)]);
+        } catch (error) {
+          console.error('Error during auth check or data fetch:', error);
+          setPostsError(error.message);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      checkAuthAndFetch();
+    }, [fetchUserData, fetchAllPosts, loadUsers, navigation])
   );
 
   useFocusEffect(
@@ -644,6 +626,27 @@ export default function Home() {
       };
     }, [])
   );
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    setCurrentPage(1);
+    setMyPosts([]); // Clear posts
+    setUsers([]); // Clear users
+    Promise.all([fetchAllPosts(), loadUsers(true)]).finally(() => {
+      setRefreshing(false);
+    });
+  }, [fetchAllPosts, loadUsers]);
+
+  const toggleExpand = useCallback((index) => {
+    setExpandedItems((prev) => ({ ...prev, [index]: !prev[index] }));
+  }, []);
+
+  const renderFooter = () =>
+    loading && (
+      <View style={styles.loaderContainer}>
+        <ActivityIndicator size="large" color="#007AFF" />
+      </View>
+    );
 
   const keyExtractor = useCallback((item, index) => {
     if (item.post_id) return `post-${item.post_id}`;
@@ -727,6 +730,11 @@ export default function Home() {
         style={styles.keyboardAvoid}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
+        {postsError && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>Error: {postsError}</Text>
+          </View>
+        )}
         <FlatList
           data={combinedData}
           extraData={combinedData}
@@ -1130,5 +1138,14 @@ const styles = StyleSheet.create({
     color: '#868E96',
     textAlign: 'center',
     marginVertical: 20,
+  },
+  errorContainer: {
+    padding: 16,
+    backgroundColor: '#FFDDDD',
+    alignItems: 'center',
+  },
+  errorText: {
+    color: '#D32F2F',
+    fontSize: 16,
   },
 });
