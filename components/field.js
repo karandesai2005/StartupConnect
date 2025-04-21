@@ -1,11 +1,9 @@
 import React, { useState } from "react";
 import { Text, StyleSheet, View, Pressable, FlatList, Alert } from "react-native";
-import { useNavigation } from "@react-navigation/native";
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { NGROK_URL } from '@env';
+import { useNavigation, useRoute } from "@react-navigation/native"; // Added useRoute
+import { supabase } from '../services/supabase';
 
 const INTERESTS = [
-  // Startup Domains
   "Healthcare & Wellness",
   "Mental Health",
   "Fitness & Nutrition",
@@ -33,12 +31,13 @@ const INTERESTS = [
   "Social Impact",
   "Nonprofit Tech",
   "Accessibility Tech",
-  "LegalTech"
+  "LegalTech",
 ];
-
 
 const Signup = () => {
   const navigation = useNavigation();
+  const route = useRoute();
+  const { supabase_uid } = route.params || {};
   const [selectedInterests, setSelectedInterests] = useState([]);
 
   const toggleInterest = (interest) => {
@@ -56,45 +55,38 @@ const Signup = () => {
     }
 
     try {
-      const userId = await AsyncStorage.getItem('userId');
-      console.log("userId:", userId);
-      if (!userId) {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user || user.id !== supabase_uid) {
         Alert.alert("Error", "Session expired. Please restart registration.");
         navigation.navigate("Register1");
         return;
       }
 
-      const payload = {
-        step: 6,
-        data: { interests: selectedInterests, userId: parseInt(userId) },
-      };
-      console.log("Sending payload:", JSON.stringify(payload));
-      console.log("NGROK_URL:", NGROK_URL);
-
-      const response = await fetch(`${NGROK_URL}/api/auth/save-user-details`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      console.log("Response status:", response.status);
-      const responseText = await response.text();
-      console.log("Response text:", responseText);
-
-      const result = await JSON.parse(responseText);
-
-      if (response.ok) {
-        await AsyncStorage.setItem('token', result.token);
-        await AsyncStorage.setItem('useruserData', JSON.stringify(result.user));
-        navigation.navigate("Main");
-      } else {
-        Alert.alert("Error", result.message || "Failed to complete registration.");
+      // Add interests column if it doesn't exist
+      const { error } = await supabase.from('users').update({ interests: { data: selectedInterests } }).eq('supabase_uid', user.id);
+      if (error) {
+        console.error("Database error:", error.message);
+        if (error.message.includes("column")) {
+          // Attempt to add interests column if missing
+          await supabase.rpc('add_interests_column');
+          const retryError = await supabase.from('users').update({ interests: { data: selectedInterests } }).eq('supabase_uid', user.id);
+          if (retryError) throw retryError;
+        } else {
+          throw error;
+        }
       }
+
+      // Navigate to Main with a reset to clear the stack
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Main', params: { screen: 'Home' } }],
+      });
     } catch (err) {
-      console.error("Error completing registration:", err);
+      console.error("Error completing registration:", err.message);
       Alert.alert("Error", "Something went wrong. Please try again.");
     }
   };
+
   const renderInterest = ({ item }) => (
     <Pressable
       style={[
@@ -133,7 +125,6 @@ const Signup = () => {
   );
 };
 
-// Styles remain the same
 const styles = StyleSheet.create({
   container: {
     flex: 1,

@@ -1,3 +1,4 @@
+// screens/Register1.js
 import React, { useContext, useState } from "react";
 import {
   View,
@@ -12,13 +13,15 @@ import {
 import { useNavigation } from "@react-navigation/native";
 import { UserRegistrationContext } from "../context/UserRegistrationContext";
 import Popup from "./Popup";
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { NGROK_URL } from '@env';
+import { supabase } from '../services/supabase';
 
-const SignupForm = () => {
+console.log('SUPABASE_URL:', process.env.SUPABASE_URL || 'Not loaded');
+console.log('SUPABASE_ANON_KEY value:', process.env.SUPABASE_ANON_KEY || 'Not loaded');
+console.log('Supabase client initialized:', !!supabase);
+
+const Register1 = () => {
   const navigation = useNavigation();
   const { userData, setUserData } = useContext(UserRegistrationContext);
-  console.log("NGROK_URL:", NGROK_URL);
 
   const [emailError, setEmailError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -52,43 +55,28 @@ const SignupForm = () => {
     setServerError("");
 
     try {
-      const response = await fetch(`${NGROK_URL}/api/auth/save-user-details`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          step: 1,
-          data: { email },
-        }),
-      });
-
-      const rawResponse = await response.text();
-      console.log("Raw response:", rawResponse);
-      const result = JSON.parse(rawResponse);
-      console.log("Parsed response:", result);
-
-      if (response.ok && result.result && result.result[0]?.user_id) {
-        const userId = result.result[0].user_id;
-        console.log("Navigating with userId:", userId);
-
-        try {
-          await AsyncStorage.setItem('userId', userId.toString());
-          console.log("Successfully saved userId to AsyncStorage:", userId);
-        } catch (storageError) {
-          console.error("Error saving to AsyncStorage:", storageError);
-          setPopupMessage("Error saving user data. Please try again.");
-          setIsPopupVisible(true);
-          return;
+      const tempPassword = Math.random().toString(36).slice(-8);
+      console.log('Generated tempPassword:', tempPassword);
+      const { data, error } = await supabase.auth.signUp({ email, password: tempPassword });
+      if (error) {
+        if (error.message.includes('rate limit exceeded')) {
+          throw new Error('Email rate limit exceeded. Please use a different email or wait.');
         }
+        throw error;
+      }
 
-        navigation.navigate("Register2", { userId });
+      if (data.user) {
+        setUserData({ ...userData, supabase_uid: data.user.id, tempPassword });
+        const params = { supabase_uid: data.user.id, tempPassword };
+        console.log('Navigating with params:', params);
+        navigation.navigate("Register2", params);
       } else {
-        setPopupMessage(result.message || "Unable to retrieve userId.");
+        setPopupMessage("Please check your email for verification. A temporary password was set.");
         setIsPopupVisible(true);
       }
     } catch (err) {
-      console.error("Network error:", err);
-      console.error("Error details:", err.message);
-      setPopupMessage("Unable to save details. Please try again later.");
+      console.error("Network error:", err.message, err);
+      setPopupMessage(err.message);
       setIsPopupVisible(true);
     } finally {
       setIsLoading(false);
@@ -154,42 +142,14 @@ const SignupForm = () => {
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#fff",
-  },
-  container: {
-    flex: 1,
-    paddingHorizontal: 32,
-  },
-  backButton: {
-    position: "absolute",
-    left: 28,
-    top: 46, // Adjusted to fit within SafeAreaView
-    zIndex: 1,
-  },
-  backButtonText: {
-    fontSize: 32,
-    color: "#000",
-  },
-  header: {
-    marginTop: 54, // Adjusted to account for SafeAreaView
-    alignItems: "center",
-  },
-  headerText: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#0a0a0a",
-  },
-  emailSection: {
-    marginTop: 49,
-  },
-  emailTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#000",
-    marginBottom: 16,
-  },
+  safeArea: { flex: 1, backgroundColor: "#fff" },
+  container: { flex: 1, paddingHorizontal: 32 },
+  backButton: { position: "absolute", left: 28, top: 46, zIndex: 1 },
+  backButtonText: { fontSize: 32, color: "#000" },
+  header: { marginTop: 54, alignItems: "center" },
+  headerText: { fontSize: 16, fontWeight: "700", color: "#0a0a0a" },
+  emailSection: { marginTop: 49 },
+  emailTitle: { fontSize: 20, fontWeight: "700", color: "#000", marginBottom: 16 },
   input: {
     width: "100%",
     height: 51,
@@ -199,20 +159,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "transparent",
   },
-  inputError: {
-    borderColor: "#ff0000",
-    backgroundColor: "#fff0f0",
-  },
-  helperText: {
-    fontSize: 8,
-    color: "#040404",
-    marginTop: 8,
-  },
-  errorText: {
-    fontSize: 12,
-    color: "#ff0000",
-    marginTop: 8,
-  },
+  inputError: { borderColor: "#ff0000", backgroundColor: "#fff0f0" },
+  helperText: { fontSize: 8, color: "#040404", marginTop: 8 },
+  errorText: { fontSize: 12, color: "#ff0000", marginTop: 8 },
   nextButton: {
     marginTop: 62,
     backgroundColor: "#535353",
@@ -223,13 +172,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     alignSelf: "center",
   },
-  nextButtonDisabled: {
-    opacity: 0.7,
-  },
-  nextButtonText: {
-    color: "#fff",
-    fontSize: 15,
-  },
+  nextButtonDisabled: { opacity: 0.7 },
+  nextButtonText: { color: "#fff", fontSize: 15 },
 });
 
-export default SignupForm;
+export default Register1;

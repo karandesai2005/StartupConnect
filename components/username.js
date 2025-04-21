@@ -1,3 +1,4 @@
+// screens/Username.js
 import React, { useState } from "react";
 import {
   Text,
@@ -8,10 +9,10 @@ import {
   Alert,
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import Popup from "./Popup"; // Import the Popup component
-import { NGROK_URL } from "@env";
+import Popup from "./Popup";
+import { supabase } from '../services/supabase';
 
-const Signup = () => {
+const Username = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const [username, setUsername] = useState("");
@@ -27,27 +28,17 @@ const Signup = () => {
   const handleUsernameChange = async (text) => {
     setUsername(text);
     setIsUsernameAvailable(null);
-    // Check for uppercase letters
     const containsUppercase = /[A-Z]/.test(text);
     setHasUppercase(containsUppercase);
 
-    if (!text.trim()) return;
-    if (text.length < 3 || text.length > 20) return;
-    if (containsUppercase) return; // Don't check availability if uppercase exists
+    if (!text.trim() || text.length < 3 || text.length > 20 || containsUppercase) return;
 
     setCheckingAvailability(true);
 
     try {
-      const response = await fetch(`${NGROK_URL}/api/auth/validate-username`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: text }),
-      });
-
-      const result = await response.json();
-      console.log("Username validation response:", result);
-
-      setIsUsernameAvailable(result.available);
+      const { data, error } = await supabase.from('users').select('username').eq('username', text);
+      if (error) throw error;
+      setIsUsernameAvailable(data.length === 0);
     } catch (error) {
       console.error("Error validating username:", error.message);
       setIsUsernameAvailable(false);
@@ -78,25 +69,9 @@ const Signup = () => {
     }
 
     try {
-      const response = await fetch(`${NGROK_URL}/api/auth/save-user-details`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          step: 3,
-          data: {
-            username,
-            userId: route.params.userId,
-          },
-        }),
-      });
-
-      const result = await response.json();
-
-      if (response.ok) {
-        navigation.navigate("preference", { userId: route.params.userId });
-      } else {
-        Alert.alert("Error", result.message || "Something went wrong");
-      }
+      const { error } = await supabase.from('users').update({ username }).eq('supabase_uid', route.params.supabase_uid);
+      if (error) throw error;
+      navigation.navigate("preference", { supabase_uid: route.params.supabase_uid });
     } catch (err) {
       console.error("Error saving username details:", err.message);
       Alert.alert("Error", "Failed to save username details. Please try again.");
@@ -153,82 +128,19 @@ const Signup = () => {
 };
 
 const styles = StyleSheet.create({
-  signup: {
-    backgroundColor: "#fff",
-    flex: 1,
-  },
-  container: {
-    flex: 1,
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingTop: 40,
-  },
-  backButton: {
-    position: "absolute",
-    left: 28,
-    top: 86,
-    zIndex: 1,
-  },
-  backButtonText: {
-    fontSize: 32,
-    color: "#000",
-  },
-  createAccount: {
-    fontSize: 16,
-    color: "#000",
-    fontFamily: "Avenir Next Cyr",
-    fontWeight: "700",
-    marginTop: 50,
-  },
-  whatsDoYou: {
-    fontSize: 20,
-    color: "#000",
-    fontFamily: "Avenir Next Cyr",
-    fontWeight: "700",
-    textAlign: "center",
-    marginTop: 20,
-    maxWidth: 355,
-  },
-  inputContainer: {
-    width: "100%",
-    marginTop: 20,
-  },
-  input: {
-    backgroundColor: "#b7b7b7",
-    borderRadius: 5,
-    width: "100%",
-    height: 51,
-    paddingHorizontal: 15,
-    fontSize: 16,
-    color: "#000",
-  },
-  errorText: {
-    color: "red",
-    marginTop: 10,
-    fontSize: 14,
-  },
-  loadingText: {
-    color: "#666",
-    marginTop: 10,
-    fontSize: 14,
-  },
-  buttonContainer: {
-    marginTop: 30,
-    alignItems: "center",
-  },
-  signupItem: {
-    borderRadius: 21,
-    backgroundColor: "#535353",
-    width: 82,
-    height: 42,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  next: {
-    fontSize: 15,
-    fontFamily: "Avenir Next",
-    color: "#fff",
-  },
+  signup: { backgroundColor: "#fff", flex: 1 },
+  container: { flex: 1, alignItems: "center", paddingHorizontal: 20, paddingTop: 40 },
+  backButton: { position: "absolute", left: 28, top: 86, zIndex: 1 },
+  backButtonText: { fontSize: 32, color: "#000" },
+  createAccount: { fontSize: 16, color: "#000", fontFamily: "Avenir Next Cyr", fontWeight: "700", marginTop: 50 },
+  whatsDoYou: { fontSize: 20, color: "#000", fontFamily: "Avenir Next Cyr", fontWeight: "700", textAlign: "center", marginTop: 20, maxWidth: 355 },
+  inputContainer: { width: "100%", marginTop: 20 },
+  input: { backgroundColor: "#b7b7b7", borderRadius: 5, width: "100%", height: 51, paddingHorizontal: 15, fontSize: 16, color: "#000" },
+  errorText: { color: "red", marginTop: 10, fontSize: 14 },
+  loadingText: { color: "#666", marginTop: 10, fontSize: 14 },
+  buttonContainer: { marginTop: 30, alignItems: "center" },
+  signupItem: { borderRadius: 21, backgroundColor: "#535353", width: 82, height: 42, justifyContent: "center", alignItems: "center" },
+  next: { fontSize: 15, fontFamily: "Avenir Next", color: "#fff" },
 });
 
-export default Signup;
+export default Username;

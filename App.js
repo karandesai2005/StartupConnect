@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { UserRegistrationProvider } from './context/UserRegistrationContext';
 import { ThemeProvider } from './components/ThemeContext';
 import SplashScreen from './components/SplashScreen';
@@ -18,7 +17,6 @@ import EditProfilePage from './components/Profile/P_Profile/EditProfilePage';
 import Username from './components/username';
 import Preference from './components/preference';
 import Field from './components/field';
-import Popup from './components/Popup';
 import CreatePostScreen from './components/CreatePostScreen';
 import PostViewScreen from './components/PostViewScreen';
 import Settings from './components/settings';
@@ -29,29 +27,25 @@ import ViewStory from './components/Profile/P_Profile/ViewStory';
 import EventDetails from './components/EventDetail';
 import ReelScreen from './components/Reels';
 import PostItem from './components/PostItem';
+import HandlePersonal from './components/Profile/P_Profile/handlePersonal';
+import HandleBusiness from './components/Profile/B_Profile/handleBusiness';
+import { supabase } from './services/supabase';
 
 const Stack = createStackNavigator();
 
 const App = () => {
   const [isLoading, setIsLoading] = useState(true);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [accountType, setAccountType] = useState(null);
+  const [initialRoute, setInitialRoute] = useState('Splash');
 
   useEffect(() => {
     const checkAuthStatus = async () => {
       try {
-        const token = await AsyncStorage.getItem('token');
-        const userDataStr = await AsyncStorage.getItem('userData');
-        console.log('App.js: Checking token:', token ? 'Token found' : 'No token');
-        if (token && userDataStr) {
-          const userData = JSON.parse(userDataStr);
-          setAccountType(userData?.account_type || 'personal');
-          setIsLoggedIn(true);
-        } else {
-          setIsLoggedIn(false);
-        }
+        const { data: { session } } = await supabase.auth.getSession();
+        console.log('App.js: Auth session:', session ? 'Logged in' : 'Not logged in');
+        setInitialRoute(session ? 'Main' : 'Splash');
       } catch (error) {
         console.error('App.js: Error checking auth status:', error);
+        setInitialRoute('Splash');
       } finally {
         setIsLoading(false);
       }
@@ -69,16 +63,15 @@ const App = () => {
         <UserRegistrationProvider>
           <NavigationContainer
             onStateChange={(state) => console.log('Navigation state:', JSON.stringify(state, null, 2))}
-            onUnhandledAction={(action) => console.error('Unhandled navigation:', JSON.stringify(action, null, 2))}
           >
             <Stack.Navigator
-              initialRouteName={isLoggedIn ? 'Main' : 'Splash'}
+              initialRouteName={initialRoute}
               screenOptions={{
                 headerShown: false,
                 cardStyle: { backgroundColor: 'white' },
                 transitionSpec: {
-                  open: { animation: 'timing', config: { duration: 300 } },
-                  close: { animation: 'timing', config: { duration: 300 } },
+                  open: { animation: 'timing', config: { duration: 200 } }, // Reduced duration for performance
+                  close: { animation: 'timing', config: { duration: 200 } },
                 },
                 cardStyleInterpolator: ({ current }) => ({
                   cardStyle: { opacity: current.progress },
@@ -97,7 +90,6 @@ const App = () => {
               <Stack.Screen name="username" component={Username} />
               <Stack.Screen name="preference" component={Preference} />
               <Stack.Screen name="field" component={Field} />
-              <Stack.Screen name="PopUp" component={Popup} />
               <Stack.Screen name="EditProfilePage" component={EditProfilePage} />
               <Stack.Screen name="CreatePost" component={CreatePostScreen} />
               <Stack.Screen name="PostView" component={PostViewScreen} />
@@ -109,6 +101,8 @@ const App = () => {
               <Stack.Screen name="EventDetails" component={EventDetails} />
               <Stack.Screen name="ReelScreen" component={ReelScreen} options={{ headerShown: false }} />
               <Stack.Screen name="PostItem" component={PostItem} />
+              <Stack.Screen name="handlePersonal" component={HandlePersonal} />
+              <Stack.Screen name="handleBusiness" component={HandleBusiness} />
             </Stack.Navigator>
           </NavigationContainer>
         </UserRegistrationProvider>
