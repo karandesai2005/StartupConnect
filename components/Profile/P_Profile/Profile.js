@@ -17,7 +17,7 @@ import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { NGROK_URL } from '@env';
 import { Video } from 'expo-av';
-import { supabase } from '../../services/supabase'; // Adjust path as needed
+import { supabase } from '../../../services/supabase'; // Adjust path as needed
 
 const ProfileHeader = React.memo(({ userData, navigation, isOwnProfile, onFollow }) => {
   const isBusinessProfile = userData?.account_type === "business";
