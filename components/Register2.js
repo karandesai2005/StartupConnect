@@ -24,7 +24,7 @@ const Register2 = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [popupVisible, setPopupVisible] = useState(false);
-  const [popupMessage, setPopupMessage] = useState(""); // Fixed state declaration
+  const [popupMessage, setPopupMessage] = useState("");
 
   console.log('Register2 full params:', route.params); // Debug full params
   console.log('NGROK_URL:', NGROK_URL); // Debug the environment variable
@@ -65,8 +65,8 @@ const Register2 = () => {
       return;
     }
 
-    if (!tempPassword) {
-      setPopupMessage("Temporary password is missing. Please restart registration.");
+    if (!supabase_uid) {
+      setPopupMessage("User ID is missing. Please restart registration.");
       setPopupVisible(true);
       return;
     }
@@ -79,8 +79,8 @@ const Register2 = () => {
         throw new Error('User session mismatch. Please restart registration.');
       }
 
-      // Update password via save-user-details endpoint (step 2)
-      const backendUrl = new URL('/api/auth/save-user-details', NGROK_URL).href;
+      // Update password via save-user-details endpoint
+      const backendUrl = new URL('/api/auth/save-user-details', NGROK_URL).href; // Fixed to include /api/auth
       console.log('Attempting fetch to:', backendUrl);
       const response = await fetch(backendUrl, {
         method: 'POST',
@@ -88,7 +88,7 @@ const Register2 = () => {
         body: JSON.stringify({
           step: 2,
           data: {
-            userId: user.id, // Changed from supabase_uid to userId
+            supabase_uid: user.id,
             email: userData.email,
             password: trimmedPassword,
           },
@@ -96,12 +96,12 @@ const Register2 = () => {
       });
       const result = await response.json();
       console.log('Fetch response:', result);
-      if (!response.ok) throw new Error(result.message || "Registration failed");
+      if (!response.ok) throw new Error(result.message || "Password update failed");
 
       navigation.navigate("username", { supabase_uid: user.id });
     } catch (err) {
-      console.error("Password update or registration error:", err.message, err);
-      setPopupMessage(`Unable to complete registration: ${err.message}. Check NGROK_URL (${NGROK_URL}) or redeploy backend.`);
+      console.error("Password update error:", err.message, err);
+      setPopupMessage(`Unable to update password: ${err.message}`);
       setPopupVisible(true);
     }
   };
