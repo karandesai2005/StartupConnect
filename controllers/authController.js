@@ -2,6 +2,22 @@ const { supabase } = require('../services/supabase');
 const { queryDB } = require('../config/db');
 const { uploadAndConvertPostMedia } = require('../config/multerConfig');
 
+// Password validation function
+const validatePassword = (password) => {
+  const minLength = 8;
+  const hasUppercase = /[A-Z]/.test(password);
+  const hasLowercase = /[a-z]/.test(password);
+  const hasNumber = /\d/.test(password);
+  const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+  return (
+    password.length >= minLength &&
+    hasUppercase &&
+    hasLowercase &&
+    hasNumber &&
+    hasSpecialChar
+  );
+};
+
 // Register user (creates users table entry after Supabase auth)
 const register = async (req, res) => {
   try {
@@ -129,12 +145,22 @@ const saveUserDetails = async (req, res) => {
 
       case 2:
         // Password update
-        if (!data.password) {
-          return res.status(400).json({ message: "Password is required." });
+        console.log("Attempting password update for user:", data.supabase_uid);
+        if (!data.password || !validatePassword(data.password)) {
+          console.log("Password validation failed:", data.password);
+          return res.status(400).json({
+            message: "Password must be 8+ characters with uppercase, lowercase, number, and special character.",
+          });
         }
-        const { error: updateError } = await supabase.auth.updateUser({ password: data.password });
-        if (updateError) throw updateError;
-        break;
+        const { error: authError } = await supabase.auth.admin.updateUserById(data.supabase_uid, {
+          password: data.password,
+        });
+        if (authError) {
+          console.error("Supabase auth error:", authError.message);
+          throw new Error(`Failed to update password: ${authError.message}`);
+        }
+        console.log("Password updated successfully for user:", data.supabase_uid);
+        return res.status(200).json({ message: "Password updated successfully" });
 
       case 3:
         // Username
@@ -202,7 +228,7 @@ const saveUserDetails = async (req, res) => {
 
     res.status(200).json({ message: "Data saved successfully" });
   } catch (err) {
-    console.error("Error saving user details:", err.stack);
+    console.error("Error saving user details:", err.message, err.stack);
     res.status(500).json({ message: "Internal server error", error: err.message });
   }
 };
