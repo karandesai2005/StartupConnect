@@ -1,4 +1,4 @@
-const { queryDB } = require('../config/db'); // Use queryDB instead of connectDB
+const { queryDB } = require('../config/db');
 
 // SQL query templates
 const QUERIES = {
@@ -32,12 +32,13 @@ const QUERIES = {
     SELECT u.user_id, u.username, u.profile_picture
     FROM public.users u
     JOIN public.followers f ON u.user_id = f.followee_id
-    WHERE f.follower_id = $1`
+    WHERE f.follower_id = $1`,
+  GET_BY_UUID: 'SELECT user_id FROM public.users WHERE supabase_uid = $1' // Updated to supabase_uid
 };
 
 // Utility function to execute queries
 async function executeQuery(query, params = []) {
-  return await queryDB(query, params); // Use queryDB directly
+  return await queryDB(query, params);
 }
 
 // Error handling wrapper
@@ -54,22 +55,30 @@ const User = {
   async getUserByEmail(email) {
     return withErrorHandling(async () => {
       const result = await executeQuery(QUERIES.GET_BY_EMAIL, [email]);
-      return result[0] || null; // queryDB returns rows array
+      return result[0] || null;
     }, 'getUserByEmail');
   },
 
   async getUserByUsername(username) {
     return withErrorHandling(async () => {
       const result = await executeQuery(`${QUERIES.GET_USER_DETAILS} u.username = $1`, [username]);
-      return result[0] || null; // queryDB returns rows array
+      return result[0] || null;
     }, 'getUserByUsername');
   },
 
   async getUserById(userId) {
     return withErrorHandling(async () => {
       const result = await executeQuery(`${QUERIES.GET_USER_DETAILS} u.user_id = $1`, [userId]);
-      return result[0] || null; // queryDB returns rows array
+      return result[0] || null;
     }, 'getUserById');
+  },
+
+  async getUserByUuid(uuid) {
+    return withErrorHandling(async () => {
+      const result = await executeQuery(QUERIES.GET_BY_UUID, [uuid]);
+      if (!result[0]) throw new Error('User not found by UUID');
+      return await this.getUserById(result[0].user_id);
+    }, 'getUserByUuid');
   },
 
   async createUser(username, email, passwordHash, isFounder, isInvestor) {

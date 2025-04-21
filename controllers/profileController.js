@@ -9,7 +9,14 @@ const { uploadAndConvertPostMedia } = require('../config/multerConfig');
 const BASE_URL = process.env.BASE_URL || 'https://pitch-backend-avb7geahhvfteqf9.centralindia-01.azurewebsites.net';
 
 // Utility Functions
-const getUserId = (req) => req.user?.userId || req.user?.id;
+const getUserId = async (req) => {
+  const uuid = req.user?.id; // UUID from Supabase auth
+  if (!uuid) throw new Error('User authentication required');
+
+  // Map UUID to user_id
+  const user = await User.getUserByUuid(uuid);
+  return user?.user_id; // Return the integer user_id
+};
 
 const validateId = (id, name) => {
   if (!id || isNaN(id)) throw new Error(`${name} must be a valid number`);
@@ -27,7 +34,7 @@ const validateString = (value, name, minLength, maxLength) => {
 const profileController = {
   getProfile: async (req, res) => {
     try {
-      const userId = getUserId(req);
+      const userId = await getUserId(req);
       if (!userId) return res.status(401).json({ error: 'User authentication required' });
 
       const user = await User.getUserById(userId);
@@ -48,7 +55,7 @@ const profileController = {
       const user = await User.getUserByUsername(username);
       if (!user) return res.status(404).json({ error: 'User not found' });
 
-      const followerId = getUserId(req);
+      const followerId = await getUserId(req);
       const isFollowing = followerId ? await User.isFollowing(followerId, user.user_id) : false;
 
       res.json({ ...user, isFollowing });
@@ -60,10 +67,10 @@ const profileController = {
 
   followUser: async (req, res) => {
     try {
-      const followerId = getUserId(req);
+      const followerId = await getUserId(req);
       if (!followerId) return res.status(401).json({ error: 'User authentication required' });
 
-      const { username } = req.params; // Matches /follow/:username route
+      const { username } = req.params;
       validateString(username, 'Username', 3, 20);
 
       console.log(`Follow request: followerId=${followerId}, username=${username}`);
@@ -93,10 +100,10 @@ const profileController = {
 
   unfollowUser: async (req, res) => {
     try {
-      const followerId = getUserId(req);
+      const followerId = await getUserId(req);
       if (!followerId) return res.status(401).json({ error: 'User authentication required' });
 
-      const { username } = req.params; // Matches /follow/:username route
+      const { username } = req.params;
       validateString(username, 'Username', 3, 20);
 
       console.log(`Unfollow request: followerId=${followerId}, username=${username}`);
@@ -126,7 +133,7 @@ const profileController = {
 
   getStories: async (req, res) => {
     try {
-      const userId = getUserId(req);
+      const userId = await getUserId(req);
       if (!userId) return res.status(401).json({ error: 'User authentication required' });
 
       const { page = 1, limit = 10 } = req.query;
@@ -163,7 +170,7 @@ const profileController = {
     uploadAndConvertPostMedia,
     async (req, res) => {
       try {
-        const userId = getUserId(req);
+        const userId = await getUserId(req);
         if (!userId) return res.status(401).json({ error: 'User authentication required' });
         if (!req.file) return res.status(400).json({ error: 'Media file required' });
 
@@ -182,7 +189,7 @@ const profileController = {
 
   deleteStory: async (req, res) => {
     try {
-      const userId = getUserId(req);
+      const userId = await getUserId(req);
       if (!userId) return res.status(401).json({ error: 'User authentication required' });
 
       const { storyId } = req.params;
@@ -198,7 +205,7 @@ const profileController = {
 
   getSections: async (req, res) => {
     try {
-      const userId = getUserId(req);
+      const userId = await getUserId(req);
       if (!userId) return res.status(401).json({ error: 'User authentication required' });
 
       const { page = 1, limit = 10 } = req.query;
@@ -233,7 +240,7 @@ const profileController = {
 
   addSection: async (req, res) => {
     try {
-      const userId = getUserId(req);
+      const userId = await getUserId(req);
       if (!userId) return res.status(401).json({ error: 'User authentication required' });
 
       const { type, title, content, image_uri, section, teamMember } = req.body;
@@ -264,7 +271,7 @@ const profileController = {
 
   deleteSection: async (req, res) => {
     try {
-      const userId = getUserId(req);
+      const userId = await getUserId(req);
       if (!userId) return res.status(401).json({ error: 'User authentication required' });
 
       const { sectionId } = req.params;
@@ -280,7 +287,7 @@ const profileController = {
 
   getGraphs: async (req, res) => {
     try {
-      const userId = getUserId(req);
+      const userId = await getUserId(req);
       if (!userId) return res.status(401).json({ error: 'User authentication required' });
 
       const { page = 1, limit = 10 } = req.query;
@@ -315,7 +322,7 @@ const profileController = {
 
   addGraph: async (req, res) => {
     try {
-      const userId = getUserId(req);
+      const userId = await getUserId(req);
       if (!userId) return res.status(401).json({ error: 'User authentication required' });
 
       const { type, title, data } = req.body;
@@ -335,7 +342,7 @@ const profileController = {
 
   deleteGraph: async (req, res) => {
     try {
-      const userId = getUserId(req);
+      const userId = await getUserId(req);
       if (!userId) return res.status(401).json({ error: 'User authentication required' });
 
       const { graphId } = req.params;

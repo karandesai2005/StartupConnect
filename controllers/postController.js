@@ -1,11 +1,18 @@
 require('dotenv').config();
 const Post = require('../models/postModel');
+const User = require('../models/userModel'); // Add this to use getUserByUuid
 
 // Constants
 const BASE_URL = process.env.NGROK_URL || 'https://pitch-backend-avb7geahhvfteqf9.centralindia-01.azurewebsites.net';
 
 // Utility Functions
-const getUserId = (req) => req.user?.userId || req.user?.id;
+const getUserId = async (req) => {
+  const uuid = req.user?.id; // UUID from Supabase auth
+  if (!uuid) throw new Error('User authentication required');
+
+  const user = await User.getUserByUuid(uuid);
+  return user?.user_id; // Return the integer user_id
+};
 
 const validateId = (id, name) => {
   if (!id || isNaN(id)) throw new Error(`${name} must be a valid number`);
@@ -16,7 +23,7 @@ const validateId = (id, name) => {
 const postController = {
   createPost: async (req, res) => {
     try {
-      const userId = getUserId(req);
+      const userId = await getUserId(req);
       if (!userId) return res.status(401).json({ error: 'User authentication required' });
 
       const { content, tags } = req.body;
@@ -34,7 +41,7 @@ const postController = {
 
   deletePost: async (req, res) => {
     try {
-      const userId = getUserId(req);
+      const userId = await getUserId(req);
       if (!userId) return res.status(401).json({ error: 'User authentication required' });
 
       const { postId } = req.params;
@@ -65,7 +72,7 @@ const postController = {
 
   getUserPosts: async (req, res) => {
     try {
-      const userId = getUserId(req);
+      const userId = await getUserId(req);
       if (!userId) return res.status(401).json({ error: 'User authentication required' });
 
       const { page = 1, limit = 10 } = req.query;
@@ -100,14 +107,14 @@ const postController = {
 
   toggleLike: async (req, res) => {
     try {
-      const userId = getUserId(req);
+      const userId = await getUserId(req);
       if (!userId) return res.status(401).json({ error: 'User authentication required' });
-  
+
       const { postId } = req.params;
       console.log('ToggleLike attempt - Post ID:', postId, 'User ID:', userId);
       const result = await Post.toggleLike(validateId(postId, 'Post ID'), userId);
       console.log('ToggleLike result:', result);
-  
+
       res.status(200).json({ success: true, liked: result.liked, like_count: result.like_count });
     } catch (error) {
       console.error('Toggle like error:', error.stack);
@@ -120,7 +127,7 @@ const postController = {
 
   getLikeStatus: async (req, res) => {
     try {
-      const userId = getUserId(req);
+      const userId = await getUserId(req);
       if (!userId) return res.status(401).json({ error: 'User authentication required' });
 
       const { postId } = req.params;
@@ -138,7 +145,7 @@ const postController = {
 
   getComments: async (req, res) => {
     try {
-      const userId = getUserId(req);
+      const userId = await getUserId(req);
       if (!userId) return res.status(401).json({ error: 'User authentication required' });
 
       const { postId } = req.params;
@@ -159,7 +166,7 @@ const postController = {
 
   createComment: async (req, res) => {
     try {
-      const userId = getUserId(req);
+      const userId = await getUserId(req);
       if (!userId) return res.status(401).json({ error: 'User authentication required' });
 
       const { postId } = req.params;
