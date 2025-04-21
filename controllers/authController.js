@@ -128,8 +128,13 @@ const saveUserDetails = async (req, res) => {
         return res.status(200).json({ message: "Email handled by Supabase auth" });
 
       case 2:
-        // Password (handled by Supabase auth)
-        return res.status(200).json({ message: "Password handled by Supabase auth" });
+        // Password update
+        if (!data.password) {
+          return res.status(400).json({ message: "Password is required." });
+        }
+        const { error: updateError } = await supabase.auth.updateUser({ password: data.password });
+        if (updateError) throw updateError;
+        break;
 
       case 3:
         // Username

@@ -40,13 +40,14 @@ const validateSaveUserDetailsInput = [
     .isLength({ min: 6 })
     .withMessage("Password must be at least 6 characters."),
   
-  // Step 2: Ensure userId is valid
-  body("data.userId")
-    .if(body("step").isIn([2, 3, 4, 5])) // Adjusted to include more steps
-    .isInt()
-    .withMessage("Valid userId is required."),
+  // Step 2-5: Validate supabase_uid as a string (UUID)
+  body("data.supabase_uid")
+    .if(body("step").isIn([2, 3, 4, 5]))
+    .isString()
+    .matches(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/)
+    .withMessage("Valid supabase_uid (UUID) is required."),
   
-  // Step 2: Validate optional bio (for step 2)
+  // Step 2: Validate optional bio
   body("data.bio")
     .if(body("step").equals(2))
     .isString()
