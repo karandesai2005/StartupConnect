@@ -1,5 +1,4 @@
-// screens/Username.js
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Text,
   StyleSheet,
@@ -11,6 +10,7 @@ import {
 import { useNavigation, useRoute } from "@react-navigation/native";
 import Popup from "./Popup";
 import { supabase } from '../services/supabase';
+import { NGROK_URL } from '@env';
 
 const Username = () => {
   const navigation = useNavigation();
@@ -20,6 +20,20 @@ const Username = () => {
   const [showPopup, setShowPopup] = useState(false);
   const [checkingAvailability, setCheckingAvailability] = useState(false);
   const [hasUppercase, setHasUppercase] = useState(false);
+
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        console.log('Session expired, navigating to Register1');
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Register1' }],
+        });
+      }
+    };
+    checkSession();
+  }, [navigation]);
 
   const handleBack = () => {
     navigation.goBack();
@@ -36,9 +50,13 @@ const Username = () => {
     setCheckingAvailability(true);
 
     try {
-      const { data, error } = await supabase.from('users').select('username').eq('username', text);
-      if (error) throw error;
-      setIsUsernameAvailable(data.length === 0);
+      const response = await fetch(`${NGROK_URL}/api/auth/validate-username`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: text }),
+      });
+      const result = await response.json();
+      setIsUsernameAvailable(result.available);
     } catch (error) {
       console.error("Error validating username:", error.message);
       setIsUsernameAvailable(false);
@@ -69,12 +87,36 @@ const Username = () => {
     }
 
     try {
-      const { error } = await supabase.from('users').update({ username }).eq('supabase_uid', route.params.supabase_uid);
-      if (error) throw error;
+      const backendUrl = `${NGROK_URL}/api/auth/save-user-details`;
+      const response = await fetch(backendUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          step: 3,
+          data: {
+            supabase_uid: route.params.supabase_uid,
+            username: username,
+          },
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        console.error("Save username error:", result.message);
+        throw new Error(result.message || "Failed to save username");
+      }
       navigation.navigate("preference", { supabase_uid: route.params.supabase_uid });
     } catch (err) {
       console.error("Error saving username details:", err.message);
-      Alert.alert("Error", "Failed to save username details. Please try again.");
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        Alert.alert("Session Expired", "Your session has expired. Please restart registration.");
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Register1' }],
+        });
+      } else {
+        Alert.alert("Error", "Failed to save username details. Please try again.");
+      }
     }
   };
 

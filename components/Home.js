@@ -27,6 +27,7 @@ import { NGROK_URL } from '@env';
 import { Video } from 'expo-av';
 import { debounce } from 'lodash';
 import Modal from 'react-native-modal';
+import { supabase } from '../services/supabase';
 const { width } = Dimensions.get('window');
 
 const formatTimestamp = (timestamp) => {
@@ -116,10 +117,6 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
   }, [isVisible, isVideo]);
 
   useEffect(() => {
-    // console.log('isCommentModalVisible changed:', isCommentModalVisible);
-  }, [isCommentModalVisible]);
-
-  useEffect(() => {
     if (isCommentModalVisible) {
       const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
         console.log('Hardware back press detected, closing modal');
@@ -183,7 +180,6 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
       const token = await AsyncStorage.getItem('token');
       if (!token || !item.post_id) return;
       setIsLikeLoading(true);
-      console.log('Optimistic update - isLiked:', !isLiked, 'likeCount:', isLiked ? likeCount - 1 : likeCount + 1);
       setIsLiked((prev) => !prev);
       setLikeCount((prev) => (isLiked ? prev - 1 : prev + 1));
       const baseUrl = NGROK_URL.replace(/\/+$/, '');
@@ -193,10 +189,9 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (response.data && response.data.success) {
-        console.log('Response update - liked:', response.data.liked, 'like_count:', response.data.like_count);
         setIsLiked(response.data.liked);
         setLikeCount(response.data.like_count);
-        await fetchAllPosts(); // Sync with parent state
+        await fetchAllPosts();
       }
     } catch (error) {
       console.error('Error updating like:', error);
@@ -209,7 +204,7 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
 
   const handleDoubleTap = () => {
     const now = Date.now();
-    const DOUBLE_PRESS_DELAY = 300; // milliseconds
+    const DOUBLE_PRESS_DELAY = 300;
     if (lastTap && (now - lastTap) < DOUBLE_PRESS_DELAY) {
       if (!isLiked && !isLikeLoading) {
         handleLike();
@@ -229,7 +224,6 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
   };
 
   const toggleCommentModal = () => {
-    console.log('Toggling comment modal for post:', item.post_id, 'isVisible:', !isCommentModalVisible);
     if (!isCommentModalVisible) {
       fetchComments();
     }
@@ -237,61 +231,22 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
   };
 
   const handleAddComment = async () => {
-    if (!newComment.trim()) {
-      console.log('❌ Comment not posted: New comment is empty or just whitespace');
-      return;
-    }
+    if (!newComment.trim()) return;
     try {
-      console.log('🔍 Starting to add comment - Post ID:', item.post_id);
-      console.log('📝 Comment content:', newComment);
-
       const token = await AsyncStorage.getItem('token');
-      console.log('🔑 Retrieved token from AsyncStorage:', token ? 'Token found' : 'No token found');
-
-      if (!token) {
-        console.error('❌ No token found in AsyncStorage - Authentication required');
-        return;
-      }
-      if (!item.post_id) {
-        console.error('❌ No post_id found - Cannot post comment without a post ID');
-        return;
-      }
-
+      if (!token || !item.post_id) return;
       const baseUrl = NGROK_URL.replace(/\/+$/, '');
-      console.log('🚀 Sending POST request to:', `${baseUrl}/api/posts/${item.post_id}/comments`);
-      console.log('📤 Request payload:', { content: newComment });
-      console.log('🔐 Authorization header:', `Bearer ${token}`);
-
       const response = await axios.post(
         `${baseUrl}/api/posts/${item.post_id}/comments`,
         { content: newComment },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-
-      console.log('✅ Comment posted successfully - Response:', response.data);
       if (response.data) {
         await fetchComments();
         setNewComment('');
-        console.log('📋 Refreshed comments state from server');
-        console.log('🧹 Cleared newComment input');
       }
     } catch (error) {
-      console.error('❌ Error adding comment:', {
-        message: error.message,
-        status: error.response?.status,
-        data: error.response?.data,
-        config: error.config,
-      });
-      if (error.response) {
-        console.error('🌐 Server response:', error.response.data);
-      } else if (error.request) {
-        console.error('📡 No response received - Network issue:', error.request);
-      } else {
-        console.error('⚠️ Error setting up request:', error.message);
-      }
-      if (error.response?.status === 401) {
-        console.error('🔒 Token invalid or expired - Attempting to refresh or login again');
-      }
+      console.error('Error adding comment:', error);
     }
   };
 
@@ -326,13 +281,7 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
               <Text style={styles.timeStamp}>{formatTimestamp(item.created_at)}</Text>
             </View>
           </View>
-          <TouchableOpacity
-            style={styles.moreButton}
-            onPress={(e) => {
-              e.stopPropagation();
-              console.log('More button pressed for post:', item.post_id);
-            }}
-          >
+          <TouchableOpacity style={styles.moreButton} onPress={(e) => e.stopPropagation()}>
             <Text style={styles.moreButtonText}>•••</Text>
           </TouchableOpacity>
         </View>
@@ -438,8 +387,6 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
           </TouchableOpacity>
         )}
       </View>
-
-      {/* Comment Modal */}
       <Modal
         isVisible={isCommentModalVisible}
         onBackdropPress={toggleCommentModal}
@@ -464,16 +411,13 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
           ) : (
             <FlatList
               data={comments}
-              renderItem={({ item }) => {
-                // console.log('Rendering comment:', item);
-                return (
-                  <View style={styles.commentItem}>
-                    <Text style={styles.commentUsername}>{item.username || 'User'}</Text>
-                    <Text style={styles.commentText}>{item.content}</Text>
-                    <Text style={styles.commentTimestamp}>{formatTimestamp(item.created_at)}</Text>
-                  </View>
-                );
-              }}
+              renderItem={({ item }) => (
+                <View style={styles.commentItem}>
+                  <Text style={styles.commentUsername}>{item.username || 'User'}</Text>
+                  <Text style={styles.commentText}>{item.content}</Text>
+                  <Text style={styles.commentTimestamp}>{formatTimestamp(item.created_at)}</Text>
+                </View>
+              )}
               keyExtractor={(item) => item.comment_id.toString()}
               style={styles.commentList}
               contentContainerStyle={styles.commentListContent}
@@ -574,6 +518,17 @@ export default function Home() {
     try {
       setPostsError(null);
       const token = await AsyncStorage.getItem('token');
+      if (!token) {
+        console.log('No token in AsyncStorage, refreshing session');
+        const { data: { session }, error } = await supabase.auth.refreshSession();
+        if (error || !session) {
+          console.error('Session refresh failed:', error?.message);
+          navigation.reset({ index: 0, routes: [{ name: 'Register1' }] });
+          return;
+        }
+        await AsyncStorage.setItem('token', session.access_token);
+        token = session.access_token;
+      }
       const baseUrl = NGROK_URL.replace(/\/+$/, '');
       const response = await axios.get(`${baseUrl}/api/posts/all`, {
         headers: {
@@ -607,17 +562,18 @@ export default function Home() {
 
   useEffect(() => {
     const checkAuthStatus = async () => {
-      try {
-        const token = await AsyncStorage.getItem('token');
-        if (!token) {
-          navigation.replace('Home');
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        console.log('No session, attempting refresh');
+        const { data, error } = await supabase.auth.refreshSession();
+        if (error || !data.session) {
+          console.error('Refresh failed:', error?.message);
+          navigation.reset({ index: 0, routes: [{ name: 'Register1' }] });
           return;
         }
-        await Promise.all([fetchUserData(), loadUsers(), fetchAllPosts()]);
-      } catch (error) {
-        console.error('Error checking auth status:', error);
-        navigation.replace('Home');
+        await AsyncStorage.setItem('token', data.session.access_token);
       }
+      await Promise.all([fetchUserData(), loadUsers(), fetchAllPosts()]);
     };
     checkAuthStatus();
   }, [navigation, fetchUserData, loadUsers, fetchAllPosts]);
@@ -628,7 +584,6 @@ export default function Home() {
   }, [currentPage]);
 
   const onRefresh = useCallback(() => {
-    console.log('🔄 Refresh triggered...');
     setRefreshing(true);
     setCurrentPage(1);
     loadUsers(true);
@@ -649,12 +604,17 @@ export default function Home() {
   const fetchUserData = useCallback(async () => {
     try {
       const token = await AsyncStorage.getItem('token');
-      if (!token) return;
+      if (!token) {
+        console.log('No token, refreshing session for user data');
+        const { data: { session }, error } = await supabase.auth.refreshSession();
+        if (error || !session) throw error;
+        await AsyncStorage.setItem('token', session.access_token);
+      }
       const baseUrl = NGROK_URL.replace(/\/+$/, '');
       const response = await fetch(`${baseUrl}/api/auth/profile`, {
         method: 'GET',
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${await AsyncStorage.getItem('token')}`,
           'Content-Type': 'application/json',
         },
       });
@@ -662,14 +622,13 @@ export default function Home() {
         const data = await response.json();
         console.log('User data fetched:', data);
         setUserData(data);
+      } else {
+        console.error('Profile fetch failed:', await response.text());
       }
     } catch (error) {
       console.error('Error fetching user data:', error);
+      Alert.alert('Error', 'Failed to load user data. Please try again.');
     }
-  }, []);
-
-  useEffect(() => {
-    fetchUserData();
   }, []);
 
   useFocusEffect(

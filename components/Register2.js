@@ -12,13 +12,13 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 import Popup from "./Popup";
 import { supabase } from '../services/supabase';
 import { UserRegistrationContext } from "../context/UserRegistrationContext";
-import { NGROK_URL } from '@env'; // Import the environment variable
+import { NGROK_URL } from '@env';
 
 const Register2 = () => {
   const navigation = useNavigation();
   const route = useRoute();
-  const { userData } = useContext(UserRegistrationContext); // For email
-  const { supabase_uid, tempPassword } = route.params || {};
+  const { userData } = useContext(UserRegistrationContext);
+  const { supabase_uid } = route.params || {};
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -26,8 +26,8 @@ const Register2 = () => {
   const [popupVisible, setPopupVisible] = useState(false);
   const [popupMessage, setPopupMessage] = useState("");
 
-  console.log('Register2 full params:', route.params); // Debug full params
-  console.log('NGROK_URL:', NGROK_URL); // Debug the environment variable
+  console.log('Register2 full params:', route.params);
+  console.log('NGROK_URL:', NGROK_URL);
 
   const handleBack = () => {
     navigation.goBack();
@@ -39,7 +39,6 @@ const Register2 = () => {
     const hasLowercase = /[a-z]/.test(password);
     const hasNumber = /\d/.test(password);
     const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
-
     return (
       password.length >= minLength &&
       hasUppercase &&
@@ -50,8 +49,10 @@ const Register2 = () => {
   };
 
   const handleNext = async () => {
+    console.log('handleNext triggered');
     const trimmedPassword = password.trim();
     const trimmedConfirmPassword = confirmPassword.trim();
+    console.log('Password:', trimmedPassword, 'Confirm:', trimmedConfirmPassword);
 
     if (trimmedPassword !== trimmedConfirmPassword) {
       setPopupMessage("Passwords do not match.");
@@ -72,19 +73,19 @@ const Register2 = () => {
     }
 
     try {
-      // Verify current user
       const { data: { user } } = await supabase.auth.getUser();
       console.log('Current user:', user);
       if (!user || user.id !== supabase_uid) {
         throw new Error('User session mismatch. Please restart registration.');
       }
 
-      // Update password via save-user-details endpoint
-      const backendUrl = new URL('/api/auth/save-user-details', NGROK_URL).href; // Fixed to include /api/auth
+      const backendUrl = new URL('/api/auth/save-user-details', NGROK_URL).href;
       console.log('Attempting fetch to:', backendUrl);
       const response = await fetch(backendUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
           step: 2,
           data: {
@@ -94,14 +95,44 @@ const Register2 = () => {
           },
         }),
       });
+      console.log('Fetch attempted');
       const result = await response.json();
       console.log('Fetch response:', result);
       if (!response.ok) throw new Error(result.message || "Password update failed");
 
+      // Get the max user_id and increment it
+      const { data: maxId, error: maxIdError } = await supabase
+        .from('users')
+        .select('user_id')
+        .order('user_id', { ascending: false })
+        .limit(1)
+        .single();
+      if (maxIdError) throw maxIdError;
+      const newUserId = maxId ? maxId.user_id + 1 : 1;
+
+      // Insert minimal user record into users table
+      const { error: insertError } = await supabase.from('users').insert({
+        user_id: newUserId,
+        supabase_uid: user.id,
+        email: userData.email,
+        created_at: new Date().toISOString(),
+      });
+      if (insertError) {
+        console.error("User insert error:", insertError.message, insertError);
+        throw new Error(`Failed to create user record: ${insertError.message}`);
+      }
+
+      // Sign in the user to refresh the session
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: userData.email,
+        password: trimmedPassword,
+      });
+      if (signInError) throw signInError;
+
       navigation.navigate("username", { supabase_uid: user.id });
     } catch (err) {
-      console.error("Password update error:", err.message, err);
-      setPopupMessage(`Unable to update password: ${err.message}`);
+      console.error("Password update or registration error:", err.message, err);
+      setPopupMessage(`Unable to complete registration: ${err.message}`);
       setPopupVisible(true);
     }
   };

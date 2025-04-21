@@ -1,99 +1,82 @@
 import React, { useState } from "react";
 import { Text, StyleSheet, View, Pressable, FlatList, Alert } from "react-native";
-import { useNavigation, useRoute } from "@react-navigation/native"; // Added useRoute
+import { useNavigation, useRoute } from "@react-navigation/native";
 import { supabase } from '../services/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const INTERESTS = [
-  "Healthcare & Wellness",
-  "Mental Health",
-  "Fitness & Nutrition",
-  "Biotech",
-  "Sustainability & Environment",
-  "Renewable Energy",
-  "Recycling & Waste Management",
-  "Climate Tech",
-  "EdTech",
-  "Skill-based Learning",
-  "Gamified Learning",
-  "FinTech",
-  "InsurTech",
-  "SME Tools",
-  "DeFi & Crypto",
-  "Smart Cities",
-  "Real Estate Tech",
-  "Mobility & Transport",
-  "FoodTech",
-  "Restaurant Tech",
-  "Lifestyle Platforms",
-  "Entertainment & Media",
-  "Creator Economy",
-  "Virtual Worlds & Metaverse",
-  "Social Impact",
-  "Nonprofit Tech",
-  "Accessibility Tech",
-  "LegalTech",
+const FIELDS = [
+  "Tech",
+  "AI",
+  "Sustainability",
+  "Finance",
+  "Health",
+  "Education",
+  "Gaming",
+  "Rob-linkotics",
+  "Marketing",
+  "Blockchain",
+  "Design",
+  "Data Science",
 ];
 
-const Signup = () => {
+const Field = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const { supabase_uid } = route.params || {};
-  const [selectedInterests, setSelectedInterests] = useState([]);
+  const [selectedFields, setSelectedFields] = useState([]);
 
-  const toggleInterest = (interest) => {
-    setSelectedInterests(current =>
-      current.includes(interest)
-        ? current.filter(item => item !== interest)
-        : [...current, interest].slice(0, 3)
+  const toggleField = (field) => {
+    setSelectedFields(current =>
+      current.includes(field)
+        ? current.filter(item => item !== field)
+        : [...current, field].slice(0, 3)
     );
   };
 
   const handleNext = async () => {
-    if (selectedInterests.length < 3) {
-      Alert.alert("Error", "Please select at least 3 interests.");
+    if (selectedFields.length < 1) {
+      Alert.alert("Error", "Please select at least 1 field.");
       return;
     }
 
     try {
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      if (authError || !user || user.id !== supabase_uid) {
-        Alert.alert("Error", "Session expired. Please restart registration.");
-        navigation.navigate("Register1");
+      console.log('Checking session in field.js with supabase_uid:', supabase_uid);
+      const { data: { session }, error: authError } = await supabase.auth.refreshSession();
+      if (authError || !session || session.user.id !== supabase_uid) {
+        console.log('Session invalid or expired:', authError?.message || 'No session after refresh');
+        Alert.alert("Error", "Session expired. Restarting registration.");
+        navigation.reset({ index: 0, routes: [{ name: 'Register1' }] });
         return;
       }
 
-      // Add interests column if it doesn't exist
-      const { error } = await supabase.from('users').update({ interests: { data: selectedInterests } }).eq('supabase_uid', user.id);
+      console.log('Session valid, updating interests:', selectedFields);
+      const { error } = await supabase.from('users').update({ interests: selectedFields }).eq('supabase_uid', session.user.id);
       if (error) {
-        console.error("Database error:", error.message);
-        if (error.message.includes("column")) {
-          // Attempt to add interests column if missing
-          await supabase.rpc('add_interests_column');
-          const retryError = await supabase.from('users').update({ interests: { data: selectedInterests } }).eq('supabase_uid', user.id);
-          if (retryError) throw retryError;
-        } else {
-          throw error;
-        }
+        console.error("Database error:", error.message, error.details || 'No details');
+        throw error;
       }
 
-      // Navigate to Main with a reset to clear the stack
+      // Persist session and store token
+      await supabase.auth.setSession(session);
+      await AsyncStorage.setItem('token', session.access_token);
+      console.log('Session persisted and token stored, navigating to Main with Home tab');
       navigation.reset({
         index: 0,
-        routes: [{ name: 'Main', params: { screen: 'Home' } }],
+        routes: [{ name: 'Main', state: { routes: [{ name: 'Home' }], index: 0 } }],
       });
     } catch (err) {
-      console.error("Error completing registration:", err.message);
-      Alert.alert("Error", "Something went wrong. Please try again.");
+      console.error("Error completing registration:", err.message, err.stack || 'No stack trace');
+      Alert.alert("Error", err.message || "Something went wrong. Please try again.");
     }
   };
 
-  const renderInterest = ({ item }) => (
+  const renderField = ({ item }) => (
     <Pressable
       style={[
         styles.fieldContainer,
-        selectedInterests.includes(item) && styles.selectedField
+        selectedFields.includes(item) && styles.selectedField
       ]}
-      onPress={() => toggleInterest(item)}
+      onPress={() => toggleField(item)}
     >
       <Text style={styles.fieldText}>{item}</Text>
     </Pressable>
@@ -101,23 +84,21 @@ const Signup = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Choose 3 fields you like</Text>
-
+      <Text style={styles.title}>Select up to 3 fields</Text>
       <FlatList
-        data={INTERESTS}
-        renderItem={renderInterest}
+        data={FIELDS}
+        renderItem={renderField}
         keyExtractor={item => item}
         contentContainerStyle={styles.interestsList}
         numColumns={2}
       />
-
       <Pressable
         style={[
           styles.nextButton,
-          selectedInterests.length < 3 && styles.disabledButton
+          selectedFields.length < 1 && styles.disabledButton
         ]}
         onPress={handleNext}
-        disabled={selectedInterests.length < 3}
+        disabled={selectedFields.length < 1}
       >
         <Text style={styles.nextButtonText}>Next</Text>
       </Pressable>
@@ -177,4 +158,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default Signup;
+export default Field;
