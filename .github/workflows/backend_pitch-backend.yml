@@ -37,15 +37,10 @@ jobs:
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_19A9DD0473794F56A6F4128E86C2E570 }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_AC3787B04EFD4004A2BDA5EE813257FA }}
 
-      - name: Install FFmpeg and Deploy to Azure Web App
+      - name: 'Deploy to Azure Web App'
         id: deploy-to-webapp
         uses: azure/webapps-deploy@v3
         with:
           app-name: 'PITCH-backend'
           slot-name: 'Production'
-          package: .
-          # Custom command to install FFmpeg via Kudu
-          startup-command: 'apt-get update && apt-get install -y ffmpeg && npm start'
-
-      - name: Logout from Azure
-        run: az logout
+          package: .  
