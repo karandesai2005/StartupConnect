@@ -15,6 +15,7 @@ import { NGROK_URL } from '@env';
 const Username = () => {
   const navigation = useNavigation();
   const route = useRoute();
+  const { supabase_uid } = route.params || {};
   const [username, setUsername] = useState("");
   const [isUsernameAvailable, setIsUsernameAvailable] = useState(null);
   const [showPopup, setShowPopup] = useState(false);
@@ -23,17 +24,35 @@ const Username = () => {
 
   useEffect(() => {
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        console.log('Session expired, navigating to Register1');
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'Register1' }],
-        });
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser();
+        console.log('Username.js - Current user:', user, 'Error:', error);
+        if (error || !user || user.id !== supabase_uid) {
+          console.warn('Session check failed:', error?.message || 'No user or ID mismatch');
+          Alert.alert(
+            "Session Expired",
+            "Your session has expired. Please sign in to continue.",
+            [
+              {
+                text: "OK",
+                onPress: () => navigation.navigate("Login"),
+              },
+            ]
+          );
+        }
+      } catch (err) {
+        console.error('Session check error:', err.message);
+        Alert.alert("Error", "Failed to verify session. Please try again.");
       }
     };
-    checkSession();
-  }, [navigation]);
+    if (supabase_uid) {
+      checkSession();
+    } else {
+      console.warn('No supabase_uid provided');
+      Alert.alert("Error", "Invalid registration data. Please restart registration.");
+      navigation.navigate("Register1");
+    }
+  }, [navigation, supabase_uid]);
 
   const handleBack = () => {
     navigation.goBack();
@@ -56,6 +75,7 @@ const Username = () => {
         body: JSON.stringify({ username: text }),
       });
       const result = await response.json();
+      console.log('Username availability:', result);
       setIsUsernameAvailable(result.available);
     } catch (error) {
       console.error("Error validating username:", error.message);
@@ -87,6 +107,12 @@ const Username = () => {
     }
 
     try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      console.log('handleNext - Current user:', user, 'Error:', userError);
+      if (userError || !user || user.id !== supabase_uid) {
+        throw new Error("User not authenticated");
+      }
+
       const backendUrl = `${NGROK_URL}/api/auth/save-user-details`;
       const response = await fetch(backendUrl, {
         method: 'POST',
@@ -94,29 +120,35 @@ const Username = () => {
         body: JSON.stringify({
           step: 3,
           data: {
-            supabase_uid: route.params.supabase_uid,
+            supabase_uid: user.id,
             username: username,
           },
         }),
       });
       const result = await response.json();
+      console.log('Save username response:', result);
       if (!response.ok) {
         console.error("Save username error:", result.message);
         throw new Error(result.message || "Failed to save username");
       }
-      navigation.navigate("preference", { supabase_uid: route.params.supabase_uid });
+      navigation.navigate("preference", { supabase_uid: user.id });
     } catch (err) {
-      console.error("Error saving username details:", err.message);
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        Alert.alert("Session Expired", "Your session has expired. Please restart registration.");
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'Register1' }],
-        });
-      } else {
-        Alert.alert("Error", "Failed to save username details. Please try again.");
-      }
+      console.error("Error saving username details:", err.message, err);
+      Alert.alert(
+        "Error",
+        err.message.includes("not authenticated")
+          ? "Your session has expired. Please sign in to continue."
+          : "Failed to save username. Please try again.",
+        [
+          {
+            text: "OK",
+            onPress: () =>
+              err.message.includes("not authenticated")
+                ? navigation.navigate("Login")
+                : null,
+          },
+        ]
+      );
     }
   };
 

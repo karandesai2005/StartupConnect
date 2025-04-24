@@ -1,23 +1,45 @@
-// screens/Preference.js
-import React, { useEffect } from "react";
+import React, { useEffect, useContext } from "react";
 import { Text, StyleSheet, View, Pressable, TouchableOpacity, Alert } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { supabase } from '../services/supabase';
+import { UserRegistrationContext } from "../context/UserRegistrationContext";
 
 const Preference = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const { supabase_uid } = route.params || {};
+  const { userData } = useContext(UserRegistrationContext);
 
   useEffect(() => {
     const checkUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user || user.id !== supabase_uid) {
-        Alert.alert("Error", "Session expired or invalid. Please restart registration.");
-        navigation.navigate("Register1");
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser();
+        console.log('Preference.js - Current user:', user, 'Error:', error);
+        if (error || !user || user.id !== supabase_uid) {
+          console.warn('Session check failed:', error?.message || 'No user or ID mismatch');
+          Alert.alert(
+            "Session Expired",
+            "Your session has expired. Please sign in to continue.",
+            [
+              {
+                text: "OK",
+                onPress: () => navigation.navigate("Login"), // Navigate to a Login screen
+              },
+            ]
+          );
+        }
+      } catch (err) {
+        console.error('Session check error:', err.message);
+        Alert.alert("Error", "Failed to verify session. Please try again.");
       }
     };
-    checkUser();
+    if (supabase_uid) {
+      checkUser();
+    } else {
+      console.warn('No supabase_uid provided');
+      Alert.alert("Error", "Invalid registration data. Please restart registration.");
+      navigation.navigate("Register1");
+    }
   }, [supabase_uid]);
 
   const handleBack = () => {
@@ -26,27 +48,45 @@ const Preference = () => {
 
   const handlePersonalAccount = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user || user.id !== supabase_uid) throw new Error("User not authenticated");
-      const { error } = await supabase.from('users').update({ is_personal: true, is_business: false }).eq('supabase_uid', user.id);
-      if (error) throw error;
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      console.log('Personal account - User:', user, 'Error:', userError);
+      if (userError || !user || user.id !== supabase_uid) {
+        throw new Error("User not authenticated");
+      }
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ is_personal: true, is_business: false })
+        .eq('supabase_uid', user.id);
+      if (updateError) {
+        console.error('Update error:', updateError);
+        throw updateError;
+      }
       navigation.navigate("handlePersonal", { supabase_uid: user.id });
     } catch (error) {
-      console.error("Error in handlePersonalAccount:", error.message);
-      Alert.alert("Error", "Something went wrong. Please try again.");
+      console.error("Error in handlePersonalAccount:", error.message, error);
+      Alert.alert("Error", "Failed to set account preference. Please try again.");
     }
   };
 
   const handleBusinessAccount = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user || user.id !== supabase_uid) throw new Error("User not authenticated");
-      const { error } = await supabase.from('users').update({ is_personal: false, is_business: true }).eq('supabase_uid', user.id);
-      if (error) throw error;
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      console.log('Business account - User:', user, 'Error:', userError);
+      if (userError || !user || user.id !== supabase_uid) {
+        throw new Error("User not authenticated");
+      }
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ is_personal: false, is_business: true })
+        .eq('supabase_uid', user.id);
+      if (updateError) {
+        console.error('Update error:', updateError);
+        throw updateError;
+      }
       navigation.navigate("handleBusiness", { supabase_uid: user.id });
     } catch (error) {
-      console.error("Error in handleBusinessAccount:", error.message);
-      Alert.alert("Error", "Something went wrong. Please try again.");
+      console.error("Error in handleBusinessAccount:", error.message, error);
+      Alert.alert("Error", "Failed to set account preference. Please try again.");
     }
   };
 

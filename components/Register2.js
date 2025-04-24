@@ -73,12 +73,14 @@ const Register2 = () => {
     }
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      console.log('Current user:', user);
-      if (!user || user.id !== supabase_uid) {
+      // Verify user session
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      console.log('Current user:', user, 'Error:', userError);
+      if (userError || !user || user.id !== supabase_uid) {
         throw new Error('User session mismatch. Please restart registration.');
       }
 
+      // Update password via backend
       const backendUrl = new URL('/api/auth/save-user-details', NGROK_URL).href;
       console.log('Attempting fetch to:', backendUrl);
       const response = await fetch(backendUrl, {
@@ -98,19 +100,43 @@ const Register2 = () => {
       console.log('Fetch attempted');
       const result = await response.json();
       console.log('Fetch response:', result);
-      if (!response.ok) throw new Error(result.message || "Password update failed");
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to update password');
+      }
 
-      // Get the max user_id and increment it
-      const { data: maxId, error: maxIdError } = await supabase
+      // Refresh session with new password
+      const { data: { session }, error: signInError } = await supabase.auth.signInWithPassword({
+        email: userData.email,
+        password: trimmedPassword,
+      });
+      console.log('Sign-in session:', session, 'Error:', signInError);
+      if (signInError) {
+        console.error('Sign-in error:', signInError);
+        throw new Error(`Failed to refresh session: ${signInError.message}`);
+      }
+
+      // Get new user_id from sequence
+      const { data: newUserId, error: seqError } = await supabase.rpc('get_next_user_id');
+      if (seqError) {
+        console.error('Sequence error:', seqError);
+        throw new Error(`Failed to generate user_id: ${seqError.message}`);
+      }
+
+      // Check for existing user to prevent duplicates
+      const { data: existingUser, error: checkError } = await supabase
         .from('users')
-        .select('user_id')
-        .order('user_id', { ascending: false })
-        .limit(1)
-        .single();
-      if (maxIdError) throw maxIdError;
-      const newUserId = maxId ? maxId.user_id + 1 : 1;
+        .select('supabase_uid')
+        .eq('supabase_uid', user.id)
+        .maybeSingle();
+      if (checkError) {
+        console.error('Check user error:', checkError);
+        throw new Error(`Failed to check existing user: ${checkError.message}`);
+      }
+      if (existingUser) {
+        throw new Error('User already exists in database');
+      }
 
-      // Insert minimal user record into users table
+      // Insert new user
       const { error: insertError } = await supabase.from('users').insert({
         user_id: newUserId,
         supabase_uid: user.id,
@@ -118,21 +144,15 @@ const Register2 = () => {
         created_at: new Date().toISOString(),
       });
       if (insertError) {
-        console.error("User insert error:", insertError.message, insertError);
+        console.error('Insert error:', insertError);
         throw new Error(`Failed to create user record: ${insertError.message}`);
       }
 
-      // Sign in the user to refresh the session
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: userData.email,
-        password: trimmedPassword,
-      });
-      if (signInError) throw signInError;
-
+      // Navigate to next screen
       navigation.navigate("username", { supabase_uid: user.id });
     } catch (err) {
-      console.error("Password update or registration error:", err.message, err);
-      setPopupMessage(`Unable to complete registration: ${err.message}`);
+      console.error('Registration error:', err.message, err.stack);
+      setPopupMessage(`Unable to complete registration: ${err.message}. Please try again.`);
       setPopupVisible(true);
     }
   };
