@@ -48,14 +48,22 @@ jobs:
       - name: Deploy to Elastic Beanstalk
         id: deploy-to-beanstalk
         run: |
-          aws s3 cp app.zip s3://elasticbeanstalk-ap-south-1-940420095386/app-$GITHUB_SHA.zip
+          # Generate a unique version label by appending the current timestamp to $GITHUB_SHA
+          VERSION_LABEL="$GITHUB_SHA-$(date +%s)"
+          
+          # Upload the app.zip to S3 with the unique version label
+          aws s3 cp app.zip s3://elasticbeanstalk-ap-south-1-940420095386/app-$VERSION_LABEL.zip
+          
+          # Create a new application version with the unique version label
           aws elasticbeanstalk create-application-version \
             --application-name pitch-backend \
-            --version-label $GITHUB_SHA \
-            --source-bundle S3Bucket="elasticbeanstalk-ap-south-1-940420095386",S3Key="app-$GITHUB_SHA.zip"
+            --version-label $VERSION_LABEL \
+            --source-bundle S3Bucket="elasticbeanstalk-ap-south-1-940420095386",S3Key="app-$VERSION_LABEL.zip"
+          
+          # Update the environment with the new version label
           aws elasticbeanstalk update-environment \
             --environment-name Pitch-backend-env \
-            --version-label $GITHUB_SHA
+            --version-label $VERSION_LABEL
         env:
           AWS_REGION: ap-south-1
 
