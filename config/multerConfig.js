@@ -4,36 +4,40 @@ const fs = require('fs').promises; // Use promises for cleaner async code
 const ffmpeg = require('fluent-ffmpeg');
 const { promisify } = require('util');
 
-// Load environment variables (e.g., with dotenv in your app)
+// Load environment variables
 const { env } = process;
-const FFMPEG_PATH = env.FFMPEG_PATH || '/usr/bin/ffmpeg';
-const FFPROBE_PATH = env.FFPROBE_PATH || '/usr/bin/ffprobe';
+const FFMPEG_PATH = env.FFMPEG_PATH || '/usr/local/bin/ffmpeg'; // Updated to match static binary path
+const FFPROBE_PATH = env.FFPROBE_PATH || '/usr/local/bin/ffprobe';
 const UPLOAD_BASE_DIR = env.UPLOAD_BASE_DIR || path.join(__dirname, '../uploads');
 
-// FFmpeg setup with verification
+// FFmpeg setup with verification and fallback
+let ffmpegAvailable = false;
 try {
   ffmpeg.setFfmpegPath(FFMPEG_PATH);
   ffmpeg.setFfprobePath(FFPROBE_PATH);
   promisify(ffmpeg.getAvailableFormats)()
-    .then(() => console.log('✅ FFmpeg initialized'))
+    .then(() => {
+      console.log('✅ FFmpeg initialized');
+      ffmpegAvailable = true;
+    })
     .catch(err => {
-      console.error('❌ FFmpeg verification failed:', err);
-      process.exit(1);
+      console.error('⚠️ FFmpeg verification failed:', err.message);
+      ffmpegAvailable = false; // Fallback to proceed without FFmpeg
     });
 } catch (error) {
-  console.error('❌ FFmpeg setup failed:', error);
-  process.exit(1);
+  console.error('⚠️ FFmpeg setup failed:', error.message);
+  ffmpegAvailable = false; // Proceed without FFmpeg
 }
 
-// Ensure upload directories exist (async for non-blocking startup)
+// Ensure upload directories exist
 const profileUploadDir = path.join(UPLOAD_BASE_DIR, 'profile_pictures');
 const postUploadDir = path.join(UPLOAD_BASE_DIR, 'posts');
 (async () => {
   await Promise.all([
     fs.mkdir(profileUploadDir, { recursive: true }),
     fs.mkdir(postUploadDir, { recursive: true }),
-  ]);
-})().catch(err => console.error('❌ Directory creation failed:', err));
+  ]).catch(err => console.error('❌ Directory creation failed:', err));
+})();
 
 // Filename generator
 const generateFilename = (prefix, file) =>
@@ -70,15 +74,20 @@ const limits = {
   post: { fileSize: parseInt(env.POST_SIZE_LIMIT) || 100 * 1024 * 1024 },   // 100MB default
 };
 
-// Validate file (async)
+// Validate file
 const validateUploadedFile = async filePath => {
   const stats = await fs.stat(filePath);
   if (stats.size === 0) throw new Error('Empty file uploaded');
   return true;
 };
 
-// Optimized video conversion
+// Optimized video conversion (with fallback)
 const convertToCompatibleFormat = async (filePath, originalMimetype) => {
+  if (!ffmpegAvailable) {
+    console.warn('⚠️ FFmpeg not available, skipping conversion');
+    return filePath; // Return original path if FFmpeg is missing
+  }
+
   const outputPath = `${path.parse(filePath).dir}/${path.parse(filePath).name}-converted.mp4`;
   const needsReencode = originalMimetype === 'video/quicktime';
 
@@ -99,8 +108,8 @@ const convertToCompatibleFormat = async (filePath, originalMimetype) => {
   });
 };
 
-// Video metadata (cached for reuse)
-const getVideoMetadata = promisify(ffmpeg.ffprobe);
+// Video metadata (cached for reuse, optional if FFmpeg is unavailable)
+const getVideoMetadata = ffmpegAvailable ? promisify(ffmpeg.ffprobe) : () => Promise.reject(new Error('FFmpeg not available'));
 
 // Upload and convert middleware
 const uploadAndConvertPostMedia = async (req, res, next) => {
@@ -116,12 +125,14 @@ const uploadAndConvertPostMedia = async (req, res, next) => {
 
     await validateUploadedFile(req.file.path);
 
-    if (req.file.mimetype !== 'video/mp4' && videoTypes.has(req.file.mimetype)) {
+    if (req.file.mimetype !== 'video/mp4' && videoTypes.has(req.file.mimetype) && ffmpegAvailable) {
       const startTime = Date.now();
       req.file.path = await convertToCompatibleFormat(req.file.path, req.file.mimetype);
       req.file.filename = path.basename(req.file.path);
       req.file.mimetype = 'video/mp4';
       console.log(`Conversion took ${(Date.now() - startTime) / 1000}s`);
+    } else if (videoTypes.has(req.file.mimetype) && !ffmpegAvailable) {
+      console.warn('⚠️ Video uploaded but not converted due to missing FFmpeg');
     }
 
     next();
