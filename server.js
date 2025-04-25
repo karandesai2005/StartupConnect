@@ -8,7 +8,7 @@ const authRoutes = require("./routes/authRoutes");
 const profileRoutes = require("./routes/profileRoutes");
 
 const app = express();
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 5000; // Changed from 8080 to 5000 for Elastic Beanstalk
 
 // Middleware
 app.use(express.json());
@@ -18,7 +18,12 @@ app.use(cors());
 // Static files
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-// Health check route
+// Health check route for Elastic Beanstalk
+app.get("/health", (req, res) => {
+  res.status(200).send("OK");
+});
+
+// Default route
 app.get("/", (req, res) => {
   res.send("Welcome to the PITCH-backend server!");
 });
