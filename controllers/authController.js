@@ -324,7 +324,7 @@ const updateProfile = async (req, res) => {
     let updates = {};
     if (bio) updates.bio = bio;
     if (profilePicture) {
-      updates.profile_picture = `https://pitch-backend-avb7geahhvfteqf9.centralindia-01.azurewebsites.net/uploads/profile_pictures/${profilePicture.filename}`;
+      updates.profile_picture = `http://pitch-backend-env.eba-ep4nstmn.ap-south-1.elasticbeanstalk.com//uploads/profile_pictures/${profilePicture.filename}`;
     }
 
     if (Object.keys(updates).length === 0) {

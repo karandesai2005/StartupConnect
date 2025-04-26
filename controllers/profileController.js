@@ -6,7 +6,7 @@ const User = require('../models/userModel');
 const { uploadAndConvertPostMedia } = require('../config/multerConfig');
 
 // Constants
-const BASE_URL = process.env.BASE_URL || 'https://pitch-backend-avb7geahhvfteqf9.centralindia-01.azurewebsites.net';
+const BASE_URL = process.env.BASE_URL || 'http://pitch-backend-env.eba-ep4nstmn.ap-south-1.elasticbeanstalk.com';
 
 // Utility Functions
 const getUserId = async (req) => {
