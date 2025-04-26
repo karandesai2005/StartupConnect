@@ -21,7 +21,7 @@ import { debounce } from 'lodash';
 // Utility function to normalize profile picture URL
 const normalizeProfilePictureUrl = (url) => {
   if (!url || typeof url !== 'string') return null;
-  const domain = 'https://pitch-backend-avb7geahhvfteqf9.centralindia-01.azurewebsites.net';
+  const domain = 'http://pitch-backend-env.eba-ep4nstmn.ap-south-1.elasticbeanstalk.com';
   if (url.includes(`${domain}//uploads/http`)) {
     const parts = url.split(`${domain}//uploads/`);
     if (parts.length > 1) {
