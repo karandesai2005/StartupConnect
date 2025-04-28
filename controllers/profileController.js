@@ -3,10 +3,10 @@ const Story = require('../models/storyModel');
 const Section = require('../models/sectionModel');
 const Graph = require('../models/graphModel');
 const User = require('../models/userModel');
-const { uploadAndConvertPostMedia } = require('../config/multerConfig');
+const { uploadAndConvertPostMedia, uploadProfilePicture } = require('../config/multerConfig');
 
 // Constants
-const BASE_URL = process.env.BASE_URL || 'http://pitch-backend-env.eba-ep4nstmn.ap-south-1.elasticbeanstalk.com';
+const BASE_URL = process.env.BASE_URL || 'https://pitch-backend-env.eba-ep4nstmn.ap-south-1.elasticbeanstalk.com';
 
 // Utility Functions
 const getUserId = async (req) => {
@@ -30,6 +30,14 @@ const validateString = (value, name, minLength, maxLength) => {
   return value.trim();
 };
 
+const cleanUrl = (url) => {
+  if (!url) return url;
+  return url
+    .replace(/\/+/g, '/') // Normalize multiple slashes
+    .replace('http:/', 'http://')
+    .replace('https:/', 'https://');
+};
+
 // Profile Controller
 const profileController = {
   getProfile: async (req, res) => {
@@ -40,7 +48,7 @@ const profileController = {
       const user = await User.getUserById(userId);
       if (!user) return res.status(404).json({ error: 'User not found' });
 
-      res.json(user);
+      res.json({ ...user, profile_picture: cleanUrl(user.profile_picture) });
     } catch (error) {
       console.error('Get profile error:', error);
       res.status(500).json({ error: 'Server error' });
@@ -58,12 +66,37 @@ const profileController = {
       const followerId = await getUserId(req);
       const isFollowing = followerId ? await User.isFollowing(followerId, user.user_id) : false;
 
-      res.json({ ...user, isFollowing });
+      res.json({ ...user, profile_picture: cleanUrl(user.profile_picture), isFollowing });
     } catch (error) {
       console.error('Get user profile error:', error);
       res.status(error.message.includes('Username') ? 400 : 500).json({ error: error.message });
     }
   },
+
+  updateProfilePicture: [
+    uploadProfilePicture,
+    async (req, res) => {
+      try {
+        const userId = await getUserId(req);
+        if (!userId) return res.status(401).json({ error: 'User authentication required' });
+        if (!req.file) return res.status(400).json({ error: 'Profile picture required' });
+
+        const profilePictureUrl = cleanUrl(`${BASE_URL}/Uploads/profile_pictures/${req.file.filename}`);
+        console.log(`Updating profile picture for user ${userId}: ${profilePictureUrl}`);
+
+        await User.updateProfilePicture(userId, profilePictureUrl);
+        const updatedUser = await User.getUserById(userId);
+
+        res.status(200).json({
+          message: 'Profile picture updated successfully',
+          profile_picture: cleanUrl(updatedUser.profile_picture),
+        });
+      } catch (error) {
+        console.error('Update profile picture error:', error);
+        res.status(error.message.includes('Profile picture') ? 400 : 500).json({ error: error.message });
+      }
+    },
+  ],
 
   followUser: async (req, res) => {
     try {
@@ -140,7 +173,10 @@ const profileController = {
       const offset = (page - 1) * limit;
       const stories = await Story.findByUserId(userId, { limit: parseInt(limit), offset });
 
-      res.json(stories);
+      res.json(stories.map(story => ({
+        ...story,
+        image_url: cleanUrl(story.image_url),
+      })));
     } catch (error) {
       console.error('Get stories error:', error);
       res.status(500).json({ error: 'Server error' });
@@ -159,7 +195,10 @@ const profileController = {
       const offset = (page - 1) * limit;
       const stories = await Story.findByUserId(user.user_id, { limit: parseInt(limit), offset });
 
-      res.json(stories);
+      res.json(stories.map(story => ({
+        ...story,
+        image_url: cleanUrl(story.image_url),
+      })));
     } catch (error) {
       console.error('Get user stories error:', error);
       res.status(error.message.includes('Username') ? 400 : 500).json({ error: error.message });
@@ -176,7 +215,7 @@ const profileController = {
 
         const username = req.user.username;
         const section = req.body.section || 'default';
-        const imageUrl = `${BASE_URL}/uploads/posts/${req.file.filename}`;
+        const imageUrl = cleanUrl(`${BASE_URL}/Uploads/posts/${req.file.filename}`);
 
         const storyId = await Story.create(userId, username, imageUrl, 1, 0, section);
         res.status(201).json({ story_id: storyId, image_url: imageUrl, section });
@@ -212,7 +251,10 @@ const profileController = {
       const offset = (page - 1) * limit;
       const sections = await Section.findByUserId(userId, { limit: parseInt(limit), offset });
 
-      res.json(sections);
+      res.json(sections.map(section => ({
+        ...section,
+        image_uri: cleanUrl(section.image_uri),
+      })));
     } catch (error) {
       console.error('Get sections error:', error);
       res.status(500).json({ error: 'Server error' });
@@ -231,7 +273,10 @@ const profileController = {
       const offset = (page - 1) * limit;
       const sections = await Section.findByUserId(user.user_id, { limit: parseInt(limit), offset });
 
-      res.json(sections);
+      res.json(sections.map(section => ({
+        ...section,
+        image_uri: cleanUrl(section.image_uri),
+      })));
     } catch (error) {
       console.error('Get user sections error:', error);
       res.status(error.message.includes('Username') ? 400 : 500).json({ error: error.message });
@@ -247,10 +292,12 @@ const profileController = {
       validateString(type, 'Type', 1, 50);
       validateString(title, 'Title', 1, 100);
 
+      let cleanedImageUri = image_uri ? cleanUrl(image_uri) : null;
+
       if (type === 'story' && title === 'Team' && teamMember) {
         let teamSection = await Section.findByUserIdAndSection(userId, 'team');
         if (!teamSection) {
-          const sectionId = await Section.create(userId, type, title, JSON.stringify({ teamMember }), null, 'team');
+          const sectionId = await Section.create(userId, type, title, JSON.stringify({ teamMember }), cleanedImageUri, 'team');
           teamSection = { section_id: sectionId };
         } else {
           const existingContent = teamSection.content ? JSON.parse(teamSection.content) : {};
@@ -260,7 +307,7 @@ const profileController = {
         }
         res.status(201).json({ section_id: teamSection.section_id });
       } else {
-        const sectionId = await Section.create(userId, type, title, content, image_uri, section || 'default');
+        const sectionId = await Section.create(userId, type, title, content, cleanedImageUri, section || 'default');
         res.status(201).json({ section_id: sectionId });
       }
     } catch (error) {

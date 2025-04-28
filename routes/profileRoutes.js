@@ -10,6 +10,9 @@ router.route('/')
 router.route('/user/:username')
   .get(authMiddleware, profileController.getUserProfile);
 
+router.route('/profile-picture')
+  .post(authMiddleware, profileController.updateProfilePicture);
+
 // Story Routes
 router.route('/stories')
   .get(authMiddleware, profileController.getStories)
@@ -35,8 +38,8 @@ router.route('/graphs/:graphId')
   .delete(authMiddleware, profileController.deleteGraph);
 
 // Follow Routes
-router.route('/follow/:username')  // Added :username parameter for clarity
+router.route('/follow/:username')
   .post(authMiddleware, profileController.followUser)
-  .delete(authMiddleware, profileController.unfollowUser);  // Changed to unfollowUser for clarity
+  .delete(authMiddleware, profileController.unfollowUser);
 
 module.exports = router;

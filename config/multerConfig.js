@@ -1,14 +1,16 @@
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs').promises; // Use promises for cleaner async code
+const fs = require('fs').promises;
 const ffmpeg = require('fluent-ffmpeg');
 const { promisify } = require('util');
 
 // Load environment variables
 const { env } = process;
-const FFMPEG_PATH = env.FFMPEG_PATH || '/usr/local/bin/ffmpeg'; // Updated to match static binary path
+const FFMPEG_PATH = env.FFMPEG_PATH || '/usr/local/bin/ffmpeg';
 const FFPROBE_PATH = env.FFPROBE_PATH || '/usr/local/bin/ffprobe';
-const UPLOAD_BASE_DIR = env.UPLOAD_BASE_DIR || path.join(__dirname, '../uploads');
+const UPLOAD_BASE_DIR = env.UPLOAD_BASE_DIR
+  ? path.normalize(env.UPLOAD_BASE_DIR).replace(/\/+$/, '')
+  : path.join(__dirname, '../Uploads');
 
 // FFmpeg setup with verification and fallback
 let ffmpegAvailable = false;
@@ -22,21 +24,27 @@ try {
     })
     .catch(err => {
       console.error('⚠️ FFmpeg verification failed:', err.message);
-      ffmpegAvailable = false; // Fallback to proceed without FFmpeg
+      ffmpegAvailable = false;
     });
 } catch (error) {
   console.error('⚠️ FFmpeg setup failed:', error.message);
-  ffmpegAvailable = false; // Proceed without FFmpeg
+  ffmpegAvailable = false;
 }
 
 // Ensure upload directories exist
 const profileUploadDir = path.join(UPLOAD_BASE_DIR, 'profile_pictures');
 const postUploadDir = path.join(UPLOAD_BASE_DIR, 'posts');
 (async () => {
-  await Promise.all([
-    fs.mkdir(profileUploadDir, { recursive: true }),
-    fs.mkdir(postUploadDir, { recursive: true }),
-  ]).catch(err => console.error('❌ Directory creation failed:', err));
+  try {
+    await Promise.all([
+      fs.mkdir(profileUploadDir, { recursive: true }),
+      fs.mkdir(postUploadDir, { recursive: true }),
+    ]);
+    console.log('✅ Upload directories created');
+  } catch (err) {
+    console.error('❌ Directory creation failed:', err);
+    process.exit(1);
+  }
 })();
 
 // Filename generator
@@ -81,11 +89,11 @@ const validateUploadedFile = async filePath => {
   return true;
 };
 
-// Optimized video conversion (with fallback)
+// Optimized video conversion
 const convertToCompatibleFormat = async (filePath, originalMimetype) => {
   if (!ffmpegAvailable) {
     console.warn('⚠️ FFmpeg not available, skipping conversion');
-    return filePath; // Return original path if FFmpeg is missing
+    return filePath;
   }
 
   const outputPath = `${path.parse(filePath).dir}/${path.parse(filePath).name}-converted.mp4`;
@@ -108,7 +116,7 @@ const convertToCompatibleFormat = async (filePath, originalMimetype) => {
   });
 };
 
-// Video metadata (cached for reuse, optional if FFmpeg is unavailable)
+// Video metadata
 const getVideoMetadata = ffmpegAvailable ? promisify(ffmpeg.ffprobe) : () => Promise.reject(new Error('FFmpeg not available'));
 
 // Upload and convert middleware
@@ -145,17 +153,34 @@ const uploadAndConvertPostMedia = async (req, res, next) => {
   }
 };
 
+// Upload profile picture middleware
+const uploadProfilePicture = multer({
+  storage: profileStorage,
+  fileFilter: profileFileFilter,
+  limits: limits.profile,
+}).single('profile_picture');
+
 // Error handling middleware
 const handleUploadError = (err, req, res, next) =>
   res.status(500).json({ error: 'File upload failed', details: err.message });
 
 // Exports
 module.exports = {
-  uploadProfilePicture: multer({
-    storage: profileStorage,
-    fileFilter: profileFileFilter,
-    limits: limits.profile,
-  }),
+  uploadProfilePicture: async (req, res, next) => {
+    try {
+      await promisify(uploadProfilePicture)(req, res);
+      if (req.file) {
+        console.log(`Profile picture uploaded: ${req.file.path}`);
+      }
+      next();
+    } catch (err) {
+      console.error('Profile picture upload error:', err);
+      res.status(err instanceof multer.MulterError ? 400 : 500).json({
+        error: 'Profile picture upload failed',
+        details: err.message,
+      });
+    }
+  },
   uploadAndConvertPostMedia,
   handleUploadError,
   getVideoMetadata,
