@@ -217,7 +217,7 @@ const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, na
     const username = isUserPost
       ? item.username
       : item.name
-        ? `${item.name.first} ${item.name.last}`
+        ? `${item.name.first} ${item.name.last || ''}`
         : 'User';
     navigation.navigate('Profile', { username, isOtherUser: true });
   };
@@ -493,18 +493,62 @@ export default function Home() {
     return [...validPosts, ...users];
   }, [myPosts, users]);
 
+  const generateMockTimestamp = () => {
+    const now = new Date();
+    const randomMinutes = Math.floor(Math.random() * 60 * 24 * 7); // Up to 7 days ago
+    return new Date(now.getTime() - randomMinutes * 60 * 1000).toISOString();
+  };
+
   const loadUsers = useCallback(
     async (refresh = false) => {
       try {
         setLoading(true);
-        const response = await axios.get(`https://randomuser.me/api?results=10&page=${currentPage}`);
+        const page = currentPage > 10 ? 1 : currentPage; // Loop back to page 1 after page 10
+        const response = await axios.get(
+          `https://jsonplaceholder.typicode.com/posts?_page=${page}&_limit=10`
+        );
+        const userCache = new Map(); // Cache for user data
+        const mappedUsers = await Promise.all(
+          response.data.map(async (post) => {
+            let user = userCache.get(post.userId);
+            if (!user) {
+              try {
+                const userResponse = await axios.get(
+                  `https://jsonplaceholder.typicode.com/users/${post.userId}`
+                );
+                user = userResponse.data;
+                userCache.set(post.userId, user);
+              } catch (userError) {
+                console.error(`Error fetching user ${post.userId}:`, userError);
+                user = { name: `User${post.userId}` }; // Fallback
+              }
+            }
+            const nameParts = user.name.split(' ');
+            return {
+              login: { uuid: `${post.id}-${currentPage}` }, // Unique ID for infinite scroll
+              name: {
+                first: nameParts[0],
+                last: nameParts.slice(1).join(' ') || '', // Ensure last is not undefined
+              },
+              profile_picture: require('../assets/profiledefault.jpg'), // Fixed profile picture
+              email: user.email || `user${post.userId}@example.com`, // Use user email or mock
+              registered: { date: generateMockTimestamp() }, // Mock timestamp
+              content: post.body, // Post body as content
+              caption: post.title, // Post title as caption
+              image_url: require('../assets/PITCH.png'), // Fixed post image
+              likes: Math.floor(Math.random() * 100), // Mock likes
+              comment_count: Math.floor(Math.random() * 20), // Mock comments
+            };
+          })
+        );
         if (refresh) {
-          setUsers(response.data.results);
+          setUsers(mappedUsers);
         } else {
-          setUsers((prev) => [...prev, ...response.data.results]);
+          setUsers((prev) => [...prev, ...mappedUsers]);
         }
       } catch (error) {
         console.error('Error loading users:', error);
+        Alert.alert('Error', 'Failed to load posts. Please try again.');
       } finally {
         setLoading(false);
         setRefreshing(false);
@@ -1148,4 +1192,4 @@ const styles = StyleSheet.create({
     color: '#D32F2F',
     fontSize: 16,
   },
-});
+}); 

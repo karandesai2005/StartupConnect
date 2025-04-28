@@ -165,11 +165,22 @@ const Profile = ({ route }) => {
 
         if (profileResponse.ok && postsResponse.ok) {
           const [profileData, postsData] = await Promise.all([profileResponse.json(), postsResponse.json()]);
+          const baseBackendUrl = 'http://pitch-backend-env.eba-ep4nstmn.ap-south-1.elasticbeanstalk.com/';
+          // Clean profile_picture URL
+          let cleanedProfilePicture = profileData.profile_picture;
+          if (cleanedProfilePicture && cleanedProfilePicture.includes(baseBackendUrl + 'Uploads/' + baseBackendUrl)) {
+            cleanedProfilePicture = cleanedProfilePicture.replace(
+              baseBackendUrl + 'Uploads/' + baseBackendUrl,
+              baseBackendUrl
+            );
+          } else if (cleanedProfilePicture && !cleanedProfilePicture.startsWith('https')) {
+            cleanedProfilePicture = `${NGROK_URL}/Uploads/${cleanedProfilePicture}`;
+          }
+          console.log('Cleaned profile_picture:', cleanedProfilePicture);
+
           const formattedUserData = {
             ...profileData,
-            profile_picture: profileData.profile_picture?.startsWith('https')
-              ? profileData.profile_picture
-              : profileData.profile_picture ? `${NGROK_URL}/Uploads/${profileData.profile_picture}` : null,
+            profile_picture: cleanedProfilePicture,
           };
 
           if (mounted) {
@@ -179,17 +190,40 @@ const Profile = ({ route }) => {
               await AsyncStorage.setItem('userData', JSON.stringify(formattedUserData));
             }
 
-            const mappedPosts = Array.isArray(postsData) ? postsData.map(post => ({
-              _id: post.post_id || post.id,
-              username: post.username,
-              profile_picture: post.profile_picture?.startsWith('https') ? post.profile_picture : post.profile_picture ? `${NGROK_URL}/Uploads/${post.profile_picture}` : null,
-              image_url: post.media_url?.startsWith('https') ? post.media_url : post.media_url ? `${NGROK_URL}/Uploads/${post.media_url}` : null,
-              content: post.content,
-              created_at: post.created_at,
-              likes: post.like_count || 0,
-              comments: post.comment_count || 0,
-              media_type: post.media_type || (post.media_url?.includes('.mp4') ? 'video' : 'image')
-            })).filter(post => post.image_url && !post.image_url.includes('undefined'))
+            const mappedPosts = Array.isArray(postsData) ? postsData.map(post => {
+              // Clean post profile_picture and image_url
+              let cleanedPostProfilePicture = post.profile_picture;
+              let cleanedImageUrl = post.media_url;
+              if (cleanedPostProfilePicture && cleanedPostProfilePicture.includes(baseBackendUrl + 'Uploads/' + baseBackendUrl)) {
+                cleanedPostProfilePicture = cleanedPostProfilePicture.replace(
+                  baseBackendUrl + 'Uploads/' + baseBackendUrl,
+                  baseBackendUrl
+                );
+              } else if (cleanedPostProfilePicture && !cleanedPostProfilePicture.startsWith('https')) {
+                cleanedPostProfilePicture = `${NGROK_URL}/Uploads/${cleanedPostProfilePicture}`;
+              }
+              if (cleanedImageUrl && cleanedImageUrl.includes(baseBackendUrl + 'Uploads/' + baseBackendUrl)) {
+                cleanedImageUrl = cleanedImageUrl.replace(
+                  baseBackendUrl + 'Uploads/' + baseBackendUrl,
+                  baseBackendUrl
+                );
+              } else if (cleanedImageUrl && !cleanedImageUrl.startsWith('https')) {
+                cleanedImageUrl = `${NGROK_URL}/Uploads/${cleanedImageUrl}`;
+              }
+              console.log('Cleaned post URLs:', { profile_picture: cleanedPostProfilePicture, image_url: cleanedImageUrl });
+
+              return {
+                _id: post.post_id || post.id,
+                username: post.username,
+                profile_picture: cleanedPostProfilePicture,
+                image_url: cleanedImageUrl,
+                content: post.content,
+                created_at: post.created_at,
+                likes: post.like_count || 0,
+                comments: post.comment_count || 0,
+                media_type: post.media_type || (cleanedImageUrl?.includes('.mp4') ? 'video' : 'image')
+              };
+            }).filter(post => post.image_url && !post.image_url.includes('undefined'))
               .sort((a, b) => new Date(b.created_at) - new Date(a.created_at)) : [];
 
             console.log('Fetched posts:', mappedPosts.length);
