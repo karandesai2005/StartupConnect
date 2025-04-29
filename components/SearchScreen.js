@@ -18,7 +18,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NGROK_URL } from '@env';
 import { debounce } from 'lodash';
-import { supabase } from '../services/supabase'; // Import Supabase client
+import { supabase } from '../services/supabase';
 
 const SearchScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -46,7 +46,7 @@ const SearchScreen = () => {
         }
 
         const baseUrl = NGROK_URL.replace(/\/+$/, '');
-        const response = await axios.get(`${baseUrl}/api/profile/search`, {
+        const response = await axios.get(`${baseUrl}/api/search-users`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',

@@ -21,7 +21,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { NGROK_URL } from '@env';
 import * as ImagePicker from 'expo-image-picker';
-import { supabase } from "../services/supabase";
+import { supabase } from '../services/supabase';
 
 const { width } = Dimensions.get('window');
 
@@ -73,7 +73,6 @@ export default function SettingsScreen() {
       }
     } catch (error) {
       console.error('Error fetching user data:', error);
-      // Try loading cached userData
       const cachedData = await AsyncStorage.getItem('userData');
       if (cachedData) {
         setUserData(JSON.parse(cachedData));
@@ -155,7 +154,7 @@ export default function SettingsScreen() {
         });
 
         const baseUrl = NGROK_URL.replace(/\/+$/, '');
-        await axios.post(`${baseUrl}/api/profile/picture`, formData, {
+        await axios.post(`${baseUrl}/api/profile-picture`, formData, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'multipart/form-data',
@@ -195,7 +194,7 @@ export default function SettingsScreen() {
     );
   };
 
-  const handleDeleteAccount = () => {
+  const handleDeleteAccount = async () => {
     Alert.alert(
       'Delete Account',
       'This action cannot be undone. All your data will be permanently deleted.',
@@ -221,7 +220,7 @@ export default function SettingsScreen() {
               }
 
               const baseUrl = NGROK_URL.replace(/\/+$/, '');
-              await axios.delete(`${baseUrl}/api/profile`, {
+              await axios.delete(`${baseUrl}/api/delete-account`, {
                 headers: {
                   Authorization: `Bearer ${token}`,
                   'Content-Type': 'application/json',
