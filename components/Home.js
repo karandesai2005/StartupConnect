@@ -65,47 +65,47 @@ const PostCard = memo(
     const [imageHeight, setImageHeight] = useState(width);
     const [isLoading, setIsLoading] = useState(true);
     const [isLiked, setIsLiked] = useState(false);
-    const [likeCount, setLikeCount] = useState(item.likes || 0);
+    const [likeCount, setLikeCount] = useState(item.likes || item.like_count || 0);
     const [comments, setComments] = useState([]);
-    const [newComment, setNewComment] = useState("");
+    const [newComment, setNewComment] = useState('');
     const [isCommentModalVisible, setIsCommentModalVisible] = useState(false);
     const [isCommentsLoading, setIsCommentsLoading] = useState(false);
     const animatedScale = new Animated.Value(1);
     const [isVideo, setIsVideo] = useState(false);
     const videoRef = React.useRef(null);
     const [isLikeLoading, setIsLikeLoading] = useState(false);
-    const debouncedHandleLike = useCallback(
-      debounce(async () => handleLike(), 300),
-      [handleLike]
-    );
-    const isUserPost =
-      item.hasOwnProperty("caption") || item.hasOwnProperty("content");
     const [shouldShowMore, setShouldShowMore] = useState(false);
     const [isMeasured, setIsMeasured] = useState(false);
     const [fullTextHeight, setFullTextHeight] = useState(0);
     const [lastTap, setLastTap] = useState(null);
+
+    const isUserPost = item.hasOwnProperty('caption') || item.hasOwnProperty('content');
 
     useEffect(() => {
       fetchLikeStatus();
     }, [item.post_id]);
 
     useEffect(() => {
-      const mediaUrl = item.image_url || item.media_url;
-      if (typeof mediaUrl === "string") {
+      const rawMediaUrl = item.image_url || item.media_url;
+      const mediaUrl = rawMediaUrl?.replace('https://', 'http://');
+      console.log(`Processing media for post ${item.post_id}:`, { rawMediaUrl, mediaUrl });
+
+      if (typeof mediaUrl === 'string') {
         if (mediaUrl.match(/\.(mp4|mov|avi|wmv|3gp|mkv)$/i)) {
           setIsVideo(true);
           setImageHeight((width * 5) / 4);
           setIsLoading(false);
-        } else if (mediaUrl.startsWith("http")) {
+        } else if (mediaUrl.startsWith('http')) {
           Image.getSize(
             mediaUrl,
             (originalWidth, originalHeight) => {
               const aspectRatio = originalWidth / originalHeight;
               setImageHeight(width / aspectRatio);
               setIsLoading(false);
+              console.log(`Image size for post ${item.post_id}:`, { width: originalWidth, height: originalHeight });
             },
             (error) => {
-              console.log("Error getting image size:", error);
+              console.error(`Error getting image size for post ${item.post_id}:`, error);
               setImageHeight(width);
               setIsLoading(false);
             }
@@ -123,118 +123,100 @@ const PostCard = memo(
         if (isVisible) {
           videoRef.current
             .playAsync()
-            .catch((error) => console.error("Play error:", error));
+            .catch((error) => console.error(`Play error for post ${item.post_id}:`, error));
         } else {
           videoRef.current
             .pauseAsync()
-            .catch((error) => console.error("Pause error:", error));
+            .catch((error) => console.error(`Pause error for post ${item.post_id}:`, error));
         }
       }
     }, [isVisible, isVideo]);
 
     useEffect(() => {
       if (isCommentModalVisible) {
-        const backHandler = BackHandler.addEventListener(
-          "hardwareBackPress",
-          () => {
-            console.log("Hardware back press detected, closing modal");
-            setIsCommentModalVisible(false);
-            return true;
-          }
-        );
+        const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+          setIsCommentModalVisible(false);
+          return true;
+        });
         return () => backHandler.remove();
       }
     }, [isCommentModalVisible]);
 
     const handlePressIn = () => {
-      Animated.spring(animatedScale, {
-        toValue: 0.98,
-        useNativeDriver: true,
-      }).start();
+      Animated.spring(animatedScale, { toValue: 0.98, useNativeDriver: true }).start();
     };
 
     const handlePressOut = () => {
-      Animated.spring(animatedScale, {
-        toValue: 1,
-        useNativeDriver: true,
-      }).start();
+      Animated.spring(animatedScale, { toValue: 1, useNativeDriver: true }).start();
     };
 
     const fetchLikeStatus = async () => {
       try {
-        const token = await AsyncStorage.getItem("token");
+        const token = await AsyncStorage.getItem('token');
         if (!token || !item.post_id) return;
-        const baseUrl = NGROK_URL.replace(/\/+$/, "");
-        const response = await axios.get(
-          `${baseUrl}/api/posts/${item.post_id}/likes`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
+        const baseUrl = NGROK_URL.replace(/\/+$/, '');
+        const response = await axios.get(`${baseUrl}/api/posts/${item.post_id}/likes`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         if (response.data) {
           setIsLiked(response.data.isLiked === 1);
           setLikeCount(response.data.likeCount);
         }
       } catch (error) {
-        console.error("Error fetching like status:", error);
+        console.error(`Error fetching like status for post ${item.post_id}:`, error);
       }
     };
 
     const fetchComments = async () => {
       try {
         setIsCommentsLoading(true);
-        const token = await AsyncStorage.getItem("token");
+        const token = await AsyncStorage.getItem('token');
         if (!token || !item.post_id) return;
-        const baseUrl = NGROK_URL.replace(/\/+$/, "");
-        const response = await axios.get(
-          `${baseUrl}/api/posts/${item.post_id}/comments`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-        if (response.data) {
-          setComments(response.data || []);
-          console.log(
-            `Fetched comments for post ${item.post_id}:`,
-            response.data
-          );
-        } else {
-          console.warn("No data returned from comments API");
-        }
+        const baseUrl = NGROK_URL.replace(/\/+$/, '');
+        const response = await axios.get(`${baseUrl}/api/posts/${item.post_id}/comments`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setComments(response.data || []);
+        console.log(`Fetched comments for post ${item.post_id}:`, response.data);
       } catch (error) {
-        console.error("Error fetching comments:", error);
+        console.error(`Error fetching comments for post ${item.post_id}:`, error);
         setComments([]);
       } finally {
         setIsCommentsLoading(false);
       }
     };
 
-    const handleLike = async () => {
-      try {
-        const token = await AsyncStorage.getItem("token");
-        if (!token || !item.post_id) return;
-        setIsLikeLoading(true);
-        setIsLiked((prev) => !prev);
-        setLikeCount((prev) => (isLiked ? prev - 1 : prev + 1));
-        const baseUrl = NGROK_URL.replace(/\/+$/, "");
-        const response = await axios.post(
-          `${baseUrl}/api/posts/${item.post_id}/toggle-like`,
-          {},
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        if (response.data && response.data.success) {
-          setIsLiked(response.data.liked);
-          setLikeCount(response.data.like_count);
-          await fetchAllPosts();
+    const handleLike = useCallback(
+      async () => {
+        try {
+          const token = await AsyncStorage.getItem('token');
+          if (!token || !item.post_id) return;
+          setIsLikeLoading(true);
+          setIsLiked((prev) => !prev);
+          setLikeCount((prev) => (isLiked ? prev - 1 : prev + 1));
+          const baseUrl = NGROK_URL.replace(/\/+$/, '');
+          const response = await axios.post(
+            `${baseUrl}/api/posts/${item.post_id}/toggle-like`,
+            {},
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          if (response.data && response.data.success) {
+            setIsLiked(response.data.liked);
+            setLikeCount(response.data.like_count);
+            await fetchAllPosts();
+          }
+        } catch (error) {
+          console.error(`Error updating like for post ${item.post_id}:`, error);
+          setIsLiked((prev) => !prev);
+          setLikeCount((prev) => (isLiked ? prev + 1 : prev - 1));
+        } finally {
+          setIsLikeLoading(false);
         }
-      } catch (error) {
-        console.error("Error updating like:", error);
-        setIsLiked((prev) => !prev);
-        setLikeCount((prev) => (isLiked ? prev + 1 : prev - 1));
-      } finally {
-        setIsLikeLoading(false);
-      }
-    };
+      },
+      [isLiked, item.post_id, fetchAllPosts]
+    );
+
+    const debouncedHandleLike = useCallback(debounce(handleLike, 300), [handleLike]);
 
     const handleDoubleTap = () => {
       const now = Date.now();
@@ -252,9 +234,9 @@ const PostCard = memo(
       const username = isUserPost
         ? item.username
         : item.name
-        ? `${item.name.first} ${item.name.last || ""}`
-        : "User";
-      navigation.navigate("Profile", { username, isOtherUser: true });
+        ? `${item.name.first} ${item.name.last || ''}`
+        : 'User';
+      navigation.navigate('Profile', { username, isOtherUser: true });
     };
 
     const toggleCommentModal = () => {
@@ -267,9 +249,9 @@ const PostCard = memo(
     const handleAddComment = async () => {
       if (!newComment.trim()) return;
       try {
-        const token = await AsyncStorage.getItem("token");
+        const token = await AsyncStorage.getItem('token');
         if (!token || !item.post_id) return;
-        const baseUrl = NGROK_URL.replace(/\/+$/, "");
+        const baseUrl = NGROK_URL.replace(/\/+$/, '');
         const response = await axios.post(
           `${baseUrl}/api/posts/${item.post_id}/comments`,
           { content: newComment },
@@ -277,10 +259,10 @@ const PostCard = memo(
         );
         if (response.data) {
           await fetchComments();
-          setNewComment("");
+          setNewComment('');
         }
       } catch (error) {
-        console.error("Error adding comment:", error);
+        console.error(`Error adding comment for post ${item.post_id}:`, error);
       }
     };
 
@@ -293,41 +275,32 @@ const PostCard = memo(
       }
     };
 
+    const mediaUrl = (item.image_url || item.media_url)?.replace('https://', 'http://');
+
     return (
-      <Animated.View
-        style={[styles.card, { transform: [{ scale: animatedScale }] }]}
-      >
+      <Animated.View style={[styles.card, { transform: [{ scale: animatedScale }] }]}>
         <TouchableOpacity onPress={handleProfilePress} activeOpacity={0.7}>
           <View style={styles.cardHeader}>
             <View style={styles.userInfo}>
               <TouchableOpacity onPress={handleProfilePress}>
                 <Image
                   source={
-                    typeof item.profile_picture === "string" &&
-                    item.profile_picture.startsWith("http")
-                      ? { uri: item.profile_picture }
-                      : require("../assets/profiledefault.jpg")
+                    typeof item.profile_picture === 'string' && item.profile_picture.startsWith('http')
+                      ? { uri: item.profile_picture.replace('https://', 'http://') }
+                      : require('../assets/profiledefault.jpg')
                   }
                   style={styles.avatar}
+                  onError={(e) => console.error(`Profile picture error for post ${item.post_id}:`, e.nativeEvent.error)}
                 />
               </TouchableOpacity>
               <View>
                 <Text style={styles.name}>
-                  {isUserPost
-                    ? item.username
-                    : item.name
-                    ? item.name.first
-                    : "User"}
+                  {isUserPost ? item.username : item.name ? item.name.first : 'User'}
                 </Text>
-                <Text style={styles.timeStamp}>
-                  {formatTimestamp(item.created_at)}
-                </Text>
+                <Text style={styles.timeStamp}>{formatTimestamp(item.created_at)}</Text>
               </View>
             </View>
-            <TouchableOpacity
-              style={styles.moreButton}
-              onPress={(e) => e.stopPropagation()}
-            >
+            <TouchableOpacity style={styles.moreButton} onPress={(e) => e.stopPropagation()}>
               <Text style={styles.moreButtonText}>•••</Text>
             </TouchableOpacity>
           </View>
@@ -347,36 +320,34 @@ const PostCard = memo(
             {isVideo ? (
               <Video
                 ref={videoRef}
-                source={{ uri: item.image_url || item.media_url }}
+                source={{ uri: mediaUrl }}
                 style={[styles.video, { height: imageHeight }]}
                 resizeMode="cover"
                 isLooping={true}
                 onLoad={() => setIsLoading(false)}
                 onError={(error) => {
-                  console.error(
-                    `Video loading error for ${
-                      item.image_url || item.media_url
-                    }:`,
-                    error
-                  );
+                  console.error(`Video loading error for post ${item.post_id}:`, error);
                   setIsLoading(false);
                   setIsVideo(false);
                 }}
-                useNativeControls={false}
               />
             ) : (
               <Image
                 source={
-                  typeof item.image_url === "string" &&
-                  item.image_url.startsWith("http")
-                    ? { uri: item.image_url }
-                    : typeof item.media_url === "string" &&
-                      item.media_url.startsWith("http")
-                    ? { uri: item.media_url }
-                    : require("../assets/PITCH.png")
+                  mediaUrl && mediaUrl.startsWith('http')
+                    ? { uri: mediaUrl }
+                    : require('../assets/PITCH.png')
                 }
                 style={[styles.postImage, { height: imageHeight }]}
-                onLoad={() => setIsLoading(false)}
+                resizeMode="cover"
+                onLoad={() => {
+                  setIsLoading(false);
+                  console.log(`Image loaded for post ${item.post_id}`);
+                }}
+                onError={(e) => {
+                  console.error(`Image loading error for post ${item.post_id}:`, e.nativeEvent.error);
+                  setIsLoading(false);
+                }}
               />
             )}
           </View>
@@ -395,54 +366,29 @@ const PostCard = memo(
             disabled={isLikeLoading}
           >
             <Image
-              source={require("../assets/icon-like.png")}
+              source={require('../assets/icon-like.png')}
               style={[
                 styles.navIcon,
-                { tintColor: isLiked ? "#1f219c" : "#000000" },
+                { tintColor: isLiked ? '#1f219c' : '#000000' },
                 isLikeLoading && { opacity: 0.5 },
               ]}
             />
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={toggleCommentModal}
-          >
-            <Image
-              source={require("../assets/comment6.png")}
-              style={styles.navIcon}
-            />
+          <TouchableOpacity style={styles.actionButton} onPress={toggleCommentModal}>
+            <Image source={require('../assets/comment6.png')} style={styles.navIcon} />
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={handleChatPress}
-          >
-            <Image
-              source={require("../assets/share.png")}
-              style={styles.navIcon}
-            />
+          <TouchableOpacity style={styles.actionButton} onPress={handleChatPress}>
+            <Image source={require('../assets/share.png')} style={styles.navIcon} />
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={handleChatPress}
-          >
-            <Image
-              source={require("../assets/save.png")}
-              style={styles.navIcon}
-            />
+          <TouchableOpacity style={styles.actionButton} onPress={handleChatPress}>
+            <Image source={require('../assets/save.png')} style={styles.navIcon} />
           </TouchableOpacity>
         </View>
         <View style={styles.captionContainer}>
           {!isMeasured && (
-            <Text
-              style={[styles.caption, styles.measureText]}
-              onLayout={handleTextLayout}
-            >
+            <Text style={[styles.caption, styles.measureText]} onLayout={handleTextLayout}>
               <Text style={styles.username}>
-                {isUserPost
-                  ? item.username
-                  : item.name
-                  ? item.name.first
-                  : "User"}{" "}
+                {isUserPost ? item.username : item.name ? item.name.first : 'User'}{' '}
               </Text>
               {item.content || item.caption}
             </Text>
@@ -450,16 +396,10 @@ const PostCard = memo(
           {isMeasured && (
             <Text
               style={styles.caption}
-              numberOfLines={
-                shouldShowMore && !expandedItems[index] ? 2 : undefined
-              }
+              numberOfLines={shouldShowMore && !expandedItems[index] ? 2 : undefined}
             >
               <Text style={styles.username}>
-                {isUserPost
-                  ? item.username
-                  : item.name
-                  ? item.name.first
-                  : "User"}{" "}
+                {isUserPost ? item.username : item.name ? item.name.first : 'User'}{' '}
               </Text>
               {item.content || item.caption}
             </Text>
@@ -467,7 +407,7 @@ const PostCard = memo(
           {shouldShowMore && (
             <TouchableOpacity onPress={() => toggleExpand(index)}>
               <Text style={styles.showMoreText}>
-                {expandedItems[index] ? "Show less" : "Show more"}
+                {expandedItems[index] ? 'Show less' : 'Show more'}
               </Text>
             </TouchableOpacity>
           )}
@@ -492,19 +432,13 @@ const PostCard = memo(
               </TouchableOpacity>
             </View>
             {isCommentsLoading ? (
-              <ActivityIndicator
-                size="large"
-                color="#007AFF"
-                style={styles.commentLoader}
-              />
+              <ActivityIndicator size="large" color="#007AFF" style={styles.commentLoader} />
             ) : (
               <FlatList
                 data={comments}
                 renderItem={({ item }) => (
                   <View style={styles.commentItem}>
-                    <Text style={styles.commentUsername}>
-                      {item.username || "User"}
-                    </Text>
+                    <Text style={styles.commentUsername}>{item.username || 'User'}</Text>
                     <Text style={styles.commentText}>{item.content}</Text>
                     <Text style={styles.commentTimestamp}>
                       {formatTimestamp(item.created_at)}
@@ -514,9 +448,7 @@ const PostCard = memo(
                 keyExtractor={(item) => item.comment_id.toString()}
                 style={styles.commentList}
                 contentContainerStyle={styles.commentListContent}
-                ListEmptyComponent={
-                  <Text style={styles.noCommentsText}>No comments yet.</Text>
-                }
+                ListEmptyComponent={<Text style={styles.noCommentsText}>No comments yet.</Text>}
               />
             )}
             <View style={styles.commentInputContainer}>
@@ -528,10 +460,7 @@ const PostCard = memo(
                 onSubmitEditing={handleAddComment}
                 returnKeyType="send"
               />
-              <TouchableOpacity
-                style={styles.postCommentButton}
-                onPress={handleAddComment}
-              >
+              <TouchableOpacity style={styles.postCommentButton} onPress={handleAddComment}>
                 <Text style={styles.postCommentText}>Post</Text>
               </TouchableOpacity>
             </View>
@@ -595,7 +524,7 @@ export default function Home() {
 
   const generateMockTimestamp = () => {
     const now = new Date();
-    const randomMinutes = Math.floor(Math.random() * 60 * 24 * 7); // Up to 7 days ago
+    const randomMinutes = Math.floor(Math.random() * 60 * 24 * 7);
     return new Date(now.getTime() - randomMinutes * 60 * 1000).toISOString();
   };
 
@@ -603,11 +532,11 @@ export default function Home() {
     async (refresh = false) => {
       try {
         setLoading(true);
-        const page = currentPage > 10 ? 1 : currentPage; // Loop back to page 1 after page 10
+        const page = currentPage > 10 ? 1 : currentPage;
         const response = await axios.get(
           `https://jsonplaceholder.typicode.com/posts?_page=${page}&_limit=10`
         );
-        const userCache = new Map(); // Cache for user data
+        const userCache = new Map();
         const mappedUsers = await Promise.all(
           response.data.map(async (post) => {
             let user = userCache.get(post.userId);
@@ -620,24 +549,24 @@ export default function Home() {
                 userCache.set(post.userId, user);
               } catch (userError) {
                 console.error(`Error fetching user ${post.userId}:`, userError);
-                user = { name: `User${post.userId}` }; // Fallback
+                user = { name: `User${post.userId}` };
               }
             }
             const nameParts = user.name.split(" ");
             return {
-              login: { uuid: `${post.id}-${currentPage}` }, // Unique ID for infinite scroll
+              login: { uuid: `${post.id}-${currentPage}` },
               name: {
                 first: nameParts[0],
-                last: nameParts.slice(1).join(" ") || "", // Ensure last is not undefined
+                last: nameParts.slice(1).join(" ") || "",
               },
-              profile_picture: require("../assets/profiledefault.jpg"), // Fixed profile picture
-              email: user.email || `user${post.userId}@example.com`, // Use user email or mock
-              registered: { date: generateMockTimestamp() }, // Mock timestamp
-              content: post.body, // Post body as content
-              caption: post.title, // Post title as caption
-              image_url: require("../assets/PITCH.png"), // Fixed post image
-              likes: Math.floor(Math.random() * 100), // Mock likes
-              comment_count: Math.floor(Math.random() * 20), // Mock comments
+              profile_picture: require("../assets/profiledefault.jpg"),
+              email: user.email || `user${post.userId}@example.com`,
+              registered: { date: generateMockTimestamp() },
+              content: post.body,
+              caption: post.title,
+              image_url: require("../assets/PITCH.png"),
+              likes: Math.floor(Math.random() * 100),
+              comment_count: Math.floor(Math.random() * 20),
             };
           })
         );
@@ -660,19 +589,12 @@ export default function Home() {
   const fetchAllPosts = useCallback(async () => {
     try {
       setPostsError(null);
-      const token = await AsyncStorage.getItem("token");
-      if (!token) {
-        console.log("No token in AsyncStorage");
-        return;
-      }
       const baseUrl = NGROK_URL.replace(/\/+$/, "");
+      console.log('Fetching posts from:', `${baseUrl}/api/posts/all`);
       const response = await axios.get(`${baseUrl}/api/posts/all`, {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        timeout: 10000,
       });
-      console.log("Posts API response:", response.data); // Debug log
+      console.log("Posts API response:", response.data);
       if (response.data && Array.isArray(response.data)) {
         const mappedPosts = response.data.map((post) => ({
           _id: post.post_id,
@@ -701,7 +623,7 @@ export default function Home() {
         "Error fetching posts:",
         error.response?.data || error.message
       );
-      setPostsError(error.message);
+      setPostsError(error.response?.data?.message || error.message);
     }
   }, []);
 
@@ -722,6 +644,7 @@ export default function Home() {
         await AsyncStorage.setItem("token", session.access_token);
       }
       const baseUrl = NGROK_URL.replace(/\/+$/, "");
+      console.log('Fetching user data from:', `${baseUrl}/api/profile`);
       const response = await fetch(`${baseUrl}/api/profile`, {
         method: "GET",
         headers: {
@@ -749,7 +672,6 @@ export default function Home() {
       const checkAuthAndFetch = async () => {
         try {
           setLoading(true);
-          // Check authentication status
           let token = await AsyncStorage.getItem("token");
           if (!token) {
             console.log("No token, refreshing session");
@@ -765,8 +687,6 @@ export default function Home() {
             token = session.access_token;
             await AsyncStorage.setItem("token", token);
           }
-
-          // Fetch user data, posts, and users concurrently
           await Promise.all([
             fetchUserData(),
             fetchAllPosts(),
@@ -779,7 +699,6 @@ export default function Home() {
           setLoading(false);
         }
       };
-
       checkAuthAndFetch();
     }, [fetchUserData, fetchAllPosts, loadUsers, navigation])
   );
@@ -795,8 +714,8 @@ export default function Home() {
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     setCurrentPage(1);
-    setMyPosts([]); // Clear posts
-    setUsers([]); // Clear users
+    setMyPosts([]);
+    setUsers([]);
     Promise.all([fetchAllPosts(), loadUsers(true)]).finally(() => {
       setRefreshing(false);
     });
@@ -976,7 +895,6 @@ export default function Home() {
     </SafeAreaView>
   );
 }
-
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
