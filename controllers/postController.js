@@ -3,7 +3,7 @@ require('dotenv').config();
   const User = require('../models/userModel');
 
   // Constants
-  const BASE_URL = process.env.NGROK_URL || 'https://pitch-backend-env.eba-ep4nstmn.ap-south-1.elasticbeanstalk.com';
+  const BASE_URL = process.env.NGROK_URL || 'http://pitch-backend-env.eba-ep4nstmn.ap-south-1.elasticbeanstalk.com';
 
   // Utility Functions
   const getUserId = async (req) => {
