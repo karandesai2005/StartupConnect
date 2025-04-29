@@ -2,13 +2,13 @@ require("dotenv").config();
 const express = require("express");
 const path = require("path");
 const cors = require("cors");
-const { connectDB } = require("./config/db"); // Import db functions
+const { connectDB } = require("./config/db");
 const postRoutes = require("./routes/postRoutes");
 const authRoutes = require("./routes/authRoutes");
 const profileRoutes = require("./routes/profileRoutes");
 
 const app = express();
-const PORT = process.env.PORT || 5000; // Changed from 8080 to 5000 for Elastic Beanstalk
+const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(express.json());
@@ -16,9 +16,9 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cors());
 
 // Static files
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use("/uploads", express.static(path.join(__dirname, "Uploads")));
 
-// Health check route for Elastic Beanstalk
+// Health check route
 app.get("/health", (req, res) => {
   res.status(200).send("OK");
 });
@@ -29,7 +29,7 @@ app.get("/", (req, res) => {
 });
 
 // API Routes
-app.use("/api", postRoutes);
+app.use("/api/posts", postRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/profile", profileRoutes);
 
@@ -48,6 +48,11 @@ app.use((req, res) => {
 async function startServer() {
   try {
     await connectDB();
+    console.log('Environment:', {
+      BASE_URL: process.env.BASE_URL,
+      SUPABASE_URL: process.env.SUPABASE_URL,
+      PORT,
+    });
     app.listen(PORT, "0.0.0.0", () => {
       console.log(`🚀 Server running on http://0.0.0.0:${PORT}`);
     });
@@ -63,4 +68,3 @@ process.on("unhandledRejection", (err) => {
   console.error("Unhandled rejection:", err.stack);
   process.exit(1);
 });
-//final

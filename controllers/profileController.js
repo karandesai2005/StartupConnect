@@ -158,25 +158,31 @@ const profileController = {
     try {
       const { username } = req.params;
       validateString(username, 'Username', 3, 20);
-
+  
       const user = await User.getUserByUsername(username);
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
-
+  
       const postsQuery = `
-        SELECT p.post_id, p.user_id, u.username, p.media_url, p.content, p.created_at, p.media_type,
-               (SELECT COUNT(*) FROM likes WHERE post_id = p.post_id) AS like_count
+        SELECT p.post_id, p.user_id, u.username, u.name, p.media_url, p.content, p.created_at, p.media_type,
+               (SELECT COUNT(*) FROM likes WHERE post_id = p.post_id) AS like_count,
+               (SELECT COUNT(*) FROM comments WHERE post_id = p.post_id) AS comment_count,
+               u.profile_picture
         FROM posts p
         JOIN users u ON p.user_id = u.user_id
         WHERE p.user_id = $1
         ORDER BY p.created_at DESC
       `;
       const posts = await queryDB(postsQuery, [user.user_id]);
-
+  
       res.json(posts.map(post => ({
         ...post,
         media_url: cleanUrl(post.media_url),
+        profile_picture: cleanUrl(post.profile_picture || ''),
+        name: post.name || post.username,
+        comment_count: Number(post.comment_count) || 0,
+        like_count: Number(post.like_count) || 0
       })));
     } catch (error) {
       console.error('Get user posts by username error:', error);
