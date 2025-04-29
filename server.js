@@ -5,6 +5,7 @@ const cors = require("cors");
 const { connectDB } = require("./config/db");
 const postRoutes = require("./routes/postRoutes");
 const authRoutes = require("./routes/authRoutes");
+const feedbackRoutes = require('./routes/feedbackRoutes');
 const profileRoutes = require("./routes/profileRoutes");
 
 const app = express();
@@ -32,6 +33,7 @@ app.get("/", (req, res) => {
 app.use("/api/posts", postRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/profile", profileRoutes);
+app.use('/api/feedback', feedbackRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
