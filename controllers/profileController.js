@@ -8,7 +8,7 @@ const { queryDB } = require('../config/db');
 const { uploadAndConvertPostMedia, uploadProfilePicture } = require('../config/multerConfig');
 
 // Constants
-const BASE_URL = process.env.BASE_URL || 'https://pitch-backend-env.eba-ep4nstmn.ap-south-1.elasticbeanstalk.com';
+const BASE_URL = process.env.BASE_URL || 'http://pitch-backend-env.eba-ep4nstmn.ap-south-1.elasticbeanstalk.com';
 
 // Utility Functions
 const getUserId = async (req) => {
