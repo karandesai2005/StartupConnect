@@ -19,31 +19,40 @@ const validateTags = (tags) => {
   return JSON.stringify(tags);
 };
 
+const validateMediaType = (mediaType) => {
+  if (!mediaType) return null;
+  if (!['image', 'video'].includes(mediaType)) throw new Error('Invalid media type');
+  return mediaType;
+};
+
 const Post = {
-  create: async (content, media_url, user_id, tags = []) => {
+  create: async (content, media_url, media_type, user_id, tags = []) => {
     if (!media_url && (!content || content.trim() === '')) {
       throw new Error('Content or media is required');
     }
 
     const query = `
-      INSERT INTO public.posts (content, media_url, user_id, tags, created_at)
-      VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
-      RETURNING post_id, content, media_url, created_at, user_id, tags, 0 AS like_count;
+      INSERT INTO public.posts (content, media_url, media_type, user_id, tags, created_at)
+      VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
+      RETURNING post_id, content, media_url, media_type, created_at, user_id, tags, 0 AS like_count;
     `;
 
     try {
+      console.log('postModel.js: Creating post:', { content, media_url, media_type, user_id, tags });
       const result = await queryDB(query, [
         validateContent(content),
         media_url || null,
+        validateMediaType(media_type),
         validateId(user_id, 'User ID'),
-        validateTags(tags)
+        validateTags(tags),
       ]);
       const post = result[0];
       post.tags = JSON.parse(post.tags);
+      console.log('postModel.js: Post created:', post);
       return post;
     } catch (error) {
-      console.error('Create post error:', error.stack);
-      throw new Error(error.message.includes('must be') ? error.message : 'Unable to create post');
+      console.error('postModel.js: Create post error:', error.stack);
+      throw new Error(error.message.includes('must be') || error.message.includes('Invalid') ? error.message : 'Unable to create post');
     }
   },
 
@@ -53,6 +62,7 @@ const Post = {
         p.post_id,
         p.content,
         p.media_url,
+        p.media_type,
         p.created_at,
         p.user_id,
         p.tags,
@@ -68,13 +78,16 @@ const Post = {
     `;
 
     try {
+      console.log('postModel.js: Fetching all posts:', { limit, offset });
       const result = await queryDB(query, [offset, limit]);
-      return result.map(post => ({
+      const posts = result.map(post => ({
         ...post,
         tags: post.tags ? JSON.parse(post.tags) : [],
       }));
+      console.log('postModel.js: Fetched posts:', posts.length);
+      return posts;
     } catch (error) {
-      console.error('Get all posts error:', error.stack);
+      console.error('postModel.js: Get all posts error:', error.stack);
       throw new Error('Unable to fetch posts');
     }
   },
@@ -85,6 +98,7 @@ const Post = {
         p.post_id,
         p.content,
         p.media_url,
+        p.media_type,
         p.created_at,
         p.user_id,
         p.tags,
@@ -101,17 +115,20 @@ const Post = {
     `;
 
     try {
+      console.log('postModel.js: Fetching posts by user:', { userId, limit, offset });
       const result = await queryDB(query, [
         validateId(userId, 'User ID'),
         offset,
-        limit
+        limit,
       ]);
-      return result.map(post => ({
+      const posts = result.map(post => ({
         ...post,
         tags: post.tags ? JSON.parse(post.tags) : [],
       }));
+      console.log('postModel.js: Fetched user posts:', posts.length);
+      return posts;
     } catch (error) {
-      console.error('Get posts by user ID error:', error.stack);
+      console.error('postModel.js: Get posts by user ID error:', error.stack);
       throw new Error(error.message.includes('must be') ? error.message : 'Unable to fetch user posts');
     }
   },
@@ -121,6 +138,7 @@ const Post = {
     const userIdValidated = validateId(userId, 'User ID');
 
     try {
+      console.log('postModel.js: Deleting post:', { postId: postIdValidated, userId: userIdValidated });
       // Verify ownership
       const verifyResult = await queryDB(
         'SELECT COUNT(*) AS count FROM public.posts WHERE post_id = $1 AND user_id = $2',
@@ -135,9 +153,10 @@ const Post = {
       await queryDB('DELETE FROM public.comments WHERE post_id = $1', [postIdValidated]);
       await queryDB('DELETE FROM public.posts WHERE post_id = $1 AND user_id = $2', [postIdValidated, userIdValidated]);
 
+      console.log('postModel.js: Post deleted:', { postId: postIdValidated });
       return { deleted: true };
     } catch (error) {
-      console.error('Delete post error:', error.stack);
+      console.error('postModel.js: Delete post error:', error.stack);
       if (error.message.includes('not found') || error.message.includes('unauthorized')) {
         throw new Error('Post not found or unauthorized');
       }
@@ -151,6 +170,7 @@ const Post = {
         p.post_id,
         p.content,
         p.media_url,
+        p.media_type,
         p.created_at,
         p.user_id,
         p.tags,
@@ -167,6 +187,7 @@ const Post = {
     `;
 
     try {
+      console.log('postModel.js: Fetching posts by username:', { username, limit, offset });
       const result = await queryDB(query, [username, offset, limit]);
 
       if (result.length === 0) {
@@ -177,12 +198,14 @@ const Post = {
         if (userCheck.length === 0) throw new Error('User not found');
       }
 
-      return result.map(post => ({
+      const posts = result.map(post => ({
         ...post,
         tags: post.tags ? JSON.parse(post.tags) : [],
       }));
+      console.log('postModel.js: Fetched posts by username:', posts.length);
+      return posts;
     } catch (error) {
-      console.error('Get posts by username error:', error.stack);
+      console.error('postModel.js: Get posts by username error:', error.stack);
       if (error.message === 'User not found') throw new Error('User not found');
       throw new Error(error.message.includes('must be') ? error.message : 'Unable to fetch posts by username');
     }
@@ -192,27 +215,26 @@ const Post = {
     try {
       const postIdValidated = validateId(postId, 'Post ID');
       const userIdValidated = validateId(user_id, 'User ID');
-  
-      console.log('ToggleLike - Post ID:', postIdValidated);
-      console.log('ToggleLike - User ID:', userIdValidated);
-  
+
+      console.log('postModel.js: ToggleLike:', { postId: postIdValidated, userId: userIdValidated });
+
       // Check if post exists
       const postCheck = await queryDB(
         'SELECT 1 FROM public.posts WHERE post_id = $1',
         [postIdValidated]
       );
       if (postCheck.length === 0) throw new Error('Post not found');
-  
+
       // Check if like exists
       const likeCheck = await queryDB(
         'SELECT 1 FROM public.likes WHERE post_id = $1 AND user_id = $2',
         [postIdValidated, userIdValidated]
       );
-  
+
       let result;
       if (likeCheck.length > 0) {
         // Unlike
-        console.log('ToggleLike - Deleting like');
+        console.log('postModel.js: Deleting like');
         await queryDB(
           'DELETE FROM public.likes WHERE post_id = $1 AND user_id = $2',
           [postIdValidated, userIdValidated]
@@ -220,7 +242,7 @@ const Post = {
         result = { liked: false };
       } else {
         // Like
-        console.log('ToggleLike - Inserting like');
+        console.log('postModel.js: Inserting like');
         const insertQuery = `
           INSERT INTO public.likes (post_id, user_id)
           VALUES ($1, $2)
@@ -231,18 +253,18 @@ const Post = {
         const insertResult = await queryDB(insertQuery, [postIdValidated, userIdValidated]);
         result = { liked: insertResult.length > 0 };
       }
-  
+
       // Get like count
       const countResult = await queryDB(
         'SELECT COUNT(*) AS like_count FROM public.likes WHERE post_id = $1',
         [postIdValidated]
       );
       result.like_count = parseInt(countResult[0].like_count);
-  
-      console.log('ToggleLike - Result:', result);
+
+      console.log('postModel.js: ToggleLike result:', result);
       return result;
     } catch (error) {
-      console.error('Toggle like error:', error.stack);
+      console.error('postModel.js: Toggle like error:', error.stack);
       if (error.message.includes('Post not found')) throw new Error('Post not found');
       throw new Error('Unable to toggle like');
     }
@@ -259,15 +281,17 @@ const Post = {
     `;
 
     try {
+      console.log('postModel.js: Fetching like status:', { postId, userId });
       const result = await queryDB(query, [
         validateId(postId, 'Post ID'),
-        validateId(userId, 'User ID')
+        validateId(userId, 'User ID'),
       ]);
 
       if (result.length === 0) throw new Error('Post not found');
+      console.log('postModel.js: Like status:', result[0]);
       return result[0];
     } catch (error) {
-      console.error('Get like status error:', error.stack);
+      console.error('postModel.js: Get like status error:', error.stack);
       if (error.message.includes('Post not found')) throw new Error('Post not found');
       throw new Error(error.message.includes('must be') ? error.message : 'Unable to get like status');
     }
@@ -289,16 +313,16 @@ const Post = {
     `;
 
     try {
-      console.log('Executing getCommentsByPostId:', { query, params: [validateId(postId, 'Post ID'), offset, limit] });
+      console.log('postModel.js: Fetching comments:', { postId, limit, offset });
       const result = await queryDB(query, [
         validateId(postId, 'Post ID'),
         offset,
-        limit
+        limit,
       ]);
-      console.log('Comments fetched successfully:', result);
+      console.log('postModel.js: Comments fetched:', result.length);
       return result;
     } catch (error) {
-      console.error('Get comments error:', error.stack);
+      console.error('postModel.js: Get comments error:', error.stack);
       throw new Error(error.message.includes('must be') ? error.message : 'Unable to fetch comments');
     }
   },
@@ -311,16 +335,16 @@ const Post = {
     `;
 
     try {
-      console.log('Executing createComment:', { query, params: [validateId(postId, 'Post ID'), validateId(userId, 'User ID'), validateContent(content)] });
+      console.log('postModel.js: Creating comment:', { postId, userId, content });
       const result = await queryDB(query, [
         validateId(postId, 'Post ID'),
         validateId(userId, 'User ID'),
-        validateContent(content)
+        validateContent(content),
       ]);
-      console.log('Comment created successfully:', result[0]);
+      console.log('postModel.js: Comment created:', result[0]);
       return result[0];
     } catch (error) {
-      console.error('Create comment error:', error.stack);
+      console.error('postModel.js: Create comment error:', error.stack);
       throw new Error(error.message.includes('must be') ? error.message : 'Unable to create comment');
     }
   },
