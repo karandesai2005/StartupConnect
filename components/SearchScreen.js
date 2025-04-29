@@ -11,25 +11,14 @@ import {
   Platform,
   StatusBar,
   SafeAreaView,
+  Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NGROK_URL } from '@env';
 import { debounce } from 'lodash';
-
-// Utility function to normalize profile picture URL
-const normalizeProfilePictureUrl = (url) => {
-  if (!url || typeof url !== 'string') return null;
-  const domain = 'http://pitch-backend-env.eba-ep4nstmn.ap-south-1.elasticbeanstalk.com';
-  if (url.includes(`${domain}//uploads/http`)) {
-    const parts = url.split(`${domain}//uploads/`);
-    if (parts.length > 1) {
-      return `${domain}/uploads/${parts[1].replace(/^http:\/\/[^\/]+/, '')}`;
-    }
-  }
-  return url;
-};
+import { supabase } from '../services/supabase'; // Import Supabase client
 
 const SearchScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -43,9 +32,21 @@ const SearchScreen = () => {
         return;
       }
       try {
-        const token = await AsyncStorage.getItem('token');
+        let token = await AsyncStorage.getItem('token');
+        if (!token) {
+          console.log('No token, refreshing session');
+          const { data: { session }, error } = await supabase.auth.refreshSession();
+          if (error || !session) {
+            console.error('Session refresh failed:', error?.message);
+            navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+            return;
+          }
+          token = session.access_token;
+          await AsyncStorage.setItem('token', token);
+        }
+
         const baseUrl = NGROK_URL.replace(/\/+$/, '');
-        const response = await axios.get(`${baseUrl}/api/auth/search-users`, {
+        const response = await axios.get(`${baseUrl}/api/profile/search`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -56,6 +57,7 @@ const SearchScreen = () => {
       } catch (error) {
         console.error('Error searching users:', error);
         setSearchResults([]);
+        Alert.alert('Error', 'Failed to search users. Please try again.');
       }
     }, 300),
     []
@@ -73,7 +75,6 @@ const SearchScreen = () => {
   };
 
   const renderSearchResult = ({ item }) => {
-    const profilePictureUri = normalizeProfilePictureUrl(item.profile_picture);
     return (
       <TouchableOpacity
         style={styles.searchResultItem}
@@ -81,8 +82,8 @@ const SearchScreen = () => {
       >
         <Image
           source={
-            profilePictureUri
-              ? { uri: profilePictureUri }
+            item.profile_picture
+              ? { uri: item.profile_picture }
               : require('../assets/profiledefault.jpg')
           }
           style={styles.searchAvatar}
@@ -99,7 +100,7 @@ const SearchScreen = () => {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
       <View style={styles.topBar}>
-        <TouchableOpacity onPress={() => navigation.goBack('Home')} style={styles.backButton}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Text style={styles.backButtonText}>←</Text>
         </TouchableOpacity>
         <TextInput
@@ -160,7 +161,7 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     fontSize: 32,
-    color: "#000",
+    color: '#000',
   },
   searchResultsList: {
     flex: 1,
