@@ -14,7 +14,7 @@ import React, { useState } from 'react';
   import * as ImagePicker from 'expo-image-picker';
   import AsyncStorage from '@react-native-async-storage/async-storage';
   import { NGROK_URL } from '@env';
-  import { supabase } from '../services/supabase';
+  import { supabase } from '../../../services/supabase.js';
 
   const EditProfilePage = () => {
     const navigation = useNavigation();
@@ -143,7 +143,7 @@ import React, { useState } from 'react';
         <ScrollView style={styles.content}>
           <TouchableOpacity onPress={handleProfilePictureChange} style={styles.imageContainer}>
             <Image
-              source={updatedProfileImage ? { uri: updatedProfileImage } : require('../assets/profiledefault.jpg')}
+              source={updatedProfileImage ? { uri: updatedProfileImage } : require('../../../assets/profiledefault.jpg')}
               style={styles.profileImage}
             />
             <Text style={styles.changePhotoText}>Change Profile Photo</Text>

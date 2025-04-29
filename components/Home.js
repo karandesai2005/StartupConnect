@@ -78,6 +78,7 @@ const PostCard = memo(
     const [isMeasured, setIsMeasured] = useState(false);
     const [fullTextHeight, setFullTextHeight] = useState(0);
     const [lastTap, setLastTap] = useState(null);
+    const placeholderImage = 'https://via.placeholder.com/300';
 
     const isUserPost = item.hasOwnProperty('caption') || item.hasOwnProperty('content');
 
@@ -87,32 +88,39 @@ const PostCard = memo(
 
     useEffect(() => {
       const rawMediaUrl = item.image_url || item.media_url;
-      const mediaUrl = rawMediaUrl?.replace('https://', 'http://');
-      console.log(`Processing media for post ${item.post_id}:`, { rawMediaUrl, mediaUrl });
+      console.log(`PostCard: Processing media for post ${item.post_id || item.login?.uuid}:`, { rawMediaUrl, media_type: item.media_type });
 
-      if (typeof mediaUrl === 'string') {
-        if (mediaUrl.match(/\.(mp4|mov|avi|wmv|3gp|mkv)$/i)) {
-          setIsVideo(true);
-          setImageHeight((width * 5) / 4);
-          setIsLoading(false);
-        } else if (mediaUrl.startsWith('http')) {
-          Image.getSize(
-            mediaUrl,
-            (originalWidth, originalHeight) => {
-              const aspectRatio = originalWidth / originalHeight;
-              setImageHeight(width / aspectRatio);
-              setIsLoading(false);
-              console.log(`Image size for post ${item.post_id}:`, { width: originalWidth, height: originalHeight });
-            },
-            (error) => {
-              console.error(`Error getting image size for post ${item.post_id}:`, error);
-              setImageHeight(width);
-              setIsLoading(false);
-            }
-          );
-        } else {
-          setIsLoading(false);
-        }
+      if (!rawMediaUrl || typeof rawMediaUrl !== 'string') {
+        console.warn(`PostCard: Invalid media_url for post ${item.post_id || item.login?.uuid}`, { rawMediaUrl });
+        setImageHeight(width);
+        setIsLoading(false);
+        return;
+      }
+
+      const mediaUrl = rawMediaUrl.startsWith('http')
+        ? rawMediaUrl.replace('https://', 'http://')
+        : `${NGROK_URL.replace(/\/+$/, '')}${rawMediaUrl}`.replace('https://', 'http://');
+
+      const isVideoPost = item.media_type === 'video' || mediaUrl.match(/\.(mp4|mov|avi|wmv|3gp|mkv)$/i);
+      if (isVideoPost) {
+        setIsVideo(true);
+        setImageHeight((width * 5) / 4);
+        setIsLoading(false);
+      } else if (mediaUrl.startsWith('http')) {
+        Image.getSize(
+          mediaUrl,
+          (originalWidth, originalHeight) => {
+            const aspectRatio = originalWidth / originalHeight;
+            setImageHeight(width / aspectRatio);
+            setIsLoading(false);
+            console.log(`PostCard: Image size for post ${item.post_id || item.login?.uuid}:`, { width: originalWidth, height: originalHeight });
+          },
+          (error) => {
+            console.error(`PostCard: Error getting image size for post ${item.post_id || item.login?.uuid}:`, error);
+            setImageHeight(width);
+            setIsLoading(false);
+          }
+        );
       } else {
         setIsLoading(false);
       }
@@ -123,11 +131,11 @@ const PostCard = memo(
         if (isVisible) {
           videoRef.current
             .playAsync()
-            .catch((error) => console.error(`Play error for post ${item.post_id}:`, error));
+            .catch((error) => console.error(`PostCard: Play error for post ${item.post_id || item.login?.uuid}:`, error));
         } else {
           videoRef.current
             .pauseAsync()
-            .catch((error) => console.error(`Pause error for post ${item.post_id}:`, error));
+            .catch((error) => console.error(`PostCard: Pause error for post ${item.post_id || item.login?.uuid}:`, error));
         }
       }
     }, [isVisible, isVideo]);
@@ -151,6 +159,7 @@ const PostCard = memo(
     };
 
     const fetchLikeStatus = async () => {
+      if (!isUserPost) return; // Skip for mock users
       try {
         const token = await AsyncStorage.getItem('token');
         if (!token || !item.post_id) return;
@@ -163,11 +172,12 @@ const PostCard = memo(
           setLikeCount(response.data.likeCount);
         }
       } catch (error) {
-        console.error(`Error fetching like status for post ${item.post_id}:`, error);
+        console.error(`PostCard: Error fetching like status for post ${item.post_id}:`, error);
       }
     };
 
     const fetchComments = async () => {
+      if (!isUserPost) return; // Skip for mock users
       try {
         setIsCommentsLoading(true);
         const token = await AsyncStorage.getItem('token');
@@ -177,9 +187,9 @@ const PostCard = memo(
           headers: { Authorization: `Bearer ${token}` },
         });
         setComments(response.data || []);
-        console.log(`Fetched comments for post ${item.post_id}:`, response.data);
+        console.log(`PostCard: Fetched comments for post ${item.post_id}:`, response.data);
       } catch (error) {
-        console.error(`Error fetching comments for post ${item.post_id}:`, error);
+        console.error(`PostCard: Error fetching comments for post ${item.post_id}:`, error);
         setComments([]);
       } finally {
         setIsCommentsLoading(false);
@@ -188,6 +198,7 @@ const PostCard = memo(
 
     const handleLike = useCallback(
       async () => {
+        if (!isUserPost) return; // Skip for mock users
         try {
           const token = await AsyncStorage.getItem('token');
           if (!token || !item.post_id) return;
@@ -206,7 +217,7 @@ const PostCard = memo(
             await fetchAllPosts();
           }
         } catch (error) {
-          console.error(`Error updating like for post ${item.post_id}:`, error);
+          console.error(`PostCard: Error updating like for post ${item.post_id}:`, error);
           setIsLiked((prev) => !prev);
           setLikeCount((prev) => (isLiked ? prev + 1 : prev - 1));
         } finally {
@@ -247,7 +258,7 @@ const PostCard = memo(
     };
 
     const handleAddComment = async () => {
-      if (!newComment.trim()) return;
+      if (!isUserPost || !newComment.trim()) return;
       try {
         const token = await AsyncStorage.getItem('token');
         if (!token || !item.post_id) return;
@@ -262,7 +273,7 @@ const PostCard = memo(
           setNewComment('');
         }
       } catch (error) {
-        console.error(`Error adding comment for post ${item.post_id}:`, error);
+        console.error(`PostCard: Error adding comment for post ${item.post_id}:`, error);
       }
     };
 
@@ -275,7 +286,9 @@ const PostCard = memo(
       }
     };
 
-    const mediaUrl = (item.image_url || item.media_url)?.replace('https://', 'http://');
+    const mediaUrl = typeof (item.image_url || item.media_url) === 'string'
+      ? (item.image_url || item.media_url).replace('https://', 'http://')
+      : placeholderImage;
 
     return (
       <Animated.View style={[styles.card, { transform: [{ scale: animatedScale }] }]}>
@@ -290,7 +303,7 @@ const PostCard = memo(
                       : require('../assets/profiledefault.jpg')
                   }
                   style={styles.avatar}
-                  onError={(e) => console.error(`Profile picture error for post ${item.post_id}:`, e.nativeEvent.error)}
+                  onError={(e) => console.error(`PostCard: Profile picture error for post ${item.post_id || item.login?.uuid}:`, e.nativeEvent.error)}
                 />
               </TouchableOpacity>
               <View>
@@ -326,26 +339,22 @@ const PostCard = memo(
                 isLooping={true}
                 onLoad={() => setIsLoading(false)}
                 onError={(error) => {
-                  console.error(`Video loading error for post ${item.post_id}:`, error);
+                  console.error(`PostCard: Video loading error for post ${item.post_id || item.login?.uuid}:`, error);
                   setIsLoading(false);
                   setIsVideo(false);
                 }}
               />
             ) : (
               <Image
-                source={
-                  mediaUrl && mediaUrl.startsWith('http')
-                    ? { uri: mediaUrl }
-                    : require('../assets/PITCH.png')
-                }
+                source={{ uri: mediaUrl }}
                 style={[styles.postImage, { height: imageHeight }]}
                 resizeMode="cover"
                 onLoad={() => {
                   setIsLoading(false);
-                  console.log(`Image loaded for post ${item.post_id}`);
+                  console.log(`PostCard: Image loaded for post ${item.post_id || item.login?.uuid}`);
                 }}
                 onError={(e) => {
-                  console.error(`Image loading error for post ${item.post_id}:`, e.nativeEvent.error);
+                  console.error(`PostCard: Image loading error for post ${item.post_id || item.login?.uuid}:`, e.nativeEvent.error);
                   setIsLoading(false);
                 }}
               />
@@ -373,7 +382,7 @@ const PostCard = memo(
                 isLikeLoading && { opacity: 0.5 },
               ]}
             />
-          </TouchableOpacity>
+           </TouchableOpacity>
           <TouchableOpacity style={styles.actionButton} onPress={toggleCommentModal}>
             <Image source={require('../assets/comment6.png')} style={styles.navIcon} />
           </TouchableOpacity>
@@ -516,10 +525,23 @@ export default function Home() {
     const validPosts = myPosts.filter(
       (post) =>
         post &&
+        post.post_id &&
         (post.image_url || post.media_url) &&
-        !String(post.image_url || post.media_url).includes("undefined")
+        typeof (post.image_url || post.media_url) === 'string' &&
+        !String(post.image_url || post.media_url).includes("undefined") &&
+        !String(post.image_url || post.media_url).includes("null")
     );
-    return [...validPosts, ...users];
+    const validUsers = users.filter(
+      (user) =>
+        user &&
+        user.login?.uuid &&
+        user.image_url &&
+        typeof user.image_url === 'string' &&
+        !String(user.image_url).includes("undefined") &&
+        !String(user.image_url).includes("null")
+    );
+    console.log('Home.js: Combined data:', { posts: validPosts.length, users: validUsers.length });
+    return [...validPosts, ...validUsers];
   }, [myPosts, users]);
 
   const generateMockTimestamp = () => {
@@ -548,7 +570,7 @@ export default function Home() {
                 user = userResponse.data;
                 userCache.set(post.userId, user);
               } catch (userError) {
-                console.error(`Error fetching user ${post.userId}:`, userError);
+                console.error(`Home.js: Error fetching user ${post.userId}:`, userError);
                 user = { name: `User${post.userId}` };
               }
             }
@@ -559,12 +581,13 @@ export default function Home() {
                 first: nameParts[0],
                 last: nameParts.slice(1).join(" ") || "",
               },
-              profile_picture: require("../assets/profiledefault.jpg"),
+              profile_picture: 'https://via.placeholder.com/40',
               email: user.email || `user${post.userId}@example.com`,
               registered: { date: generateMockTimestamp() },
               content: post.body,
               caption: post.title,
-              image_url: require("../assets/PITCH.png"),
+              image_url: 'https://via.placeholder.com/300',
+              media_type: 'image', // Explicitly set for mock data
               likes: Math.floor(Math.random() * 100),
               comment_count: Math.floor(Math.random() * 20),
             };
@@ -576,7 +599,7 @@ export default function Home() {
           setUsers((prev) => [...prev, ...mappedUsers]);
         }
       } catch (error) {
-        console.error("Error loading users:", error);
+        console.error("Home.js: Error loading users:", error);
         Alert.alert("Error", "Failed to load posts. Please try again.");
       } finally {
         setLoading(false);
@@ -590,37 +613,42 @@ export default function Home() {
     try {
       setPostsError(null);
       const baseUrl = NGROK_URL.replace(/\/+$/, "");
-      console.log('Fetching posts from:', `${baseUrl}/api/posts/all`);
+      console.log('Home.js: Fetching posts from:', `${baseUrl}/api/posts/all`);
       const response = await axios.get(`${baseUrl}/api/posts/all`, {
         timeout: 10000,
+        headers: { Authorization: `Bearer ${await AsyncStorage.getItem('token')}` },
       });
-      console.log("Posts API response:", response.data);
+      console.log("Home.js: Posts API response:", response.data);
       if (response.data && Array.isArray(response.data)) {
-        const mappedPosts = response.data.map((post) => ({
-          _id: post.post_id,
-          post_id: post.post_id,
-          username: post.username,
-          profile_picture: post.profile_picture,
-          image_url: post.media_url,
-          content: post.content,
-          created_at: post.created_at,
-          likes: post.like_count || 0,
-          comments: post.comment_count || 0,
-          caption: post.content,
-        }));
+        const mappedPosts = response.data
+          .filter((post) => post && post.post_id && (post.media_url ? typeof post.media_url === 'string' : true))
+          .map((post) => ({
+            _id: post.post_id,
+            post_id: post.post_id,
+            username: post.users?.username || post.username,
+            profile_picture: post.users?.profile_picture || post.profile_picture,
+            image_url: post.media_url || null,
+            media_type: post.media_type || (post.media_url?.match(/\.(mp4|mov|avi|wmv|3gp|mkv)$/i) ? 'video' : post.media_url?.match(/\.(jpg|jpeg|png|gif)$/i) ? 'image' : null),
+            content: post.content || '',
+            created_at: post.created_at,
+            likes: post.like_count || post.likes || 0,
+            comment_count: post.comment_count || 0,
+            caption: post.content || '',
+          }));
         const sortedPosts = mappedPosts
           .filter(
-            (post) => post.image_url && !post.image_url.includes("undefined")
+            (post) => post.image_url && !post.image_url.includes("undefined") && !post.image_url.includes("null")
           )
           .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        console.log('Home.js: Mapped posts:', sortedPosts.length);
         setMyPosts(sortedPosts);
       } else {
-        console.warn("Invalid posts data:", response.data);
+        console.warn("Home.js: Invalid posts data:", response.data);
         setPostsError("Invalid data from server");
       }
     } catch (error) {
       console.error(
-        "Error fetching posts:",
+        "Home.js: Error fetching posts:",
         error.response?.data || error.message
       );
       setPostsError(error.response?.data?.message || error.message);
@@ -631,20 +659,20 @@ export default function Home() {
     try {
       const token = await AsyncStorage.getItem("token");
       if (!token) {
-        console.log("No token, refreshing session for user data");
+        console.log("Home.js: No token, refreshing session for user data");
         const {
           data: { session },
           error,
         } = await supabase.auth.refreshSession();
         if (error || !session) {
-          console.error("Session refresh failed:", error?.message);
+          console.error("Home.js: Session refresh failed:", error?.message);
           navigation.reset({ index: 0, routes: [{ name: "Register1" }] });
           return;
         }
         await AsyncStorage.setItem("token", session.access_token);
       }
       const baseUrl = NGROK_URL.replace(/\/+$/, "");
-      console.log('Fetching user data from:', `${baseUrl}/api/profile`);
+      console.log('Home.js: Fetching user data from:', `${baseUrl}/api/profile`);
       const response = await fetch(`${baseUrl}/api/profile`, {
         method: "GET",
         headers: {
@@ -654,15 +682,15 @@ export default function Home() {
       });
       if (response.ok) {
         const data = await response.json();
-        console.log("User data fetched:", data);
+        console.log("Home.js: User data fetched:", data);
         setUserData(data);
         await AsyncStorage.setItem("userData", JSON.stringify(data));
       } else {
-        console.error("Profile fetch failed:", await response.text());
+        console.error("Home.js: Profile fetch failed:", await response.text());
         Alert.alert("Error", "Failed to load profile. Please try again.");
       }
     } catch (error) {
-      console.error("Error fetching user data:", error);
+      console.error("Home.js: Error fetching user data:", error);
       Alert.alert("Error", "Failed to load user data. Please try again.");
     }
   }, [navigation]);
@@ -674,13 +702,13 @@ export default function Home() {
           setLoading(true);
           let token = await AsyncStorage.getItem("token");
           if (!token) {
-            console.log("No token, refreshing session");
+            console.log("Home.js: No token, refreshing session");
             const {
               data: { session },
               error,
             } = await supabase.auth.refreshSession();
             if (error || !session) {
-              console.error("Session refresh failed:", error?.message);
+              console.error("Home.js: Session refresh failed:", error?.message);
               navigation.reset({ index: 0, routes: [{ name: "Register1" }] });
               return;
             }
@@ -693,7 +721,7 @@ export default function Home() {
             loadUsers(true),
           ]);
         } catch (error) {
-          console.error("Error during auth check or data fetch:", error);
+          console.error("Home.js: Error during auth check or data fetch:", error);
           setPostsError(error.message);
         } finally {
           setLoading(false);
@@ -762,7 +790,7 @@ export default function Home() {
 
   const handleProfilePress = () => {
     if (!userData) {
-      console.log("User data not loaded yet");
+      console.log("Home.js: User data not loaded yet");
       return;
     }
     const isBusinessUser = userData.is_business;
@@ -782,7 +810,7 @@ export default function Home() {
           <Image
             source={
               userData?.profile_picture
-                ? { uri: userData.profile_picture }
+                ? { uri: userData.profile_picture.replace('https://', 'http://') }
                 : require("../assets/profiledefault.jpg")
             }
             style={styles.profilePic}
@@ -852,6 +880,7 @@ export default function Home() {
           contentContainerStyle={styles.listContentContainer}
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
+          ListEmptyComponent={<Text style={styles.noPostsText}>No posts available</Text>}
         />
       </KeyboardAvoidingView>
       <Modal
@@ -895,6 +924,7 @@ export default function Home() {
     </SafeAreaView>
   );
 }
+
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
@@ -1247,5 +1277,11 @@ const styles = StyleSheet.create({
   errorText: {
     color: "#D32F2F",
     fontSize: 16,
+  },
+  noPostsText: {
+    fontSize: 16,
+    color: "#868E96",
+    textAlign: "center",
+    padding: 20,
   },
 });
