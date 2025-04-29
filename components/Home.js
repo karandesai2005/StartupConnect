@@ -78,13 +78,12 @@ const PostCard = memo(
     const [isMeasured, setIsMeasured] = useState(false);
     const [fullTextHeight, setFullTextHeight] = useState(0);
     const [lastTap, setLastTap] = useState(null);
-    const placeholderImage = 'https://via.placeholder.com/300';
 
     const isUserPost = item.hasOwnProperty('caption') || item.hasOwnProperty('content');
 
     useEffect(() => {
-      fetchLikeStatus();
-    }, [item.post_id]);
+      if (isUserPost) fetchLikeStatus();
+    }, [item.post_id, isUserPost]);
 
     useEffect(() => {
       const rawMediaUrl = item.image_url || item.media_url;
@@ -97,16 +96,14 @@ const PostCard = memo(
         return;
       }
 
-      const mediaUrl = rawMediaUrl.startsWith('http')
-        ? rawMediaUrl.replace('https://', 'http://')
-        : `${NGROK_URL.replace(/\/+$/, '')}${rawMediaUrl}`.replace('https://', 'http://');
+      const mediaUrl = rawMediaUrl.startsWith('http') ? rawMediaUrl : `${NGROK_URL}${rawMediaUrl}`;
 
       const isVideoPost = item.media_type === 'video' || mediaUrl.match(/\.(mp4|mov|avi|wmv|3gp|mkv)$/i);
       if (isVideoPost) {
         setIsVideo(true);
         setImageHeight((width * 5) / 4);
         setIsLoading(false);
-      } else if (mediaUrl.startsWith('http')) {
+      } else {
         Image.getSize(
           mediaUrl,
           (originalWidth, originalHeight) => {
@@ -121,8 +118,6 @@ const PostCard = memo(
             setIsLoading(false);
           }
         );
-      } else {
-        setIsLoading(false);
       }
     }, [item]);
 
@@ -159,7 +154,6 @@ const PostCard = memo(
     };
 
     const fetchLikeStatus = async () => {
-      if (!isUserPost) return; // Skip for mock users
       try {
         const token = await AsyncStorage.getItem('token');
         if (!token || !item.post_id) return;
@@ -177,7 +171,6 @@ const PostCard = memo(
     };
 
     const fetchComments = async () => {
-      if (!isUserPost) return; // Skip for mock users
       try {
         setIsCommentsLoading(true);
         const token = await AsyncStorage.getItem('token');
@@ -198,7 +191,7 @@ const PostCard = memo(
 
     const handleLike = useCallback(
       async () => {
-        if (!isUserPost) return; // Skip for mock users
+        if (!isUserPost) return;
         try {
           const token = await AsyncStorage.getItem('token');
           if (!token || !item.post_id) return;
@@ -286,9 +279,11 @@ const PostCard = memo(
       }
     };
 
-    const mediaUrl = typeof (item.image_url || item.media_url) === 'string'
-      ? (item.image_url || item.media_url).replace('https://', 'http://')
-      : placeholderImage;
+    const mediaSource = typeof (item.image_url || item.media_url) === 'string' &&
+      !(item.image_url || item.media_url).includes('undefined') &&
+      !(item.image_url || item.media_url).includes('null')
+      ? { uri: (item.image_url || item.media_url).startsWith('http') ? (item.image_url || item.media_url) : `${NGROK_URL}${item.image_url || item.media_url}` }
+      : require('../assets/PITCH.png');
 
     return (
       <Animated.View style={[styles.card, { transform: [{ scale: animatedScale }] }]}>
@@ -299,7 +294,7 @@ const PostCard = memo(
                 <Image
                   source={
                     typeof item.profile_picture === 'string' && item.profile_picture.startsWith('http')
-                      ? { uri: item.profile_picture.replace('https://', 'http://') }
+                      ? { uri: item.profile_picture }
                       : require('../assets/profiledefault.jpg')
                   }
                   style={styles.avatar}
@@ -333,11 +328,14 @@ const PostCard = memo(
             {isVideo ? (
               <Video
                 ref={videoRef}
-                source={{ uri: mediaUrl }}
+                source={typeof mediaSource === 'string' ? { uri: mediaSource } : mediaSource}
                 style={[styles.video, { height: imageHeight }]}
                 resizeMode="cover"
                 isLooping={true}
-                onLoad={() => setIsLoading(false)}
+                onLoad={() => {
+                  setIsLoading(false);
+                  console.log(`PostCard: Video loaded for post ${item.post_id || item.login?.uuid}`);
+                }}
                 onError={(error) => {
                   console.error(`PostCard: Video loading error for post ${item.post_id || item.login?.uuid}:`, error);
                   setIsLoading(false);
@@ -346,7 +344,7 @@ const PostCard = memo(
               />
             ) : (
               <Image
-                source={{ uri: mediaUrl }}
+                source={mediaSource}
                 style={[styles.postImage, { height: imageHeight }]}
                 resizeMode="cover"
                 onLoad={() => {
@@ -382,7 +380,7 @@ const PostCard = memo(
                 isLikeLoading && { opacity: 0.5 },
               ]}
             />
-           </TouchableOpacity>
+          </TouchableOpacity>
           <TouchableOpacity style={styles.actionButton} onPress={toggleCommentModal}>
             <Image source={require('../assets/comment6.png')} style={styles.navIcon} />
           </TouchableOpacity>
@@ -581,13 +579,13 @@ export default function Home() {
                 first: nameParts[0],
                 last: nameParts.slice(1).join(" ") || "",
               },
-              profile_picture: 'https://via.placeholder.com/40',
+              profile_picture: require('../assets/profiledefault.jpg'),
               email: user.email || `user${post.userId}@example.com`,
               registered: { date: generateMockTimestamp() },
               content: post.body,
               caption: post.title,
-              image_url: 'https://via.placeholder.com/300',
-              media_type: 'image', // Explicitly set for mock data
+              image_url: require('../assets/PITCH.png'),
+              media_type: 'image',
               likes: Math.floor(Math.random() * 100),
               comment_count: Math.floor(Math.random() * 20),
             };
@@ -809,8 +807,8 @@ export default function Home() {
         <TouchableOpacity onPress={handleProfilePress}>
           <Image
             source={
-              userData?.profile_picture
-                ? { uri: userData.profile_picture.replace('https://', 'http://') }
+              userData?.profile_picture && typeof userData.profile_picture === 'string'
+                ? { uri: userData.profile_picture }
                 : require("../assets/profiledefault.jpg")
             }
             style={styles.profilePic}
