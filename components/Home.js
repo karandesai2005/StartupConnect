@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, memo, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, memo, useMemo } from "react";
 import {
   View,
   Text,
@@ -18,23 +18,23 @@ import {
   KeyboardAvoidingView,
   StatusBar,
   Alert,
-} from 'react-native';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { NGROK_URL } from '@env';
-import { Video } from 'expo-av';
-import { debounce } from 'lodash';
-import Modal from 'react-native-modal';
-import { supabase } from '../services/supabase';
-const { width } = Dimensions.get('window');
+} from "react-native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import axios from "axios";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { NGROK_URL } from "@env";
+import { Video } from "expo-av";
+import { debounce } from "lodash";
+import Modal from "react-native-modal";
+import { supabase } from "../services/supabase";
+const { width } = Dimensions.get("window");
 
 const formatTimestamp = (timestamp) => {
-  if (!timestamp) return 'Just now';
+  if (!timestamp) return "Just now";
   const now = new Date();
   const postDate = new Date(timestamp);
   const diffInMinutes = Math.floor((now - postDate) / (1000 * 60));
-  if (diffInMinutes < 1) return 'Just now';
+  if (diffInMinutes < 1) return "Just now";
   if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
   const diffInHours = Math.floor(diffInMinutes / 60);
   if (diffInHours < 24) return `${diffInHours}h ago`;
@@ -45,402 +45,502 @@ const formatTimestamp = (timestamp) => {
 
 const handleChatPress = () => {
   Alert.alert(
-    'Feature Unavailable',
-    'Sorry, this feature is not available currently.',
-    [{ text: 'OK' }]
+    "Feature Unavailable",
+    "Sorry, this feature is not available currently.",
+    [{ text: "OK" }]
   );
 };
 
 // Memoized Post Card Component
-const PostCard = memo(({ item, index, toggleExpand, expandedItems, isVisible, navigation, fetchAllPosts }) => {
-  const [imageHeight, setImageHeight] = useState(width);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isLiked, setIsLiked] = useState(false);
-  const [likeCount, setLikeCount] = useState(item.likes || 0);
-  const [comments, setComments] = useState([]);
-  const [newComment, setNewComment] = useState('');
-  const [isCommentModalVisible, setIsCommentModalVisible] = useState(false);
-  const [isCommentsLoading, setIsCommentsLoading] = useState(false);
-  const animatedScale = new Animated.Value(1);
-  const [isVideo, setIsVideo] = useState(false);
-  const videoRef = React.useRef(null);
-  const [isLikeLoading, setIsLikeLoading] = useState(false);
-  const debouncedHandleLike = useCallback(debounce(async () => handleLike(), 300), [handleLike]);
-  const isUserPost = item.hasOwnProperty('caption') || item.hasOwnProperty('content');
-  const [shouldShowMore, setShouldShowMore] = useState(false);
-  const [isMeasured, setIsMeasured] = useState(false);
-  const [fullTextHeight, setFullTextHeight] = useState(0);
-  const [lastTap, setLastTap] = useState(null);
+const PostCard = memo(
+  ({
+    item,
+    index,
+    toggleExpand,
+    expandedItems,
+    isVisible,
+    navigation,
+    fetchAllPosts,
+  }) => {
+    const [imageHeight, setImageHeight] = useState(width);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isLiked, setIsLiked] = useState(false);
+    const [likeCount, setLikeCount] = useState(item.likes || 0);
+    const [comments, setComments] = useState([]);
+    const [newComment, setNewComment] = useState("");
+    const [isCommentModalVisible, setIsCommentModalVisible] = useState(false);
+    const [isCommentsLoading, setIsCommentsLoading] = useState(false);
+    const animatedScale = new Animated.Value(1);
+    const [isVideo, setIsVideo] = useState(false);
+    const videoRef = React.useRef(null);
+    const [isLikeLoading, setIsLikeLoading] = useState(false);
+    const debouncedHandleLike = useCallback(
+      debounce(async () => handleLike(), 300),
+      [handleLike]
+    );
+    const isUserPost =
+      item.hasOwnProperty("caption") || item.hasOwnProperty("content");
+    const [shouldShowMore, setShouldShowMore] = useState(false);
+    const [isMeasured, setIsMeasured] = useState(false);
+    const [fullTextHeight, setFullTextHeight] = useState(0);
+    const [lastTap, setLastTap] = useState(null);
 
-  useEffect(() => {
-    fetchLikeStatus();
-  }, [item.post_id]);
+    useEffect(() => {
+      fetchLikeStatus();
+    }, [item.post_id]);
 
-  useEffect(() => {
-    const mediaUrl = item.image_url || item.media_url;
-    if (typeof mediaUrl === 'string') {
-      if (mediaUrl.match(/\.(mp4|mov|avi|wmv|3gp|mkv)$/i)) {
-        setIsVideo(true);
-        setImageHeight(width * 5 / 4);
+    useEffect(() => {
+      const mediaUrl = item.image_url || item.media_url;
+      if (typeof mediaUrl === "string") {
+        if (mediaUrl.match(/\.(mp4|mov|avi|wmv|3gp|mkv)$/i)) {
+          setIsVideo(true);
+          setImageHeight((width * 5) / 4);
+          setIsLoading(false);
+        } else if (mediaUrl.startsWith("http")) {
+          Image.getSize(
+            mediaUrl,
+            (originalWidth, originalHeight) => {
+              const aspectRatio = originalWidth / originalHeight;
+              setImageHeight(width / aspectRatio);
+              setIsLoading(false);
+            },
+            (error) => {
+              console.log("Error getting image size:", error);
+              setImageHeight(width);
+              setIsLoading(false);
+            }
+          );
+        } else {
+          setIsLoading(false);
+        }
+      } else {
         setIsLoading(false);
-      } else if (mediaUrl.startsWith('http')) {
-        Image.getSize(
-          mediaUrl,
-          (originalWidth, originalHeight) => {
-            const aspectRatio = originalWidth / originalHeight;
-            setImageHeight(width / aspectRatio);
-            setIsLoading(false);
-          },
-          (error) => {
-            console.log('Error getting image size:', error);
-            setImageHeight(width);
-            setIsLoading(false);
+      }
+    }, [item]);
+
+    useEffect(() => {
+      if (isVideo && videoRef.current) {
+        if (isVisible) {
+          videoRef.current
+            .playAsync()
+            .catch((error) => console.error("Play error:", error));
+        } else {
+          videoRef.current
+            .pauseAsync()
+            .catch((error) => console.error("Pause error:", error));
+        }
+      }
+    }, [isVisible, isVideo]);
+
+    useEffect(() => {
+      if (isCommentModalVisible) {
+        const backHandler = BackHandler.addEventListener(
+          "hardwareBackPress",
+          () => {
+            console.log("Hardware back press detected, closing modal");
+            setIsCommentModalVisible(false);
+            return true;
           }
         );
+        return () => backHandler.remove();
+      }
+    }, [isCommentModalVisible]);
+
+    const handlePressIn = () => {
+      Animated.spring(animatedScale, {
+        toValue: 0.98,
+        useNativeDriver: true,
+      }).start();
+    };
+
+    const handlePressOut = () => {
+      Animated.spring(animatedScale, {
+        toValue: 1,
+        useNativeDriver: true,
+      }).start();
+    };
+
+    const fetchLikeStatus = async () => {
+      try {
+        const token = await AsyncStorage.getItem("token");
+        if (!token || !item.post_id) return;
+        const baseUrl = NGROK_URL.replace(/\/+$/, "");
+        const response = await axios.get(
+          `${baseUrl}/api/posts/${item.post_id}/likes`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        if (response.data) {
+          setIsLiked(response.data.isLiked === 1);
+          setLikeCount(response.data.likeCount);
+        }
+      } catch (error) {
+        console.error("Error fetching like status:", error);
+      }
+    };
+
+    const fetchComments = async () => {
+      try {
+        setIsCommentsLoading(true);
+        const token = await AsyncStorage.getItem("token");
+        if (!token || !item.post_id) return;
+        const baseUrl = NGROK_URL.replace(/\/+$/, "");
+        const response = await axios.get(
+          `${baseUrl}/api/posts/${item.post_id}/comments`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        if (response.data) {
+          setComments(response.data || []);
+          console.log(
+            `Fetched comments for post ${item.post_id}:`,
+            response.data
+          );
+        } else {
+          console.warn("No data returned from comments API");
+        }
+      } catch (error) {
+        console.error("Error fetching comments:", error);
+        setComments([]);
+      } finally {
+        setIsCommentsLoading(false);
+      }
+    };
+
+    const handleLike = async () => {
+      try {
+        const token = await AsyncStorage.getItem("token");
+        if (!token || !item.post_id) return;
+        setIsLikeLoading(true);
+        setIsLiked((prev) => !prev);
+        setLikeCount((prev) => (isLiked ? prev - 1 : prev + 1));
+        const baseUrl = NGROK_URL.replace(/\/+$/, "");
+        const response = await axios.post(
+          `${baseUrl}/api/posts/${item.post_id}/toggle-like`,
+          {},
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (response.data && response.data.success) {
+          setIsLiked(response.data.liked);
+          setLikeCount(response.data.like_count);
+          await fetchAllPosts();
+        }
+      } catch (error) {
+        console.error("Error updating like:", error);
+        setIsLiked((prev) => !prev);
+        setLikeCount((prev) => (isLiked ? prev + 1 : prev - 1));
+      } finally {
+        setIsLikeLoading(false);
+      }
+    };
+
+    const handleDoubleTap = () => {
+      const now = Date.now();
+      const DOUBLE_PRESS_DELAY = 300;
+      if (lastTap && now - lastTap < DOUBLE_PRESS_DELAY) {
+        if (!isLiked && !isLikeLoading) {
+          handleLike();
+        }
       } else {
-        setIsLoading(false);
+        setLastTap(now);
       }
-    } else {
-      setIsLoading(false);
-    }
-  }, [item]);
+    };
 
-  useEffect(() => {
-    if (isVideo && videoRef.current) {
-      if (isVisible) {
-        videoRef.current.playAsync().catch((error) => console.error('Play error:', error));
-      } else {
-        videoRef.current.pauseAsync().catch((error) => console.error('Pause error:', error));
+    const handleProfilePress = () => {
+      const username = isUserPost
+        ? item.username
+        : item.name
+        ? `${item.name.first} ${item.name.last || ""}`
+        : "User";
+      navigation.navigate("Profile", { username, isOtherUser: true });
+    };
+
+    const toggleCommentModal = () => {
+      if (!isCommentModalVisible) {
+        fetchComments();
       }
-    }
-  }, [isVisible, isVideo]);
+      setIsCommentModalVisible(!isCommentModalVisible);
+    };
 
-  useEffect(() => {
-    if (isCommentModalVisible) {
-      const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
-        console.log('Hardware back press detected, closing modal');
-        setIsCommentModalVisible(false);
-        return true;
-      });
-      return () => backHandler.remove();
-    }
-  }, [isCommentModalVisible]);
-
-  const handlePressIn = () => {
-    Animated.spring(animatedScale, { toValue: 0.98, useNativeDriver: true }).start();
-  };
-
-  const handlePressOut = () => {
-    Animated.spring(animatedScale, { toValue: 1, useNativeDriver: true }).start();
-  };
-
-  const fetchLikeStatus = async () => {
-    try {
-      const token = await AsyncStorage.getItem('token');
-      if (!token || !item.post_id) return;
-      const baseUrl = NGROK_URL.replace(/\/+$/, '');
-      const response = await axios.get(`${baseUrl}/api/posts/${item.post_id}/likes`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (response.data) {
-        setIsLiked(response.data.isLiked === 1);
-        setLikeCount(response.data.likeCount);
+    const handleAddComment = async () => {
+      if (!newComment.trim()) return;
+      try {
+        const token = await AsyncStorage.getItem("token");
+        if (!token || !item.post_id) return;
+        const baseUrl = NGROK_URL.replace(/\/+$/, "");
+        const response = await axios.post(
+          `${baseUrl}/api/posts/${item.post_id}/comments`,
+          { content: newComment },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (response.data) {
+          await fetchComments();
+          setNewComment("");
+        }
+      } catch (error) {
+        console.error("Error adding comment:", error);
       }
-    } catch (error) {
-      console.error('Error fetching like status:', error);
-    }
-  };
+    };
 
-  const fetchComments = async () => {
-    try {
-      setIsCommentsLoading(true);
-      const token = await AsyncStorage.getItem('token');
-      if (!token || !item.post_id) return;
-      const baseUrl = NGROK_URL.replace(/\/+$/, '');
-      const response = await axios.get(`${baseUrl}/api/posts/${item.post_id}/comments`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (response.data) {
-        setComments(response.data || []);
-        console.log(`Fetched comments for post ${item.post_id}:`, response.data);
-      } else {
-        console.warn('No data returned from comments API');
+    const handleTextLayout = (event) => {
+      if (!isMeasured) {
+        const { height } = event.nativeEvent.layout;
+        setFullTextHeight(height);
+        setShouldShowMore(height > 40 && (item.content || item.caption));
+        setIsMeasured(true);
       }
-    } catch (error) {
-      console.error('Error fetching comments:', error);
-      setComments([]);
-    } finally {
-      setIsCommentsLoading(false);
-    }
-  };
+    };
 
-  const handleLike = async () => {
-    try {
-      const token = await AsyncStorage.getItem('token');
-      if (!token || !item.post_id) return;
-      setIsLikeLoading(true);
-      setIsLiked((prev) => !prev);
-      setLikeCount((prev) => (isLiked ? prev - 1 : prev + 1));
-      const baseUrl = NGROK_URL.replace(/\/+$/, '');
-      const response = await axios.post(
-        `${baseUrl}/api/posts/${item.post_id}/toggle-like`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      if (response.data && response.data.success) {
-        setIsLiked(response.data.liked);
-        setLikeCount(response.data.like_count);
-        await fetchAllPosts();
-      }
-    } catch (error) {
-      console.error('Error updating like:', error);
-      setIsLiked((prev) => !prev);
-      setLikeCount((prev) => (isLiked ? prev + 1 : prev - 1));
-    } finally {
-      setIsLikeLoading(false);
-    }
-  };
-
-  const handleDoubleTap = () => {
-    const now = Date.now();
-    const DOUBLE_PRESS_DELAY = 300;
-    if (lastTap && (now - lastTap) < DOUBLE_PRESS_DELAY) {
-      if (!isLiked && !isLikeLoading) {
-        handleLike();
-      }
-    } else {
-      setLastTap(now);
-    }
-  };
-
-  const handleProfilePress = () => {
-    const username = isUserPost
-      ? item.username
-      : item.name
-        ? `${item.name.first} ${item.name.last || ''}`
-        : 'User';
-    navigation.navigate('Profile', { username, isOtherUser: true });
-  };
-
-  const toggleCommentModal = () => {
-    if (!isCommentModalVisible) {
-      fetchComments();
-    }
-    setIsCommentModalVisible(!isCommentModalVisible);
-  };
-
-  const handleAddComment = async () => {
-    if (!newComment.trim()) return;
-    try {
-      const token = await AsyncStorage.getItem('token');
-      if (!token || !item.post_id) return;
-      const baseUrl = NGROK_URL.replace(/\/+$/, '');
-      const response = await axios.post(
-        `${baseUrl}/api/posts/${item.post_id}/comments`,
-        { content: newComment },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      if (response.data) {
-        await fetchComments();
-        setNewComment('');
-      }
-    } catch (error) {
-      console.error('Error adding comment:', error);
-    }
-  };
-
-  const handleTextLayout = (event) => {
-    if (!isMeasured) {
-      const { height } = event.nativeEvent.layout;
-      setFullTextHeight(height);
-      setShouldShowMore(height > 40 && (item.content || item.caption));
-      setIsMeasured(true);
-    }
-  };
-
-  return (
-    <Animated.View style={[styles.card, { transform: [{ scale: animatedScale }] }]}>
-      <TouchableOpacity onPress={handleProfilePress} activeOpacity={0.7}>
-        <View style={styles.cardHeader}>
-          <View style={styles.userInfo}>
-            <TouchableOpacity onPress={handleProfilePress}>
+    return (
+      <Animated.View
+        style={[styles.card, { transform: [{ scale: animatedScale }] }]}
+      >
+        <TouchableOpacity onPress={handleProfilePress} activeOpacity={0.7}>
+          <View style={styles.cardHeader}>
+            <View style={styles.userInfo}>
+              <TouchableOpacity onPress={handleProfilePress}>
+                <Image
+                  source={
+                    typeof item.profile_picture === "string" &&
+                    item.profile_picture.startsWith("http")
+                      ? { uri: item.profile_picture }
+                      : require("../assets/profiledefault.jpg")
+                  }
+                  style={styles.avatar}
+                />
+              </TouchableOpacity>
+              <View>
+                <Text style={styles.name}>
+                  {isUserPost
+                    ? item.username
+                    : item.name
+                    ? item.name.first
+                    : "User"}
+                </Text>
+                <Text style={styles.timeStamp}>
+                  {formatTimestamp(item.created_at)}
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={styles.moreButton}
+              onPress={(e) => e.stopPropagation()}
+            >
+              <Text style={styles.moreButtonText}>•••</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity
+          activeOpacity={0.95}
+          onPressIn={handlePressIn}
+          onPressOut={handlePressOut}
+          onPress={handleDoubleTap}
+        >
+          <View style={[styles.imageContainer, { height: imageHeight }]}>
+            {isLoading && (
+              <View style={styles.imageLoader}>
+                <ActivityIndicator size="large" color="#007AFF" />
+              </View>
+            )}
+            {isVideo ? (
+              <Video
+                ref={videoRef}
+                source={{ uri: item.image_url || item.media_url }}
+                style={[styles.video, { height: imageHeight }]}
+                resizeMode="cover"
+                isLooping={true}
+                onLoad={() => setIsLoading(false)}
+                onError={(error) => {
+                  console.error(
+                    `Video loading error for ${
+                      item.image_url || item.media_url
+                    }:`,
+                    error
+                  );
+                  setIsLoading(false);
+                  setIsVideo(false);
+                }}
+                useNativeControls={false}
+              />
+            ) : (
               <Image
                 source={
-                  typeof item.profile_picture === 'string' && item.profile_picture.startsWith('http')
-                    ? { uri: item.profile_picture }
-                    : require('../assets/profiledefault.jpg')
-                }
-                style={styles.avatar}
-              />
-            </TouchableOpacity>
-            <View>
-              <Text style={styles.name}>
-                {isUserPost ? item.username : item.name ? item.name.first : 'User'}
-              </Text>
-              <Text style={styles.timeStamp}>{formatTimestamp(item.created_at)}</Text>
-            </View>
-          </View>
-          <TouchableOpacity style={styles.moreButton} onPress={(e) => e.stopPropagation()}>
-            <Text style={styles.moreButtonText}>•••</Text>
-          </TouchableOpacity>
-        </View>
-      </TouchableOpacity>
-      <TouchableOpacity
-        activeOpacity={0.95}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        onPress={handleDoubleTap}
-      >
-        <View style={[styles.imageContainer, { height: imageHeight }]}>
-          {isLoading && (
-            <View style={styles.imageLoader}>
-              <ActivityIndicator size="large" color="#007AFF" />
-            </View>
-          )}
-          {isVideo ? (
-            <Video
-              ref={videoRef}
-              source={{ uri: item.image_url || item.media_url }}
-              style={[styles.video, { height: imageHeight }]}
-              resizeMode="cover"
-              isLooping={true}
-              onLoad={() => setIsLoading(false)}
-              onError={(error) => {
-                console.error(`Video loading error for ${item.image_url || item.media_url}:`, error);
-                setIsLoading(false);
-                setIsVideo(false);
-              }}
-              useNativeControls={false}
-            />
-          ) : (
-            <Image
-              source={
-                typeof item.image_url === 'string' && item.image_url.startsWith('http')
-                  ? { uri: item.image_url }
-                  : typeof item.media_url === 'string' && item.media_url.startsWith('http')
+                  typeof item.image_url === "string" &&
+                  item.image_url.startsWith("http")
+                    ? { uri: item.image_url }
+                    : typeof item.media_url === "string" &&
+                      item.media_url.startsWith("http")
                     ? { uri: item.media_url }
-                    : require('../assets/PITCH.png')
-              }
-              style={[styles.postImage, { height: imageHeight }]}
-              onLoad={() => setIsLoading(false)}
-            />
-          )}
+                    : require("../assets/PITCH.png")
+                }
+                style={[styles.postImage, { height: imageHeight }]}
+                onLoad={() => setIsLoading(false)}
+              />
+            )}
+          </View>
+        </TouchableOpacity>
+        <View style={styles.cardFooter}>
+          <Text style={styles.likes}>👍 {likeCount} Likes</Text>
+          <Text style={styles.comments}>
+            💬 {item.comment_count || comments.length || 0} Comments
+          </Text>
         </View>
-      </TouchableOpacity>
-      <View style={styles.cardFooter}>
-        <Text style={styles.likes}>👍 {likeCount} Likes</Text>
-        <Text style={styles.comments}>💬 {item.comment_count || comments.length || 0} Comments</Text>
-      </View>
-      <View style={styles.actions}>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={debouncedHandleLike}
-          activeOpacity={0.7}
-          disabled={isLikeLoading}
-        >
-          <Image
-            source={require('../assets/icon-like.png')}
-            style={[
-              styles.navIcon,
-              { tintColor: isLiked ? '#1f219c' : '#000000' },
-              isLikeLoading && { opacity: 0.5 }
-            ]}
-          />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.actionButton} onPress={toggleCommentModal}>
-          <Image source={require('../assets/comment6.png')} style={styles.navIcon} />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.actionButton} onPress={handleChatPress}>
-          <Image source={require('../assets/share.png')} style={styles.navIcon} />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.actionButton} onPress={handleChatPress}>
-          <Image source={require('../assets/save.png')} style={styles.navIcon} />
-        </TouchableOpacity>
-      </View>
-      <View style={styles.captionContainer}>
-        {!isMeasured && (
-          <Text
-            style={[styles.caption, styles.measureText]}
-            onLayout={handleTextLayout}
+        <View style={styles.actions}>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={debouncedHandleLike}
+            activeOpacity={0.7}
+            disabled={isLikeLoading}
           >
-            <Text style={styles.username}>
-              {isUserPost ? item.username : item.name ? item.name.first : 'User'}{' '}
-            </Text>
-            {item.content || item.caption}
-          </Text>
-        )}
-        {isMeasured && (
-          <Text
-            style={styles.caption}
-            numberOfLines={shouldShowMore && !expandedItems[index] ? 2 : undefined}
-          >
-            <Text style={styles.username}>
-              {isUserPost ? item.username : item.name ? item.name.first : 'User'}{' '}
-            </Text>
-            {item.content || item.caption}
-          </Text>
-        )}
-        {shouldShowMore && (
-          <TouchableOpacity onPress={() => toggleExpand(index)}>
-            <Text style={styles.showMoreText}>{expandedItems[index] ? 'Show less' : 'Show more'}</Text>
+            <Image
+              source={require("../assets/icon-like.png")}
+              style={[
+                styles.navIcon,
+                { tintColor: isLiked ? "#1f219c" : "#000000" },
+                isLikeLoading && { opacity: 0.5 },
+              ]}
+            />
           </TouchableOpacity>
-        )}
-      </View>
-      <Modal
-        isVisible={isCommentModalVisible}
-        onBackdropPress={toggleCommentModal}
-        onSwipeComplete={toggleCommentModal}
-        swipeDirection="down"
-        backdropOpacity={0.5}
-        backdropColor="#000"
-        style={styles.commentModal}
-        animationIn="slideInUp"
-        animationOut="slideOutDown"
-        useNativeDriver={true}
-      >
-        <View style={styles.commentModalContent}>
-          <View style={styles.commentModalHeader}>
-            <Text style={styles.commentModalTitle}>Comments</Text>
-            <TouchableOpacity onPress={toggleCommentModal}>
-              <Text style={styles.closeButtonText}>Close</Text>
-            </TouchableOpacity>
-          </View>
-          {isCommentsLoading ? (
-            <ActivityIndicator size="large" color="#007AFF" style={styles.commentLoader} />
-          ) : (
-            <FlatList
-              data={comments}
-              renderItem={({ item }) => (
-                <View style={styles.commentItem}>
-                  <Text style={styles.commentUsername}>{item.username || 'User'}</Text>
-                  <Text style={styles.commentText}>{item.content}</Text>
-                  <Text style={styles.commentTimestamp}>{formatTimestamp(item.created_at)}</Text>
-                </View>
-              )}
-              keyExtractor={(item) => item.comment_id.toString()}
-              style={styles.commentList}
-              contentContainerStyle={styles.commentListContent}
-              ListEmptyComponent={<Text style={styles.noCommentsText}>No comments yet.</Text>}
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={toggleCommentModal}
+          >
+            <Image
+              source={require("../assets/comment6.png")}
+              style={styles.navIcon}
             />
-          )}
-          <View style={styles.commentInputContainer}>
-            <TextInput
-              style={styles.commentInput}
-              placeholder="Add a comment..."
-              value={newComment}
-              onChangeText={setNewComment}
-              onSubmitEditing={handleAddComment}
-              returnKeyType="send"
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={handleChatPress}
+          >
+            <Image
+              source={require("../assets/share.png")}
+              style={styles.navIcon}
             />
-            <TouchableOpacity style={styles.postCommentButton} onPress={handleAddComment}>
-              <Text style={styles.postCommentText}>Post</Text>
-            </TouchableOpacity>
-          </View>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={handleChatPress}
+          >
+            <Image
+              source={require("../assets/save.png")}
+              style={styles.navIcon}
+            />
+          </TouchableOpacity>
         </View>
-      </Modal>
-    </Animated.View>
-  );
-});
+        <View style={styles.captionContainer}>
+          {!isMeasured && (
+            <Text
+              style={[styles.caption, styles.measureText]}
+              onLayout={handleTextLayout}
+            >
+              <Text style={styles.username}>
+                {isUserPost
+                  ? item.username
+                  : item.name
+                  ? item.name.first
+                  : "User"}{" "}
+              </Text>
+              {item.content || item.caption}
+            </Text>
+          )}
+          {isMeasured && (
+            <Text
+              style={styles.caption}
+              numberOfLines={
+                shouldShowMore && !expandedItems[index] ? 2 : undefined
+              }
+            >
+              <Text style={styles.username}>
+                {isUserPost
+                  ? item.username
+                  : item.name
+                  ? item.name.first
+                  : "User"}{" "}
+              </Text>
+              {item.content || item.caption}
+            </Text>
+          )}
+          {shouldShowMore && (
+            <TouchableOpacity onPress={() => toggleExpand(index)}>
+              <Text style={styles.showMoreText}>
+                {expandedItems[index] ? "Show less" : "Show more"}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+        <Modal
+          isVisible={isCommentModalVisible}
+          onBackdropPress={toggleCommentModal}
+          onSwipeComplete={toggleCommentModal}
+          swipeDirection="down"
+          backdropOpacity={0.5}
+          backdropColor="#000"
+          style={styles.commentModal}
+          animationIn="slideInUp"
+          animationOut="slideOutDown"
+          useNativeDriver={true}
+        >
+          <View style={styles.commentModalContent}>
+            <View style={styles.commentModalHeader}>
+              <Text style={styles.commentModalTitle}>Comments</Text>
+              <TouchableOpacity onPress={toggleCommentModal}>
+                <Text style={styles.closeButtonText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+            {isCommentsLoading ? (
+              <ActivityIndicator
+                size="large"
+                color="#007AFF"
+                style={styles.commentLoader}
+              />
+            ) : (
+              <FlatList
+                data={comments}
+                renderItem={({ item }) => (
+                  <View style={styles.commentItem}>
+                    <Text style={styles.commentUsername}>
+                      {item.username || "User"}
+                    </Text>
+                    <Text style={styles.commentText}>{item.content}</Text>
+                    <Text style={styles.commentTimestamp}>
+                      {formatTimestamp(item.created_at)}
+                    </Text>
+                  </View>
+                )}
+                keyExtractor={(item) => item.comment_id.toString()}
+                style={styles.commentList}
+                contentContainerStyle={styles.commentListContent}
+                ListEmptyComponent={
+                  <Text style={styles.noCommentsText}>No comments yet.</Text>
+                }
+              />
+            )}
+            <View style={styles.commentInputContainer}>
+              <TextInput
+                style={styles.commentInput}
+                placeholder="Add a comment..."
+                value={newComment}
+                onChangeText={setNewComment}
+                onSubmitEditing={handleAddComment}
+                returnKeyType="send"
+              />
+              <TouchableOpacity
+                style={styles.postCommentButton}
+                onPress={handleAddComment}
+              >
+                <Text style={styles.postCommentText}>Post</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      </Animated.View>
+    );
+  }
+);
 
 export default function Home() {
   const [users, setUsers] = useState([]);
@@ -469,18 +569,18 @@ export default function Home() {
   };
 
   const FIELDS = [
-    'Tech',
-    'AI',
-    'Sustainability',
-    'Finance',
-    'Health',
-    'Education',
-    'Gaming',
-    'Rob-linkotics',
-    'Marketing',
-    'Blockchain',
-    'Design',
-    'Data Science',
+    "Tech",
+    "AI",
+    "Sustainability",
+    "Finance",
+    "Health",
+    "Education",
+    "Gaming",
+    "Rob-linkotics",
+    "Marketing",
+    "Blockchain",
+    "Design",
+    "Data Science",
   ];
 
   const combinedData = useMemo(() => {
@@ -488,7 +588,7 @@ export default function Home() {
       (post) =>
         post &&
         (post.image_url || post.media_url) &&
-        !String(post.image_url || post.media_url).includes('undefined')
+        !String(post.image_url || post.media_url).includes("undefined")
     );
     return [...validPosts, ...users];
   }, [myPosts, users]);
@@ -523,19 +623,19 @@ export default function Home() {
                 user = { name: `User${post.userId}` }; // Fallback
               }
             }
-            const nameParts = user.name.split(' ');
+            const nameParts = user.name.split(" ");
             return {
               login: { uuid: `${post.id}-${currentPage}` }, // Unique ID for infinite scroll
               name: {
                 first: nameParts[0],
-                last: nameParts.slice(1).join(' ') || '', // Ensure last is not undefined
+                last: nameParts.slice(1).join(" ") || "", // Ensure last is not undefined
               },
-              profile_picture: require('../assets/profiledefault.jpg'), // Fixed profile picture
+              profile_picture: require("../assets/profiledefault.jpg"), // Fixed profile picture
               email: user.email || `user${post.userId}@example.com`, // Use user email or mock
               registered: { date: generateMockTimestamp() }, // Mock timestamp
               content: post.body, // Post body as content
               caption: post.title, // Post title as caption
-              image_url: require('../assets/PITCH.png'), // Fixed post image
+              image_url: require("../assets/PITCH.png"), // Fixed post image
               likes: Math.floor(Math.random() * 100), // Mock likes
               comment_count: Math.floor(Math.random() * 20), // Mock comments
             };
@@ -547,8 +647,8 @@ export default function Home() {
           setUsers((prev) => [...prev, ...mappedUsers]);
         }
       } catch (error) {
-        console.error('Error loading users:', error);
-        Alert.alert('Error', 'Failed to load posts. Please try again.');
+        console.error("Error loading users:", error);
+        Alert.alert("Error", "Failed to load posts. Please try again.");
       } finally {
         setLoading(false);
         setRefreshing(false);
@@ -560,19 +660,19 @@ export default function Home() {
   const fetchAllPosts = useCallback(async () => {
     try {
       setPostsError(null);
-      const token = await AsyncStorage.getItem('token');
+      const token = await AsyncStorage.getItem("token");
       if (!token) {
-        console.log('No token in AsyncStorage');
+        console.log("No token in AsyncStorage");
         return;
       }
-      const baseUrl = NGROK_URL.replace(/\/+$/, '');
+      const baseUrl = NGROK_URL.replace(/\/+$/, "");
       const response = await axios.get(`${baseUrl}/api/posts/all`, {
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
       });
-      console.log('Posts API response:', response.data); // Debug log
+      console.log("Posts API response:", response.data); // Debug log
       if (response.data && Array.isArray(response.data)) {
         const mappedPosts = response.data.map((post) => ({
           _id: post.post_id,
@@ -587,48 +687,62 @@ export default function Home() {
           caption: post.content,
         }));
         const sortedPosts = mappedPosts
-          .filter((post) => post.image_url && !post.image_url.includes('undefined'))
+          .filter(
+            (post) => post.image_url && !post.image_url.includes("undefined")
+          )
           .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
         setMyPosts(sortedPosts);
       } else {
-        console.warn('Invalid posts data:', response.data);
-        setPostsError('Invalid data from server');
+        console.warn("Invalid posts data:", response.data);
+        setPostsError("Invalid data from server");
       }
     } catch (error) {
-      console.error('Error fetching posts:', error.response?.data || error.message);
+      console.error(
+        "Error fetching posts:",
+        error.response?.data || error.message
+      );
       setPostsError(error.message);
     }
   }, []);
 
   const fetchUserData = useCallback(async () => {
     try {
-      const token = await AsyncStorage.getItem('token');
+      const token = await AsyncStorage.getItem("token");
       if (!token) {
-        console.log('No token, refreshing session for user data');
-        const { data: { session }, error } = await supabase.auth.refreshSession();
-        if (error || !session) throw error;
-        await AsyncStorage.setItem('token', session.access_token);
+        console.log("No token, refreshing session for user data");
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.refreshSession();
+        if (error || !session) {
+          console.error("Session refresh failed:", error?.message);
+          navigation.reset({ index: 0, routes: [{ name: "Register1" }] });
+          return;
+        }
+        await AsyncStorage.setItem("token", session.access_token);
       }
-      const baseUrl = NGROK_URL.replace(/\/+$/, '');
-      const response = await fetch(`${baseUrl}/api/auth/profile`, {
-        method: 'GET',
+      const baseUrl = NGROK_URL.replace(/\/+$/, "");
+      const response = await fetch(`${baseUrl}/api/profile`, {
+        method: "GET",
         headers: {
-          Authorization: `Bearer ${await AsyncStorage.getItem('token')}`,
-          'Content-Type': 'application/json',
+          Authorization: `Bearer ${await AsyncStorage.getItem("token")}`,
+          "Content-Type": "application/json",
         },
       });
       if (response.ok) {
         const data = await response.json();
-        console.log('User data fetched:', data);
+        console.log("User data fetched:", data);
         setUserData(data);
+        await AsyncStorage.setItem("userData", JSON.stringify(data));
       } else {
-        console.error('Profile fetch failed:', await response.text());
+        console.error("Profile fetch failed:", await response.text());
+        Alert.alert("Error", "Failed to load profile. Please try again.");
       }
     } catch (error) {
-      console.error('Error fetching user data:', error);
-      Alert.alert('Error', 'Failed to load user data. Please try again.');
+      console.error("Error fetching user data:", error);
+      Alert.alert("Error", "Failed to load user data. Please try again.");
     }
-  }, []);
+  }, [navigation]);
 
   useFocusEffect(
     useCallback(() => {
@@ -636,23 +750,30 @@ export default function Home() {
         try {
           setLoading(true);
           // Check authentication status
-          let token = await AsyncStorage.getItem('token');
+          let token = await AsyncStorage.getItem("token");
           if (!token) {
-            console.log('No token, refreshing session');
-            const { data: { session }, error } = await supabase.auth.refreshSession();
+            console.log("No token, refreshing session");
+            const {
+              data: { session },
+              error,
+            } = await supabase.auth.refreshSession();
             if (error || !session) {
-              console.error('Session refresh failed:', error?.message);
-              navigation.reset({ index: 0, routes: [{ name: 'Register1' }] });
+              console.error("Session refresh failed:", error?.message);
+              navigation.reset({ index: 0, routes: [{ name: "Register1" }] });
               return;
             }
             token = session.access_token;
-            await AsyncStorage.setItem('token', token);
+            await AsyncStorage.setItem("token", token);
           }
 
           // Fetch user data, posts, and users concurrently
-          await Promise.all([fetchUserData(), fetchAllPosts(), loadUsers(true)]);
+          await Promise.all([
+            fetchUserData(),
+            fetchAllPosts(),
+            loadUsers(true),
+          ]);
         } catch (error) {
-          console.error('Error during auth check or data fetch:', error);
+          console.error("Error during auth check or data fetch:", error);
           setPostsError(error.message);
         } finally {
           setLoading(false);
@@ -700,7 +821,9 @@ export default function Home() {
 
   const toggleTempField = (field) => {
     setTempSelectedFields((current) =>
-      current.includes(field) ? current.filter((item) => item !== field) : [...current, field]
+      current.includes(field)
+        ? current.filter((item) => item !== field)
+        : [...current, field]
     );
   };
 
@@ -715,20 +838,20 @@ export default function Home() {
   };
 
   const handleSearchFocus = () => {
-    navigation.navigate('Search');
+    navigation.navigate("Search");
   };
 
   const handleProfilePress = () => {
     if (!userData) {
-      console.log('User data not loaded yet');
+      console.log("User data not loaded yet");
       return;
     }
     const isBusinessUser = userData.is_business;
     const username = userData.username;
     if (isBusinessUser) {
-      navigation.navigate('BusinessProfile', { username, isOtherUser: false });
+      navigation.navigate("BusinessProfile", { username, isOtherUser: false });
     } else {
-      navigation.navigate('Profile', { username, isOtherUser: false });
+      navigation.navigate("Profile", { username, isOtherUser: false });
     }
   };
 
@@ -741,7 +864,7 @@ export default function Home() {
             source={
               userData?.profile_picture
                 ? { uri: userData.profile_picture }
-                : require('../assets/profiledefault.jpg')
+                : require("../assets/profiledefault.jpg")
             }
             style={styles.profilePic}
           />
@@ -757,7 +880,10 @@ export default function Home() {
         </View>
         <View style={styles.iconsContainer}>
           <TouchableOpacity onPress={handleChatPress}>
-            <Image source={require('../assets/Arrow.png')} style={styles.chatIcon} />
+            <Image
+              source={require("../assets/Arrow.png")}
+              style={styles.chatIcon}
+            />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.iconSpacing}
@@ -766,13 +892,16 @@ export default function Home() {
               setFieldsModalVisible(true);
             }}
           >
-            <Image source={require('../assets/options.png')} style={styles.filterIcon} />
+            <Image
+              source={require("../assets/options.png")}
+              style={styles.filterIcon}
+            />
           </TouchableOpacity>
         </View>
       </View>
       <KeyboardAvoidingView
         style={styles.keyboardAvoid}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         {postsError && (
           <View style={styles.errorContainer}>
@@ -797,7 +926,9 @@ export default function Home() {
           onEndReached={() => setCurrentPage((prev) => prev + 1)}
           onEndReachedThreshold={0.5}
           ListFooterComponent={renderFooter}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.listContentContainer}
           onViewableItemsChanged={onViewableItemsChanged}
@@ -817,7 +948,8 @@ export default function Home() {
                 key={field}
                 style={[
                   styles.fieldBubble,
-                  tempSelectedFields.includes(field) && styles.selectedFieldBubble,
+                  tempSelectedFields.includes(field) &&
+                    styles.selectedFieldBubble,
                 ]}
                 onPress={() => toggleTempField(field)}
               >
@@ -826,10 +958,16 @@ export default function Home() {
             ))}
           </ScrollView>
           <View style={styles.modalActionButtons}>
-            <TouchableOpacity style={styles.modalCloseButton} onPress={handleFieldsClose}>
+            <TouchableOpacity
+              style={styles.modalCloseButton}
+              onPress={handleFieldsClose}
+            >
               <Text style={styles.modalCloseButtonText}>Close</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.modalDoneButton} onPress={handleFieldsDone}>
+            <TouchableOpacity
+              style={styles.modalDoneButton}
+              onPress={handleFieldsDone}
+            >
               <Text style={styles.modalDoneButtonText}>Done</Text>
             </TouchableOpacity>
           </View>
@@ -842,24 +980,24 @@ export default function Home() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
   },
   keyboardAvoid: {
     flex: 1,
   },
   topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderBottomWidth: 1,
-    borderBottomColor: '#E9ECEF',
+    borderBottomColor: "#E9ECEF",
   },
   iconsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   iconSpacing: {
     marginLeft: 20,
@@ -871,13 +1009,13 @@ const styles = StyleSheet.create({
   },
   searchContainer: {
     flex: 1,
-    position: 'relative',
+    position: "relative",
     marginHorizontal: 10,
   },
   searchBar: {
-    width: '100%',
+    width: "100%",
     paddingHorizontal: 15,
-    backgroundColor: '#eee',
+    backgroundColor: "#eee",
     borderRadius: 20,
     height: 40,
   },
@@ -890,23 +1028,23 @@ const styles = StyleSheet.create({
     height: 24,
   },
   card: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     marginBottom: 3,
-    elevation: Platform.OS === 'android' ? 2 : 0,
-    shadowColor: '#000',
+    elevation: Platform.OS === "android" ? 2 : 0,
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 3,
   },
   cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     padding: 12,
   },
   userInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   avatar: {
     width: 40,
@@ -916,12 +1054,12 @@ const styles = StyleSheet.create({
   },
   name: {
     fontSize: 15,
-    fontWeight: '600',
-    color: '#212529',
+    fontWeight: "600",
+    color: "#212529",
   },
   timeStamp: {
     fontSize: 13,
-    color: '#868E96',
+    color: "#868E96",
     marginTop: 2,
   },
   moreButton: {
@@ -929,59 +1067,59 @@ const styles = StyleSheet.create({
   },
   moreButtonText: {
     fontSize: 16,
-    color: '#868E96',
-    fontWeight: 'bold',
+    color: "#868E96",
+    fontWeight: "bold",
   },
   imageContainer: {
     width: width,
-    backgroundColor: '#F8F9FA',
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
+    backgroundColor: "#F8F9FA",
+    justifyContent: "center",
+    alignItems: "center",
+    overflow: "hidden",
   },
   imageLoader: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F8F9FA',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#F8F9FA",
   },
   postImage: {
     width: width,
-    resizeMode: 'cover',
+    resizeMode: "cover",
   },
   cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginVertical: 5,
     paddingHorizontal: 10,
   },
   likes: {
-    fontWeight: 'bold',
-    color: '#555',
+    fontWeight: "bold",
+    color: "#555",
   },
   comments: {
-    fontWeight: 'bold',
-    color: '#555',
+    fontWeight: "bold",
+    color: "#555",
   },
   actions: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
+    flexDirection: "row",
+    justifyContent: "space-around",
     marginTop: 10,
   },
   actionButton: {
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: 8,
     paddingHorizontal: 12,
   },
   navIcon: {
     width: 20,
     height: 20,
-    marginBottom: Platform.OS === 'ios' ? 3 : 0,
-    tintColor: '#000000',
+    marginBottom: Platform.OS === "ios" ? 3 : 0,
+    tintColor: "#000000",
   },
   captionContainer: {
     paddingHorizontal: 12,
@@ -989,16 +1127,16 @@ const styles = StyleSheet.create({
   },
   caption: {
     fontSize: 14,
-    color: '#495057',
+    color: "#495057",
     lineHeight: 20,
   },
   username: {
-    fontWeight: '600',
-    color: '#212529',
+    fontWeight: "600",
+    color: "#212529",
   },
   showMoreText: {
     fontSize: 14,
-    color: '#868E96',
+    color: "#868E96",
     marginTop: 4,
   },
   listContentContainer: {
@@ -1009,113 +1147,113 @@ const styles = StyleSheet.create({
   },
   video: {
     width: width,
-    backgroundColor: 'black',
+    backgroundColor: "black",
   },
   modal: {
-    justifyContent: 'center',
+    justifyContent: "center",
     margin: 0,
   },
   modalContent: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     padding: 20,
     borderRadius: 15,
-    alignItems: 'center',
+    alignItems: "center",
     marginHorizontal: 20,
-    maxHeight: '80%',
+    maxHeight: "80%",
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: "600",
+    color: "#333",
     marginBottom: 20,
   },
   fieldsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
     paddingBottom: 20,
   },
   fieldBubble: {
     margin: 10,
     paddingVertical: 12,
     paddingHorizontal: 20,
-    backgroundColor: '#d9d9d9',
+    backgroundColor: "#d9d9d9",
     borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   selectedFieldBubble: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: "#4CAF50",
   },
   fieldBubbleText: {
     fontSize: 15,
-    fontWeight: '500',
-    color: '#000',
+    fontWeight: "500",
+    color: "#000",
   },
   modalActionButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '100%',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
     marginTop: 10,
   },
   modalCloseButton: {
     borderWidth: 1,
-    borderColor: '#E9ECEF',
+    borderColor: "#E9ECEF",
     borderRadius: 8,
     paddingVertical: 10,
-    alignItems: 'center',
+    alignItems: "center",
     flex: 0.48,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
   },
   modalCloseButtonText: {
     fontSize: 14,
-    fontWeight: '500',
-    color: '#000',
+    fontWeight: "500",
+    color: "#000",
   },
   modalDoneButton: {
-    backgroundColor: '#a3a4eb',
+    backgroundColor: "#a3a4eb",
     borderRadius: 8,
     paddingVertical: 10,
-    alignItems: 'center',
+    alignItems: "center",
     flex: 0.48,
   },
   modalDoneButtonText: {
     fontSize: 14,
-    fontWeight: '500',
-    color: '#1f219c',
+    fontWeight: "500",
+    color: "#1f219c",
   },
   commentModal: {
-    justifyContent: 'flex-end',
+    justifyContent: "flex-end",
     margin: 0,
   },
   commentModalContent: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderTopLeftRadius: 15,
     borderTopRightRadius: 15,
     padding: 15,
     flex: 1,
-    maxHeight: '90%',
+    maxHeight: "90%",
   },
   measureText: {
-    position: 'absolute',
+    position: "absolute",
     opacity: 0,
     width: width - 24,
   },
   commentModalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 10,
   },
   commentModalTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: "600",
+    color: "#333",
   },
   closeButtonText: {
     fontSize: 16,
-    color: '#007AFF',
-    fontWeight: '600',
+    color: "#007AFF",
+    fontWeight: "600",
   },
   commentList: {
     flex: 1,
@@ -1127,30 +1265,30 @@ const styles = StyleSheet.create({
   commentItem: {
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: "#eee",
     minHeight: 60,
   },
   commentUsername: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#212529',
+    fontWeight: "600",
+    color: "#212529",
   },
   commentText: {
     fontSize: 14,
-    color: '#495057',
+    color: "#495057",
     marginTop: 5,
   },
   commentTimestamp: {
     fontSize: 12,
-    color: '#868E96',
+    color: "#868E96",
     marginTop: 5,
   },
   commentInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginTop: 10,
     borderTopWidth: 1,
-    borderTopColor: '#eee',
+    borderTopColor: "#eee",
     paddingTop: 10,
     paddingBottom: 10,
     marginBottom: 20,
@@ -1159,37 +1297,37 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 8,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: "#ddd",
     borderRadius: 20,
     marginRight: 10,
   },
   postCommentButton: {
     paddingVertical: 8,
     paddingHorizontal: 15,
-    backgroundColor: '#007AFF',
+    backgroundColor: "#007AFF",
     borderRadius: 20,
   },
   postCommentText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   commentLoader: {
     marginVertical: 20,
   },
   noCommentsText: {
     fontSize: 14,
-    color: '#868E96',
-    textAlign: 'center',
+    color: "#868E96",
+    textAlign: "center",
     marginVertical: 20,
   },
   errorContainer: {
     padding: 16,
-    backgroundColor: '#FFDDDD',
-    alignItems: 'center',
+    backgroundColor: "#FFDDDD",
+    alignItems: "center",
   },
   errorText: {
-    color: '#D32F2F',
+    color: "#D32F2F",
     fontSize: 16,
   },
-}); 
+});
