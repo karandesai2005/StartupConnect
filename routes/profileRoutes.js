@@ -5,13 +5,23 @@ const authMiddleware = require('../middleware/authenticateJWT');
 
 // Profile Routes
 router.route('/')
-  .get(authMiddleware, profileController.getProfile);
+  .get(authMiddleware, profileController.getProfile)
+  .put(authMiddleware, profileController.updateProfile);
 
 router.route('/user/:username')
   .get(authMiddleware, profileController.getUserProfile);
 
 router.route('/profile-picture')
   .post(authMiddleware, profileController.updateProfilePicture);
+
+router.route('/posts/user/:username')
+  .get(authMiddleware, profileController.getUserPostsByUsername);
+
+router.route('/search-users')
+  .get(authMiddleware, profileController.searchUsers);
+
+router.route('/fix-profile-picture-urls')
+  .post(authMiddleware, profileController.fixProfilePictureURLs);
 
 // Story Routes
 router.route('/stories')

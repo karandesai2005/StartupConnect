@@ -4,13 +4,14 @@ const { queryDB } = require('../config/db');
 const QUERIES = {
   GET_BY_EMAIL: 'SELECT * FROM public.users WHERE email = $1',
   GET_USER_DETAILS: `
-    SELECT u.*, 
+    SELECT u.user_id, u.username, u.email, u.name, u.bio, u.profile_picture, 
+           u.is_founder, u.is_investor, u.is_personal, u.is_business, u.reel_url, u.interests,
            (SELECT COUNT(*) FROM public.followers WHERE followee_id = u.user_id) AS followers,
            (SELECT COUNT(*) FROM public.followers WHERE follower_id = u.user_id) AS following
     FROM public.users u
     WHERE `,
   CREATE_USER: `
-    INSERT INTO public.users (username, email, password_hash, is_founder, is_investor, created_at)
+    INSERT INTO public.users (username, email, supabase_uid, is_founder, is_investor, created_at)
     VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
     RETURNING user_id`,
   FOLLOW: `
@@ -33,7 +34,7 @@ const QUERIES = {
     FROM public.users u
     JOIN public.followers f ON u.user_id = f.followee_id
     WHERE f.follower_id = $1`,
-  GET_BY_UUID: 'SELECT user_id FROM public.users WHERE supabase_uid = $1' // Updated to supabase_uid
+  GET_BY_UUID: 'SELECT user_id FROM public.users WHERE supabase_uid = $1',
 };
 
 // Utility function to execute queries
@@ -76,19 +77,18 @@ const User = {
   async getUserByUuid(uuid) {
     return withErrorHandling(async () => {
       const result = await executeQuery(QUERIES.GET_BY_UUID, [uuid]);
-      if (!result[0]) throw new Error('User not found by UUID');
-      return await this.getUserById(result[0].user_id);
+      return result[0] ? await this.getUserById(result[0].user_id) : null;
     }, 'getUserByUuid');
   },
 
-  async createUser(username, email, passwordHash, isFounder, isInvestor) {
+  async createUser(username, email, supabase_uid, isFounder, isInvestor) {
     return withErrorHandling(async () => {
       const result = await executeQuery(QUERIES.CREATE_USER, [
         username,
         email,
-        passwordHash,
+        supabase_uid,
         isFounder ? 1 : 0,
-        isInvestor ? 1 : 0
+        isInvestor ? 1 : 0,
       ]);
       const newUserId = result[0].user_id;
       return this.getUserById(newUserId);
@@ -97,28 +97,19 @@ const User = {
 
   async followUser(followerId, followeeId) {
     return withErrorHandling(async () => {
-      await executeQuery(QUERIES.FOLLOW, [
-        followerId,
-        followeeId
-      ]);
+      await executeQuery(QUERIES.FOLLOW, [followerId, followeeId]);
     }, 'followUser');
   },
 
   async unfollowUser(followerId, followeeId) {
     return withErrorHandling(async () => {
-      await executeQuery(QUERIES.UNFOLLOW, [
-        followerId,
-        followeeId
-      ]);
+      await executeQuery(QUERIES.UNFOLLOW, [followerId, followeeId]);
     }, 'unfollowUser');
   },
 
   async isFollowing(followerId, followeeId) {
     return withErrorHandling(async () => {
-      const result = await executeQuery(QUERIES.IS_FOLLOWING, [
-        followerId,
-        followeeId
-      ]);
+      const result = await executeQuery(QUERIES.IS_FOLLOWING, [followerId, followeeId]);
       return result[0].count > 0;
     }, 'isFollowing');
   },

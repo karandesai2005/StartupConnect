@@ -3,6 +3,8 @@ const Story = require('../models/storyModel');
 const Section = require('../models/sectionModel');
 const Graph = require('../models/graphModel');
 const User = require('../models/userModel');
+const { supabase } = require('../services/supabase');
+const { queryDB } = require('../config/db');
 const { uploadAndConvertPostMedia, uploadProfilePicture } = require('../config/multerConfig');
 
 // Constants
@@ -13,9 +15,13 @@ const getUserId = async (req) => {
   const uuid = req.user?.id; // UUID from Supabase auth
   if (!uuid) throw new Error('User authentication required');
 
-  // Map UUID to user_id
-  const user = await User.getUserByUuid(uuid);
-  return user?.user_id; // Return the integer user_id
+  const { data: user, error } = await supabase
+    .from('users')
+    .select('user_id')
+    .eq('supabase_uid', uuid)
+    .single();
+  if (error || !user) throw new Error('User not found');
+  return user.user_id;
 };
 
 const validateId = (id, name) => {
@@ -42,13 +48,18 @@ const cleanUrl = (url) => {
 const profileController = {
   getProfile: async (req, res) => {
     try {
-      const userId = await getUserId(req);
-      if (!userId) return res.status(401).json({ error: 'User authentication required' });
+      const supabase_uid = req.user.id;
 
-      const user = await User.getUserById(userId);
-      if (!user) return res.status(404).json({ error: 'User not found' });
+      const { data, error } = await supabase
+        .from('users')
+        .select('user_id, username, email, name, bio, profile_picture, is_personal, is_business, reel_url')
+        .eq('supabase_uid', supabase_uid)
+        .single();
+      if (error || !data) {
+        return res.status(404).json({ error: 'User not found' });
+      }
 
-      res.json({ ...user, profile_picture: cleanUrl(user.profile_picture) });
+      res.json({ ...data, profile_picture: cleanUrl(data.profile_picture) });
     } catch (error) {
       console.error('Get profile error:', error);
       res.status(500).json({ error: 'Server error' });
@@ -61,7 +72,9 @@ const profileController = {
       validateString(username, 'Username', 3, 20);
 
       const user = await User.getUserByUsername(username);
-      if (!user) return res.status(404).json({ error: 'User not found' });
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
 
       const followerId = await getUserId(req);
       const isFollowing = followerId ? await User.isFollowing(followerId, user.user_id) : false;
@@ -73,23 +86,66 @@ const profileController = {
     }
   },
 
+  updateProfile: [
+    uploadProfilePicture,
+    async (req, res) => {
+      try {
+        const supabase_uid = req.user.id;
+        const { bio } = req.body;
+        const profilePicture = req.file;
+
+        console.log('Received bio:', bio);
+        console.log('Received file:', profilePicture);
+
+        let updates = {};
+        if (bio) updates.bio = bio;
+        if (profilePicture) {
+          const profilePictureUrl = cleanUrl(`${BASE_URL}/Uploads/profile_pictures/${profilePicture.filename}`);
+          updates.profile_picture = profilePictureUrl;
+        }
+
+        if (Object.keys(updates).length === 0) {
+          return res.status(400).json({ error: 'No fields to update.' });
+        }
+
+        const { data, error } = await supabase
+          .from('users')
+          .update(updates)
+          .eq('supabase_uid', supabase_uid)
+          .select('user_id, username, email, name, bio, profile_picture, is_personal, is_business')
+          .single();
+        if (error) throw error;
+
+        console.log('Updated user:', data);
+        res.status(200).json({ ...data, profile_picture: cleanUrl(data.profile_picture) });
+      } catch (error) {
+        console.error('Update profile error:', error);
+        res.status(error.message.includes('No fields') ? 400 : 500).json({ error: error.message });
+      }
+    },
+  ],
+
   updateProfilePicture: [
     uploadProfilePicture,
     async (req, res) => {
       try {
-        const userId = await getUserId(req);
-        if (!userId) return res.status(401).json({ error: 'User authentication required' });
+        const supabase_uid = req.user.id;
         if (!req.file) return res.status(400).json({ error: 'Profile picture required' });
 
         const profilePictureUrl = cleanUrl(`${BASE_URL}/Uploads/profile_pictures/${req.file.filename}`);
-        console.log(`Updating profile picture for user ${userId}: ${profilePictureUrl}`);
+        console.log(`Updating profile picture for user ${supabase_uid}: ${profilePictureUrl}`);
 
-        await User.updateProfilePicture(userId, profilePictureUrl);
-        const updatedUser = await User.getUserById(userId);
+        const { data, error } = await supabase
+          .from('users')
+          .update({ profile_picture: profilePictureUrl })
+          .eq('supabase_uid', supabase_uid)
+          .select('user_id, username, email, name, bio, profile_picture, is_personal, is_business')
+          .single();
+        if (error) throw error;
 
         res.status(200).json({
           message: 'Profile picture updated successfully',
-          profile_picture: cleanUrl(updatedUser.profile_picture),
+          user: { ...data, profile_picture: cleanUrl(data.profile_picture) },
         });
       } catch (error) {
         console.error('Update profile picture error:', error);
@@ -97,6 +153,75 @@ const profileController = {
       }
     },
   ],
+
+  getUserPostsByUsername: async (req, res) => {
+    try {
+      const { username } = req.params;
+      validateString(username, 'Username', 3, 20);
+
+      const user = await User.getUserByUsername(username);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      const postsQuery = `
+        SELECT p.post_id, p.user_id, u.username, p.media_url, p.content, p.created_at, p.media_type,
+               (SELECT COUNT(*) FROM likes WHERE post_id = p.post_id) AS like_count
+        FROM posts p
+        JOIN users u ON p.user_id = u.user_id
+        WHERE p.user_id = $1
+        ORDER BY p.created_at DESC
+      `;
+      const posts = await queryDB(postsQuery, [user.user_id]);
+
+      res.json(posts.map(post => ({
+        ...post,
+        media_url: cleanUrl(post.media_url),
+      })));
+    } catch (error) {
+      console.error('Get user posts by username error:', error);
+      res.status(error.message.includes('Username') ? 400 : 500).json({ error: error.message });
+    }
+  },
+
+  searchUsers: async (req, res) => {
+    try {
+      const { q } = req.query;
+      if (!q || q.length < 1) {
+        return res.status(400).json({ error: 'Search query is required.' });
+      }
+
+      const { data, error } = await supabase
+        .from('users')
+        .select('user_id, username, profile_picture')
+        .ilike('username', `%${q.toLowerCase()}%`)
+        .order('username');
+      if (error) throw error;
+
+      res.json(data.map(user => ({
+        ...user,
+        profile_picture: cleanUrl(user.profile_picture),
+      })));
+    } catch (error) {
+      console.error('Search users error:', error);
+      res.status(500).json({ error: 'Server error' });
+    }
+  },
+
+  fixProfilePictureURLs: async (req, res) => {
+    try {
+      const query = `
+        UPDATE users
+        SET profile_picture = REPLACE(profile_picture, '//Uploads', '/Uploads')
+        WHERE profile_picture LIKE '%//Uploads%';
+      `;
+      await queryDB(query, []);
+      res.status(200).json({ message: 'Profile picture URLs normalized' });
+    } catch (error) {
+      console.error('Fix profile picture URLs error:', error);
+      res.status(500).json({ error: 'Server error' });
+    }
+  },
 
   followUser: async (req, res) => {
     try {
@@ -213,7 +338,10 @@ const profileController = {
         if (!userId) return res.status(401).json({ error: 'User authentication required' });
         if (!req.file) return res.status(400).json({ error: 'Media file required' });
 
-        const username = req.user.username;
+        const user = await User.getUserById(userId);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        const username = user.username;
         const section = req.body.section || 'default';
         const imageUrl = cleanUrl(`${BASE_URL}/Uploads/posts/${req.file.filename}`);
 

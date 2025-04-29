@@ -7,19 +7,13 @@ const {
   deleteAccount,
   validateUsername,
   saveUserDetails,
-  getUserProfile,
-  updateProfile,
-  getUserProfileByUsername,
-  getUserPostsByUsername,
-  searchUsers,
-  testSupabaseAdmin
+  testSupabaseAdmin,
 } = require('../controllers/authController');
 const {
   validateUsernameInput,
-  validateSaveUserDetailsInput
+  validateSaveUserDetailsInput,
 } = require('../middleware/validator');
 const authenticateJWT = require('../middleware/authenticateJWT');
-const { uploadProfilePicture } = require('../config/multerConfig');
 
 // Debug imports
 console.log('authController imports:', {
@@ -29,14 +23,9 @@ console.log('authController imports:', {
   deleteAccount: typeof deleteAccount,
   validateUsername: typeof validateUsername,
   saveUserDetails: typeof saveUserDetails,
-  getUserProfile: typeof getUserProfile,
-  updateProfile: typeof updateProfile,
-  getUserProfileByUsername: typeof getUserProfileByUsername,
-  getUserPostsByUsername: typeof getUserPostsByUsername,
-  searchUsers: typeof searchUsers
+  testSupabaseAdmin: typeof testSupabaseAdmin,
 });
 console.log('authenticateJWT:', typeof authenticateJWT);
-console.log('uploadProfilePicture:', typeof uploadProfilePicture);
 
 // Authentication Routes
 router.route('/register')
@@ -55,27 +44,10 @@ router.route('/validate-username')
 router.route('/save-user-details')
   .post(validateSaveUserDetailsInput, saveUserDetails);
 
-  router.route('/test-supabase-admin')
+router.route('/test-supabase-admin')
   .get(testSupabaseAdmin);
 
 router.route('/delete-account')
   .delete(authenticateJWT, deleteAccount);
-
-// Profile Routes
-router.route('/profile')
-  .get(authenticateJWT, getUserProfile);
-
-router.route('/update-profile')
-  .put(authenticateJWT, uploadProfilePicture.single('profile_picture'), updateProfile);
-
-router.route('/users/:username')
-  .get(authenticateJWT, getUserProfileByUsername);
-
-// User Content Routes
-router.route('/posts/user/:username')
-  .get(authenticateJWT, getUserPostsByUsername);
-
-router.route('/search-users')
-  .get(authenticateJWT, searchUsers);
 
 module.exports = router;
