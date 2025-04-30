@@ -12,13 +12,9 @@ require("dotenv").config();
   const PORT = process.env.PORT || 5000;
 
   // Middleware
-  app.use(express.json({ limit: '110mb' })); // Must be LARGER than Multer's limit
-  app.use(express.urlencoded({ limit: '110mb', extended: true }));
-  app.use(cors({
-    origin: true, // Allow all origins or specify your frontend URL
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization']
-  }));
+  app.use(express.json());
+  app.use(express.urlencoded({ extended: true }));
+  app.use(cors());
 
   // Static files
   app.use("/uploads", express.static(path.join(__dirname, "Uploads")));
