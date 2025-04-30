@@ -34,7 +34,18 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/PITCH1.png",
         "backgroundColor": "#ffffff"
-      } 
+      },
+      "networkSecurityConfig": {
+        "cleartextTrafficPermitted": true,
+        "domainRules": [
+          {
+            "includeSubdomains": true,
+            "domains": [
+              "pitch-backend-env.eba-ep4nstmn.ap-south-1.elasticbeanstalk.com"
+            ]
+          }
+        ]
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"
