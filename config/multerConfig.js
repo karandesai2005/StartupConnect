@@ -121,36 +121,55 @@ const getVideoMetadata = ffmpegAvailable ? promisify(ffmpeg.ffprobe) : () => Pro
 
 // Upload and convert middleware
 const uploadAndConvertPostMedia = async (req, res, next) => {
+  console.log('Incoming Content-Length:', req.headers['content-length']);
+  
   const upload = multer({
     storage: postStorage,
     fileFilter: postFileFilter,
-    limits: limits.post,
+    limits: {
+      fileSize: 100 * 1024 * 1024,
+      fields: 10,
+      files: 1,
+      parts: 20
+    }
   }).single('media');
 
-  try {
-    await promisify(upload)(req, res);
-    if (!req.file) return next();
+  upload(req, res, async (err) => {
+    if (err) {
+      console.error('Full Multer error:', {
+        code: err.code,
+        message: err.message,
+        stack: err.stack,
+        headers: req.headers
+      });
+      
+      if (req.file?.path) {
+        await fs.unlink(req.file.path).catch(console.error);
+      }
+      
+      return res.status(err.code === 'LIMIT_FILE_SIZE' ? 413 : 400).json({
+        error: err.code === 'LIMIT_FILE_SIZE' 
+          ? 'File too large (max 100MB)' 
+          : 'Upload failed'
+      });
+    }
 
-    await validateUploadedFile(req.file.path);
-
-    if (req.file.mimetype !== 'video/mp4' && videoTypes.has(req.file.mimetype) && ffmpegAvailable) {
-      const startTime = Date.now();
-      req.file.path = await convertToCompatibleFormat(req.file.path, req.file.mimetype);
-      req.file.filename = path.basename(req.file.path);
-      req.file.mimetype = 'video/mp4';
-      console.log(`Conversion took ${(Date.now() - startTime) / 1000}s`);
-    } else if (videoTypes.has(req.file.mimetype) && !ffmpegAvailable) {
-      console.warn('⚠️ Video uploaded but not converted due to missing FFmpeg');
+    // Debug the actual uploaded file
+    if (req.file) {
+      try {
+        const stats = await fs.stat(req.file.path);
+        console.log('Uploaded file verified:', {
+          size: stats.size,
+          path: req.file.path,
+          expected: req.headers['content-length']
+        });
+      } catch (e) {
+        console.error('File verification failed:', e);
+      }
     }
 
     next();
-  } catch (err) {
-    console.error('Upload/Processing error:', err);
-    res.status(err instanceof multer.MulterError ? 400 : 500).json({
-      error: 'File processing failed',
-      details: err.message,
-    });
-  }
+  });
 };
 
 // Upload profile picture middleware
