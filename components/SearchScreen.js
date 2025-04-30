@@ -52,7 +52,7 @@ const SearchScreen = () => {
         }
 
         const baseUrl = NGROK_URL.replace(/\/+$/, "");
-        const searchUrl = `${baseUrl}/api/search-users`;
+        const searchUrl = `${baseUrl}/api/profile/search-users`;
         console.log("Search query:", query); // Log the query
         console.log(
           "Full request URL:",

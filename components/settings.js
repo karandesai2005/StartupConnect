@@ -242,8 +242,17 @@ export default function SettingsScreen() {
   };
 
   const handleFeedbackSubmit = async () => {
-    if (!feedbackText.trim()) {
+    const trimmedFeedback = feedbackText.trim();
+    if (!trimmedFeedback) {
       Alert.alert('Error', 'Please enter your feedback before submitting.');
+      return;
+    }
+    if (trimmedFeedback.length < 5) {
+      Alert.alert('Error', 'Feedback must be at least 5 characters long.');
+      return;
+    }
+    if (trimmedFeedback.length > 1000) {
+      Alert.alert('Error', 'Feedback cannot exceed 1000 characters.');
       return;
     }
 
@@ -263,9 +272,9 @@ export default function SettingsScreen() {
       }
 
       const baseUrl = NGROK_URL.replace(/\/+$/, '');
-      await axios.post(
+      const response = await axios.post(
         `${baseUrl}/api/feedback`,
-        { feedback: feedbackText },
+        { feedback: trimmedFeedback },
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -278,8 +287,9 @@ export default function SettingsScreen() {
       setFeedbackModalVisible(false);
       Alert.alert('Success', 'Thank you for your feedback!');
     } catch (error) {
-      console.error('Error submitting feedback:', error);
-      Alert.alert('Error', 'Failed to submit feedback. Please try again.');
+      console.error('Error submitting feedback:', error.response?.data || error.message);
+      const errorMessage = error.response?.data?.error || 'Failed to submit feedback. Please try again.';
+      Alert.alert('Error', errorMessage);
     } finally {
       setFeedbackSubmitting(false);
     }
@@ -786,7 +796,6 @@ export default function SettingsScreen() {
     </SafeAreaView>
   );
 }
-
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,

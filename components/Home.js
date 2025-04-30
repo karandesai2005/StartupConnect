@@ -89,35 +89,45 @@ const PostCard = memo(
       const rawMediaUrl = item.image_url || item.media_url;
       console.log(`PostCard: Processing media for post ${item.post_id || item.login?.uuid}:`, { rawMediaUrl, media_type: item.media_type });
 
-      if (!rawMediaUrl || typeof rawMediaUrl !== 'string') {
+      if (!rawMediaUrl) {
         console.warn(`PostCard: Invalid media_url for post ${item.post_id || item.login?.uuid}`, { rawMediaUrl });
         setImageHeight(width);
         setIsLoading(false);
         return;
       }
 
-      const mediaUrl = rawMediaUrl.startsWith('http') ? rawMediaUrl : `${NGROK_URL}${rawMediaUrl}`;
+      const isStringUrl = typeof rawMediaUrl === 'string';
+      const mediaUrl = isStringUrl && rawMediaUrl.startsWith('http') 
+        ? rawMediaUrl 
+        : isStringUrl ? `${NGROK_URL}${rawMediaUrl}` : null;
 
-      const isVideoPost = item.media_type === 'video' || mediaUrl.match(/\.(mp4|mov|avi|wmv|3gp|mkv)$/i);
+      const isVideoPost = item.media_type === 'video' || (isStringUrl && mediaUrl?.match(/\.(mp4|mov|avi|wmv|3gp|mkv)$/i));
       if (isVideoPost) {
         setIsVideo(true);
         setImageHeight((width * 5) / 4);
         setIsLoading(false);
       } else {
-        Image.getSize(
-          mediaUrl,
-          (originalWidth, originalHeight) => {
-            const aspectRatio = originalWidth / originalHeight;
-            setImageHeight(width / aspectRatio);
-            setIsLoading(false);
-            console.log(`PostCard: Image size for post ${item.post_id || item.login?.uuid}:`, { width: originalWidth, height: originalHeight });
-          },
-          (error) => {
-            console.error(`PostCard: Error getting image size for post ${item.post_id || item.login?.uuid}:`, error);
-            setImageHeight(width);
-            setIsLoading(false);
-          }
-        );
+        // Handle local assets or URLs
+        if (isStringUrl && mediaUrl) {
+          Image.getSize(
+            mediaUrl,
+            (originalWidth, originalHeight) => {
+              const aspectRatio = originalWidth / originalHeight;
+              setImageHeight(width / aspectRatio);
+              setIsLoading(false);
+              console.log(`PostCard: Image size for post ${item.post_id || item.login?.uuid}:`, { width: originalWidth, height: originalHeight });
+            },
+            (error) => {
+              console.error(`PostCard: Error getting image size for post ${item.post_id || item.login?.uuid}:`, error);
+              setImageHeight(width);
+              setIsLoading(false);
+            }
+          );
+        } else {
+          // Assume local asset
+          setImageHeight(width); // Default for local assets
+          setIsLoading(false);
+        }
       }
     }, [item]);
 
@@ -279,11 +289,26 @@ const PostCard = memo(
       }
     };
 
-    const mediaSource = typeof (item.image_url || item.media_url) === 'string' &&
+    const mediaSource = (item.image_url || item.media_url) && 
+      typeof (item.image_url || item.media_url) === 'string' &&
       !(item.image_url || item.media_url).includes('undefined') &&
       !(item.image_url || item.media_url).includes('null')
       ? { uri: (item.image_url || item.media_url).startsWith('http') ? (item.image_url || item.media_url) : `${NGROK_URL}${item.image_url || item.media_url}` }
-      : require('../assets/PITCH.png');
+      : (item.image_url || item.media_url) || require('../assets/PITCH.png');
+
+    // Debug profile picture
+    console.log(`PostCard: Profile picture for post ${item.post_id || item.login?.uuid}:`, {
+      profile_picture: item.profile_picture,
+      isString: typeof item.profile_picture === 'string',
+      isValidUrl: typeof item.profile_picture === 'string' && item.profile_picture.startsWith('http'),
+    });
+
+    const profilePictureSource = (() => {
+      if (typeof item.profile_picture === 'string' && item.profile_picture.startsWith('http')) {
+        return { uri: item.profile_picture };
+      }
+      return item.profile_picture || require('../assets/profiledefault.jpg');
+    })();
 
     return (
       <Animated.View style={[styles.card, { transform: [{ scale: animatedScale }] }]}>
@@ -292,11 +317,7 @@ const PostCard = memo(
             <View style={styles.userInfo}>
               <TouchableOpacity onPress={handleProfilePress}>
                 <Image
-                  source={
-                    typeof item.profile_picture === 'string' && item.profile_picture.startsWith('http')
-                      ? { uri: item.profile_picture }
-                      : require('../assets/profiledefault.jpg')
-                  }
+                  source={profilePictureSource}
                   style={styles.avatar}
                   onError={(e) => console.error(`PostCard: Profile picture error for post ${item.post_id || item.login?.uuid}:`, e.nativeEvent.error)}
                 />
@@ -533,10 +554,7 @@ export default function Home() {
       (user) =>
         user &&
         user.login?.uuid &&
-        user.image_url &&
-        typeof user.image_url === 'string' &&
-        !String(user.image_url).includes("undefined") &&
-        !String(user.image_url).includes("null")
+        (user.image_url || user.media_url)
     );
     console.log('Home.js: Combined data:', { posts: validPosts.length, users: validUsers.length });
     return [...validPosts, ...validUsers];
@@ -552,7 +570,8 @@ export default function Home() {
     async (refresh = false) => {
       try {
         setLoading(true);
-        const page = currentPage > 10 ? 1 : currentPage;
+        const page = refresh ? 1 : currentPage;
+        console.log(`Home.js: Fetching mock posts for page ${page}`);
         const response = await axios.get(
           `https://jsonplaceholder.typicode.com/posts?_page=${page}&_limit=10`
         );
@@ -574,7 +593,7 @@ export default function Home() {
             }
             const nameParts = user.name.split(" ");
             return {
-              login: { uuid: `${post.id}-${currentPage}` },
+              login: { uuid: `${post.id}-${page}` },
               name: {
                 first: nameParts[0],
                 last: nameParts.slice(1).join(" ") || "",
@@ -596,9 +615,10 @@ export default function Home() {
         } else {
           setUsers((prev) => [...prev, ...mappedUsers]);
         }
+        console.log(`Home.js: Loaded ${mappedUsers.length} mock posts for page ${page}`);
       } catch (error) {
-        console.error("Home.js: Error loading users:", error);
-        Alert.alert("Error", "Failed to load posts. Please try again.");
+        console.error("Home.js: Error loading mock posts:", error);
+        Alert.alert("Error", "Failed to load mock posts. Please try again.");
       } finally {
         setLoading(false);
         setRefreshing(false);
@@ -616,23 +636,27 @@ export default function Home() {
         timeout: 10000,
         headers: { Authorization: `Bearer ${await AsyncStorage.getItem('token')}` },
       });
-      console.log("Home.js: Posts API response:", response.data);
+      console.log("Home.js: Posts API raw response:", response.data);
       if (response.data && Array.isArray(response.data)) {
         const mappedPosts = response.data
           .filter((post) => post && post.post_id && (post.media_url ? typeof post.media_url === 'string' : true))
-          .map((post) => ({
-            _id: post.post_id,
-            post_id: post.post_id,
-            username: post.users?.username || post.username,
-            profile_picture: post.users?.profile_picture || post.profile_picture,
-            image_url: post.media_url || null,
-            media_type: post.media_type || (post.media_url?.match(/\.(mp4|mov|avi|wmv|3gp|mkv)$/i) ? 'video' : post.media_url?.match(/\.(jpg|jpeg|png|gif)$/i) ? 'image' : null),
-            content: post.content || '',
-            created_at: post.created_at,
-            likes: post.like_count || post.likes || 0,
-            comment_count: post.comment_count || 0,
-            caption: post.content || '',
-          }));
+          .map((post) => {
+            const profilePicture = post.users?.profile_picture || post.profile_picture;
+            console.log(`Home.js: Mapping post ${post.post_id}:`, { profile_picture: profilePicture });
+            return {
+              _id: post.post_id,
+              post_id: post.post_id,
+              username: post.users?.username || post.username,
+              profile_picture: typeof profilePicture === 'string' && profilePicture.startsWith('http') ? profilePicture : null,
+              image_url: post.media_url || null,
+              media_type: post.media_type || (post.media_url?.match(/\.(mp4|mov|avi|wmv|3gp|mkv)$/i) ? 'video' : post.media_url?.match(/\.(jpg|jpeg|png|gif)$/i) ? 'image' : null),
+              content: post.content || '',
+              created_at: post.created_at,
+              likes: post.like_count || post.likes || 0,
+              comment_count: post.comment_count || 0,
+              caption: post.content || '',
+            };
+          });
         const sortedPosts = mappedPosts
           .filter(
             (post) => post.image_url && !post.image_url.includes("undefined") && !post.image_url.includes("null")
@@ -692,6 +716,10 @@ export default function Home() {
       Alert.alert("Error", "Failed to load user data. Please try again.");
     }
   }, [navigation]);
+
+  useEffect(() => {
+    loadUsers(); // Fetch mock posts when currentPage changes
+  }, [currentPage, loadUsers]);
 
   useFocusEffect(
     useCallback(() => {

@@ -18,7 +18,7 @@ import { FontAwesome } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import Popup from "./Popup";
 import { supabase } from '../services/supabase';
-import AsyncStorage from '@react-native-async-storage/async-storage'; // Add this import
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const LoginScreen = () => {
   const [usernameOrEmail, setUsernameOrEmail] = useState("");
@@ -29,7 +29,7 @@ const LoginScreen = () => {
   const navigation = useNavigation();
 
   const validateInput = () => {
-    return usernameOrEmail !== "" && password !== "";
+    return usernameOrEmail.trim() !== "" && password.trim() !== "";
   };
 
   const handleLogin = async () => {
@@ -42,30 +42,48 @@ const LoginScreen = () => {
     setIsLoading(true);
 
     try {
-      let emailToUse = usernameOrEmail;
-      if (!usernameOrEmail.includes('@')) {
+      let emailToUse = usernameOrEmail.trim();
+      if (!emailToUse.includes('@')) {
+        console.log('Looking up email for username:', emailToUse);
         const { data, error } = await supabase
           .from('users')
           .select('email')
-          .eq('username', usernameOrEmail)
-          .single();
-        if (error || !data) throw new Error('Username not found');
-        emailToUse = data.email;
+          .eq('username', emailToUse.toLowerCase()) // Use .eq and lowercase
+          .limit(1);
+        if (error) {
+          console.error('Username query error:', error.message);
+          throw new Error('Error querying username. Please try again.');
+        }
+        if (!data || data.length === 0) {
+          console.error('No user found for username:', emailToUse);
+          throw new Error('Username not found');
+        }
+        emailToUse = data[0].email;
+        console.log('Found email:', emailToUse);
       }
 
+      console.log('Attempting login with email:', emailToUse);
       const { data, error } = await supabase.auth.signInWithPassword({
         email: emailToUse,
         password,
       });
-      if (error) throw error;
+      if (error) {
+        console.error('Sign-in error:', error.message);
+        throw new Error(error.message || 'Invalid credentials');
+      }
 
       if (data.session) {
-        // Store token in AsyncStorage
-        await AsyncStorage.setItem('authToken', data.session.access_token);
-        navigation.replace("Main");
+        console.log('Login successful, storing tokens:', data.session.access_token.substring(0, 10) + '...');
+        await AsyncStorage.multiSet([
+          ['token', data.session.access_token],
+          ['refresh_token', data.session.refresh_token],
+        ]);
+        navigation.navigate("Main");
+      } else {
+        throw new Error('No session returned');
       }
     } catch (err) {
-      console.error("Login error:", err);
+      console.error("Login error:", err.message);
       setPopupMessage(err.message || "Network error. Please try again later.");
       setIsPopupVisible(true);
     } finally {
@@ -102,6 +120,7 @@ const LoginScreen = () => {
               placeholderTextColor="#aaa"
               value={usernameOrEmail}
               onChangeText={setUsernameOrEmail}
+              autoCapitalize="none"
             />
             <TextInput
               placeholder="Password"
