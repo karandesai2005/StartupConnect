@@ -2,13 +2,7 @@ require('dotenv').config();
 const Post = require('../models/postModel');
 const User = require('../models/userModel');
 const path = require('path');
-const { createClient } = require('@supabase/supabase-js');
-
-// Initialize Supabase client
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+const { supabase } = require('../services/supabase'); // Use centralized Supabase client
 
 // Utility Functions
 const getUserId = async (req) => {
@@ -50,7 +44,7 @@ const postController = {
           });
 
         if (error) {
-          console.error('postController.js: Supabase upload error:', error);
+          console.error('postController.js: Supabase upload error:', error.message);
           return res.status(500).json({ error: 'Failed to upload file' });
         }
 
@@ -70,7 +64,7 @@ const postController = {
 
       res.status(201).json(newPost);
     } catch (error) {
-      console.error('postController.js: Create post error:', error.stack);
+      console.error('postController.js: Create post error:', error.message);
       res.status(error.message.includes('required') ? 400 : 500).json({ error: error.message });
     }
   },
@@ -86,7 +80,7 @@ const postController = {
 
       res.status(200).json({ message: 'Post deleted successfully', result });
     } catch (error) {
-      console.error('postController.js: Delete post error:', error.stack);
+      console.error('postController.js: Delete post error:', error.message);
       if (error.message.includes('not found') || error.message.includes('unauthorized')) {
         return res.status(403).json({ error: 'Post not found or unauthorized' });
       }
@@ -103,7 +97,7 @@ const postController = {
 
       res.status(200).json(posts);
     } catch (error) {
-      console.error('postController.js: Get all posts error:', error.stack);
+      console.error('postController.js: Get all posts error:', error.message);
       res.status(500).json({ error: 'Server error' });
     }
   },
@@ -123,7 +117,7 @@ const postController = {
 
       res.status(200).json(posts);
     } catch (error) {
-      console.error('postController.js: Get user posts error:', error.stack);
+      console.error('postController.js: Get user posts error:', error.message);
       res.status(500).json({ error: 'Server error' });
     }
   },
@@ -140,7 +134,7 @@ const postController = {
 
       res.status(200).json(posts);
     } catch (error) {
-      console.error('postController.js: Get posts by username error:', error.stack);
+      console.error('postController.js: Get posts by username error:', error.message);
       if (error.message.includes('User not found')) {
         return res.status(404).json({ error: 'User not found' });
       }
@@ -160,7 +154,7 @@ const postController = {
 
       res.status(200).json({ success: true, liked: result.liked, like_count: result.like_count });
     } catch (error) {
-      console.error('postController.js: Toggle like error:', error.stack);
+      console.error('postController.js: Toggle like error:', error.message);
       if (error.message.includes('Post not found')) {
         return res.status(404).json({ error: 'Post not found' });
       }
@@ -168,22 +162,22 @@ const postController = {
     }
   },
 
-  getLikeStatus: async (req, res) => {
+  getLikeStatus: async (req, response) => {
     try {
       const userId = await getUserId(req);
-      if (!userId) return res.status(401).json({ error: 'User authentication required' });
+      if (!userId) return response.status(401).json({ error: 'User authentication required' });
 
       const { postId } = req.params;
       const status = await Post.getLikeStatus(validateId(postId, 'Post ID'), userId);
       console.log('postController.js: Fetched like status:', { postId, userId, status });
 
-      res.status(200).json(status);
+      response.status(200).json(status);
     } catch (error) {
-      console.error('postController.js: Get like status error:', error.stack);
+      console.error('postController.js: Get like status error:', error.message);
       if (error.message.includes('Post not found')) {
-        return res.status(404).json({ error: 'Post not found' });
+        return response.status(404).json({ error: 'Post not found' });
       }
-      res.status(error.message.includes('valid number') ? 400 : 500).json({ error: error.message });
+      response.status(error.message.includes('valid number') ? 400 : 500).json({ error: error.message });
     }
   },
 
@@ -200,7 +194,7 @@ const postController = {
 
       res.status(200).json(comments);
     } catch (error) {
-      console.error('postController.js: Get comments error:', error.stack);
+      console.error('postController.js: Get comments error:', error.message);
       if (error.message.includes('Post not found')) {
         return res.status(404).json({ error: 'Post not found' });
       }
@@ -226,7 +220,7 @@ const postController = {
 
       res.status(201).json(newComment);
     } catch (error) {
-      console.error('postController.js: Create comment error:', error.stack);
+      console.error('postController.js: Create comment error:', error.message);
       if (error.message.includes('Post not found')) {
         return res.status(404).json({ error: 'Post not found' });
       }

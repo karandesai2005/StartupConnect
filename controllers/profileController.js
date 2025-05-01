@@ -8,6 +8,9 @@ const { queryDB } = require('../config/db');
 const { uploadAndConvertPostMedia, uploadProfilePicture } = require('../config/multerConfig');
 const path = require('path');
 
+// Constants
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB limit, matching frontend
+
 // Utility Functions
 const getUserId = async (req) => {
   const uuid = req.user?.id; // UUID from Supabase auth
@@ -56,7 +59,7 @@ const profileController = {
 
       res.json({ ...data, profile_picture: cleanUrl(data.profile_picture) });
     } catch (error) {
-      console.error('Get profile error:', error);
+      console.error('Get profile error:', error.message);
       res.status(500).json({ error: 'Server error' });
     }
   },
@@ -76,65 +79,35 @@ const profileController = {
 
       res.json({ ...user, profile_picture: cleanUrl(user.profile_picture), isFollowing });
     } catch (error) {
-      console.error('Get user profile error:', error);
+      console.error('Get user profile error:', error.message);
       res.status(error.message.includes('Username') ? 400 : 500).json({ error: error.message });
     }
   },
 
-  updateProfile: [
-    uploadProfilePicture,
-    async (req, res) => {
-      try {
-        const supabase_uid = req.user.id;
-        const { bio } = req.body;
-        const profilePicture = req.file;
+  updateProfile: async (req, res) => {
+    try {
+      const supabase_uid = req.user.id;
+      const { bio } = req.body;
 
-        console.log('Received bio:', bio);
-        console.log('Received file:', profilePicture);
-
-        let updates = {};
-        if (bio) updates.bio = bio;
-        if (profilePicture) {
-          const fileName = `profile-${Date.now()}${path.extname(profilePicture.originalname)}`;
-          const { data, error } = await supabase.storage
-            .from('profile-pictures')
-            .upload(fileName, profilePicture.buffer, {
-              contentType: profilePicture.mimetype,
-            });
-
-          if (error) {
-            console.error('profileController.js: Supabase upload error:', error);
-            return res.status(500).json({ error: 'Failed to upload profile picture' });
-          }
-
-          const { data: urlData } = supabase.storage
-            .from('profile-pictures')
-            .getPublicUrl(fileName);
-
-          updates.profile_picture = urlData.publicUrl;
-          console.log('profileController.js: Profile picture uploaded:', updates.profile_picture);
-        }
-
-        if (Object.keys(updates).length === 0) {
-          return res.status(400).json({ error: 'No fields to update.' });
-        }
-
-        const { data, error } = await supabase
-          .from('users')
-          .update(updates)
-          .eq('supabase_uid', supabase_uid)
-          .select('user_id, username, email, name, bio, profile_picture, is_personal, is_business')
-          .single();
-        if (error) throw error;
-
-        console.log('Updated user:', data);
-        res.status(200).json({ ...data, profile_picture: cleanUrl(data.profile_picture) });
-      } catch (error) {
-        console.error('Update profile error:', error);
-        res.status(error.message.includes('No fields') ? 400 : 500).json({ error: error.message });
+      if (!bio) {
+        return res.status(400).json({ error: 'Bio is required' });
       }
-    },
-  ],
+
+      const { data, error } = await supabase
+        .from('users')
+        .update({ bio })
+        .eq('supabase_uid', supabase_uid)
+        .select('user_id, username, email, name, bio, profile_picture, is_personal, is_business')
+        .single();
+      if (error) throw error;
+
+      console.log('Updated user:', data);
+      res.status(200).json({ ...data, profile_picture: cleanUrl(data.profile_picture) });
+    } catch (error) {
+      console.error('Update profile error:', error.message);
+      res.status(error.message.includes('required') ? 400 : 500).json({ error: error.message });
+    }
+  },
 
   updateProfilePicture: [
     uploadProfilePicture,
@@ -143,6 +116,20 @@ const profileController = {
         const supabase_uid = req.user.id;
         if (!req.file) return res.status(400).json({ error: 'Profile picture required' });
 
+        // Validate file size
+        if (req.file.size > MAX_FILE_SIZE) {
+          return res.status(400).json({ error: 'File size exceeds 5MB limit' });
+        }
+
+        // Fetch current profile picture to clean up later
+        const { data: user, error: fetchError } = await supabase
+          .from('users')
+          .select('profile_picture')
+          .eq('supabase_uid', supabase_uid)
+          .single();
+        if (fetchError) throw fetchError;
+
+        // Upload new profile picture
         const fileName = `profile-${Date.now()}${path.extname(req.file.originalname)}`;
         const { data, error } = await supabase.storage
           .from('profile-pictures')
@@ -151,7 +138,7 @@ const profileController = {
           });
 
         if (error) {
-          console.error('profileController.js: Supabase upload error:', error);
+          console.error('profileController.js: Supabase upload error:', error.message);
           return res.status(500).json({ error: 'Failed to upload profile picture' });
         }
 
@@ -162,6 +149,7 @@ const profileController = {
         const profilePictureUrl = urlData.publicUrl;
         console.log(`Updating profile picture for user ${supabase_uid}: ${profilePictureUrl}`);
 
+        // Update user with new profile picture URL
         const { data: updatedData, error: updateError } = await supabase
           .from('users')
           .update({ profile_picture: profilePictureUrl })
@@ -170,12 +158,16 @@ const profileController = {
           .single();
         if (updateError) throw updateError;
 
-        res.status(200).json({
-          message: 'Profile picture updated successfully',
-          user: { ...updatedData, profile_picture: cleanUrl(updatedData.profile_picture) },
-        });
+        // Clean up old profile picture if it exists
+        if (user.profile_picture) {
+          const oldFileName = user.profile_picture.split('/').pop();
+          await supabase.storage.from('profile-pictures').remove([oldFileName]);
+          console.log(`Deleted old profile picture: ${oldFileName}`);
+        }
+
+        res.status(200).json({ user: { ...updatedData, profile_picture: cleanUrl(updatedData.profile_picture) } });
       } catch (error) {
-        console.error('Update profile picture error:', error);
+        console.error('Update profile picture error:', error.message);
         res.status(error.message.includes('Profile picture') ? 400 : 500).json({ error: error.message });
       }
     },
@@ -185,12 +177,12 @@ const profileController = {
     try {
       const { username } = req.params;
       validateString(username, 'Username', 3, 20);
-  
+
       const user = await User.getUserByUsername(username);
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
-  
+
       const postsQuery = `
         SELECT p.post_id, p.user_id, u.username, u.name, p.media_url, p.content, p.created_at, p.media_type,
                (SELECT COUNT(*) FROM likes WHERE post_id = p.post_id) AS like_count,
@@ -202,17 +194,17 @@ const profileController = {
         ORDER BY p.created_at DESC
       `;
       const posts = await queryDB(postsQuery, [user.user_id]);
-  
+
       res.json(posts.map(post => ({
         ...post,
         media_url: cleanUrl(post.media_url),
         profile_picture: cleanUrl(post.profile_picture || ''),
         name: post.name || post.username,
         comment_count: Number(post.comment_count) || 0,
-        like_count: Number(post.like_count) || 0
+        like_count: Number(post.like_count) || 0,
       })));
     } catch (error) {
-      console.error('Get user posts by username error:', error);
+      console.error('Get user posts by username error:', error.message);
       res.status(error.message.includes('Username') ? 400 : 500).json({ error: error.message });
     }
   },
@@ -236,7 +228,7 @@ const profileController = {
         profile_picture: cleanUrl(user.profile_picture),
       })));
     } catch (error) {
-      console.error('Search users error:', error);
+      console.error('Search users error:', error.message);
       res.status(500).json({ error: 'Server error' });
     }
   },
@@ -251,7 +243,7 @@ const profileController = {
       await queryDB(query, []);
       res.status(200).json({ message: 'Profile picture URLs normalized' });
     } catch (error) {
-      console.error('Fix profile picture URLs error:', error);
+      console.error('Fix profile picture URLs error:', error.message);
       res.status(500).json({ error: 'Server error' });
     }
   },
@@ -284,7 +276,7 @@ const profileController = {
         followers: updatedUser.followers || 0,
       });
     } catch (error) {
-      console.error('Follow user error:', error);
+      console.error('Follow user error:', error.message);
       res.status(error.message.includes('Username') ? 400 : 500).json({ error: error.message });
     }
   },
@@ -317,7 +309,7 @@ const profileController = {
         followers: updatedUser.followers || 0,
       });
     } catch (error) {
-      console.error('Unfollow user error:', error);
+      console.error('Unfollow user error:', error.message);
       res.status(error.message.includes('Username') ? 400 : 500).json({ error: error.message });
     }
   },
@@ -336,7 +328,7 @@ const profileController = {
         image_url: cleanUrl(story.image_url),
       })));
     } catch (error) {
-      console.error('Get stories error:', error);
+      console.error('Get stories error:', error.message);
       res.status(500).json({ error: 'Server error' });
     }
   },
@@ -358,7 +350,7 @@ const profileController = {
         image_url: cleanUrl(story.image_url),
       })));
     } catch (error) {
-      console.error('Get user stories error:', error);
+      console.error('Get user stories error:', error.message);
       res.status(error.message.includes('Username') ? 400 : 500).json({ error: error.message });
     }
   },
@@ -371,23 +363,28 @@ const profileController = {
         if (!userId) return res.status(401).json({ error: 'User authentication required' });
         if (!req.file) return res.status(400).json({ error: 'Media file required' });
 
+        // Validate file size
+        if (req.file.size > MAX_FILE_SIZE) {
+          return res.status(400).json({ error: 'File size exceeds 5MB limit' });
+        }
+
         const user = await User.getUserById(userId);
         if (!user) return res.status(404).json({ error: 'User not found' });
 
         const fileName = `story-${Date.now()}${path.extname(req.file.originalname)}`;
         const { data, error } = await supabase.storage
-          .from('posts') // Using 'posts' bucket for stories as well
+          .from('stories') // Use dedicated 'stories' bucket
           .upload(fileName, req.file.buffer, {
             contentType: req.file.mimetype,
           });
 
         if (error) {
-          console.error('profileController.js: Supabase upload error (story):', error);
+          console.error('profileController.js: Supabase upload error (story):', error.message);
           return res.status(500).json({ error: 'Failed to upload story media' });
         }
 
         const { data: urlData } = supabase.storage
-          .from('posts')
+          .from('stories')
           .getPublicUrl(fileName);
 
         const imageUrl = urlData.publicUrl;
@@ -398,7 +395,7 @@ const profileController = {
         const storyId = await Story.create(userId, username, imageUrl, 1, 0, section);
         res.status(201).json({ story_id: storyId, image_url: imageUrl, section });
       } catch (error) {
-        console.error('Add story error:', error);
+        console.error('Add story error:', error.message);
         res.status(500).json({ error: 'Server error' });
       }
     },
@@ -415,7 +412,7 @@ const profileController = {
       if (!deleted) return res.status(404).json({ error: 'Story not found or unauthorized' });
       res.status(200).json({ message: 'Story deleted successfully' });
     } catch (error) {
-      console.error('Delete story error:', error);
+      console.error('Delete story error:', error.message);
       res.status(error.message.includes('valid number') ? 400 : 500).json({ error: error.message });
     }
   },
@@ -434,7 +431,7 @@ const profileController = {
         image_uri: cleanUrl(section.image_uri),
       })));
     } catch (error) {
-      console.error('Get sections error:', error);
+      console.error('Get sections error:', error.message);
       res.status(500).json({ error: 'Server error' });
     }
   },
@@ -456,7 +453,7 @@ const profileController = {
         image_uri: cleanUrl(section.image_uri),
       })));
     } catch (error) {
-      console.error('Get user sections error:', error);
+      console.error('Get user sections error:', error.message);
       res.status(error.message.includes('Username') ? 400 : 500).json({ error: error.message });
     }
   },
@@ -489,7 +486,7 @@ const profileController = {
         res.status(201).json({ section_id: sectionId });
       }
     } catch (error) {
-      console.error('Add section error:', error);
+      console.error('Add section error:', error.message);
       res.status(error.message.includes('must be') ? 400 : 500).json({ error: error.message });
     }
   },
@@ -505,7 +502,7 @@ const profileController = {
       if (!deleted) return res.status(404).json({ error: 'Section not found or unauthorized' });
       res.status(200).json({ message: 'Section deleted successfully' });
     } catch (error) {
-      console.error('Delete section error:', error);
+      console.error('Delete section error:', error.message);
       res.status(error.message.includes('valid number') ? 400 : 500).json({ error: error.message });
     }
   },
@@ -521,7 +518,7 @@ const profileController = {
 
       res.json(graphs);
     } catch (error) {
-      console.error('Get graphs error:', error);
+      console.error('Get graphs error:', error.message);
       res.status(500).json({ error: 'Server error' });
     }
   },
@@ -540,7 +537,7 @@ const profileController = {
 
       res.json(graphs);
     } catch (error) {
-      console.error('Get user graphs error:', error);
+      console.error('Get user graphs error:', error.message);
       res.status(error.message.includes('Username') ? 400 : 500).json({ error: error.message });
     }
   },
@@ -558,7 +555,7 @@ const profileController = {
       const graphId = await Graph.create(userId, type, title, data);
       res.status(201).json({ graph_id: graphId });
     } catch (error) {
-      console.error('Add graph error:', error);
+      console.error('Add graph error:', error.message);
       res.status(error.message.includes('must be') || error.message.includes('required') ? 400 : 500).json({
         error: error.message,
       });
@@ -576,7 +573,7 @@ const profileController = {
       if (!deleted) return res.status(404).json({ error: 'Graph not found or unauthorized' });
       res.status(200).json({ message: 'Graph deleted successfully' });
     } catch (error) {
-      console.error('Delete graph error:', error);
+      console.error('Delete graph error:', error.message);
       res.status(error.message.includes('valid number') ? 400 : 500).json({ error: error.message });
     }
   },
