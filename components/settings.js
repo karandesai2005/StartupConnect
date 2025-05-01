@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -24,6 +24,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../services/supabase';
 
 const { width } = Dimensions.get('window');
+const isDev = __DEV__;
+const log = (...args) => isDev && console.log(...args);
 
 export default function SettingsScreen() {
   const navigation = useNavigation();
@@ -32,6 +34,7 @@ export default function SettingsScreen() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [dataLoading, setDataLoading] = useState(true);
+  const [profileImageError, setProfileImageError] = useState(false);
   const [feedbackModalVisible, setFeedbackModalVisible] = useState(false);
   const [accountModalVisible, setAccountModalVisible] = useState(false);
   const [privacyModalVisible, setPrivacyModalVisible] = useState(false);
@@ -48,7 +51,7 @@ export default function SettingsScreen() {
       setDataLoading(true);
       let token = await AsyncStorage.getItem('token');
       if (!token) {
-        console.log('No token, refreshing session');
+        log('No token, refreshing session');
         const { data: { session }, error } = await supabase.auth.refreshSession();
         if (error || !session) {
           console.error('Session refresh failed:', error?.message);
@@ -60,19 +63,40 @@ export default function SettingsScreen() {
       }
 
       const baseUrl = NGROK_URL.replace(/\/+$/, '');
-      const response = await axios.get(`${baseUrl}/api/profile`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      const headers = {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      };
+      let retryCount = 0;
+      const maxRetries = 3;
 
-      if (response.data) {
-        setUserData(response.data);
-        await AsyncStorage.setItem('userData', JSON.stringify(response.data));
+      while (retryCount < maxRetries) {
+        try {
+          const response = await axios.get(`${baseUrl}/api/profile`, { headers });
+          if (response.data) {
+            setUserData(response.data);
+            await AsyncStorage.setItem('userData', JSON.stringify(response.data));
+            break;
+          }
+        } catch (error) {
+          retryCount++;
+          if (retryCount === maxRetries) {
+            throw error;
+          }
+          console.warn(`Retry ${retryCount}/${maxRetries} for fetching user data:`, error.message);
+          await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retryCount)));
+
+          const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
+          if (refreshError || !session) {
+            throw new Error('Session refresh failed during retry');
+          }
+          token = session.access_token;
+          await AsyncStorage.setItem('token', token);
+          headers.Authorization = `Bearer ${token}`;
+        }
       }
     } catch (error) {
-      console.error('Error fetching user data:', error);
+      console.error('Error fetching user data:', error.message);
       const cachedData = await AsyncStorage.getItem('userData');
       if (cachedData) {
         setUserData(JSON.parse(cachedData));
@@ -133,9 +157,20 @@ export default function SettingsScreen() {
 
       if (!result.canceled && result.assets[0].uri) {
         setLoading(true);
+        const uri = result.assets[0].uri;
+        const fileExtension = uri.split('.').pop().toLowerCase();
+        const mimeType = fileExtension === 'png' ? 'image/png' : 'image/jpeg';
+        const fileName = `profile-picture-${Date.now()}.${fileExtension}`;
+
+        // Basic size validation (max 5MB)
+        const maxSizeBytes = 5 * 1024 * 1024; // 5MB
+        if (result.assets[0].fileSize && result.assets[0].fileSize > maxSizeBytes) {
+          throw new Error('Image size exceeds 5MB. Please choose a smaller image.');
+        }
+
         let token = await AsyncStorage.getItem('token');
         if (!token) {
-          console.log('No token, refreshing session');
+          log('No token, refreshing session');
           const { data: { session }, error } = await supabase.auth.refreshSession();
           if (error || !session) {
             console.error('Session refresh failed:', error?.message);
@@ -148,25 +183,50 @@ export default function SettingsScreen() {
 
         const formData = new FormData();
         formData.append('profilePicture', {
-          uri: result.assets[0].uri,
-          type: 'image/jpeg',
-          name: 'profile-picture.jpg',
+          uri: uri,
+          type: mimeType,
+          name: fileName,
         });
 
         const baseUrl = NGROK_URL.replace(/\/+$/, '');
-        await axios.post(`${baseUrl}/api/profile-picture`, formData, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'multipart/form-data',
-          },
-        });
+        let retryCount = 0;
+        const maxRetries = 3;
 
-        await fetchUserData();
-        Alert.alert('Success', 'Profile picture updated successfully!');
+        while (retryCount < maxRetries) {
+          try {
+            const response = await axios.post(`${baseUrl}/api/profile-picture`, formData, {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'multipart/form-data',
+              },
+            });
+
+            if (response.status === 200) {
+              await fetchUserData();
+              setProfileImageError(false);
+              Alert.alert('Success', 'Profile picture updated successfully!');
+              break;
+            }
+          } catch (error) {
+            retryCount++;
+            if (retryCount === maxRetries) {
+              throw error;
+            }
+            console.warn(`Retry ${retryCount}/${maxRetries} for profile picture upload:`, error.message);
+            await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retryCount)));
+
+            const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
+            if (refreshError || !session) {
+              throw new Error('Session refresh failed during retry');
+            }
+            token = session.access_token;
+            await AsyncStorage.setItem('token', token);
+          }
+        }
       }
     } catch (error) {
-      console.error('Error updating profile picture:', error);
-      Alert.alert('Error', 'Failed to update profile picture. Please try again.');
+      console.error('Error updating profile picture:', error.message);
+      Alert.alert('Error', error.message || 'Failed to update profile picture. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -208,7 +268,7 @@ export default function SettingsScreen() {
               setLoading(true);
               let token = await AsyncStorage.getItem('token');
               if (!token) {
-                console.log('No token, refreshing session');
+                log('No token, refreshing session');
                 const { data: { session }, error } = await supabase.auth.refreshSession();
                 if (error || !session) {
                   console.error('Session refresh failed:', error?.message);
@@ -220,17 +280,38 @@ export default function SettingsScreen() {
               }
 
               const baseUrl = NGROK_URL.replace(/\/+$/, '');
-              await axios.delete(`${baseUrl}/api/delete-account`, {
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                  'Content-Type': 'application/json',
-                },
-              });
+              const headers = {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              };
+              let retryCount = 0;
+              const maxRetries = 3;
 
-              await AsyncStorage.multiRemove(['token', 'userData']);
-              navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+              while (retryCount < maxRetries) {
+                try {
+                  await axios.delete(`${baseUrl}/api/delete-account`, { headers });
+                  await AsyncStorage.multiRemove(['token', 'userData']);
+                  navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+                  break;
+                } catch (error) {
+                  retryCount++;
+                  if (retryCount === maxRetries) {
+                    throw error;
+                  }
+                  console.warn(`Retry ${retryCount}/${maxRetries} for deleting account:`, error.message);
+                  await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retryCount)));
+
+                  const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
+                  if (refreshError || !session) {
+                    throw new Error('Session refresh failed during retry');
+                  }
+                  token = session.access_token;
+                  await AsyncStorage.setItem('token', token);
+                  headers.Authorization = `Bearer ${token}`;
+                }
+              }
             } catch (error) {
-              console.error('Error deleting account:', error);
+              console.error('Error deleting account:', error.message);
               Alert.alert('Error', 'Failed to delete account. Please try again.');
             } finally {
               setLoading(false);
@@ -260,7 +341,7 @@ export default function SettingsScreen() {
       setFeedbackSubmitting(true);
       let token = await AsyncStorage.getItem('token');
       if (!token) {
-        console.log('No token, refreshing session');
+        log('No token, refreshing session');
         const { data: { session }, error } = await supabase.auth.refreshSession();
         if (error || !session) {
           console.error('Session refresh failed:', error?.message);
@@ -272,22 +353,43 @@ export default function SettingsScreen() {
       }
 
       const baseUrl = NGROK_URL.replace(/\/+$/, '');
-      const response = await axios.post(
-        `${baseUrl}/api/feedback`,
-        { feedback: trimmedFeedback },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      const headers = {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      };
+      let retryCount = 0;
+      const maxRetries = 3;
 
-      setFeedbackText('');
-      setFeedbackModalVisible(false);
-      Alert.alert('Success', 'Thank you for your feedback!');
+      while (retryCount < maxRetries) {
+        try {
+          await axios.post(
+            `${baseUrl}/api/feedback`,
+            { feedback: trimmedFeedback },
+            { headers }
+          );
+          setFeedbackText('');
+          setFeedbackModalVisible(false);
+          Alert.alert('Success', 'Thank you for your feedback!');
+          break;
+        } catch (error) {
+          retryCount++;
+          if (retryCount === maxRetries) {
+            throw error;
+          }
+          console.warn(`Retry ${retryCount}/${maxRetries} for submitting feedback:`, error.message);
+          await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retryCount)));
+
+          const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
+          if (refreshError || !session) {
+            throw new Error('Session refresh failed during retry');
+          }
+          token = session.access_token;
+          await AsyncStorage.setItem('token', token);
+          headers.Authorization = `Bearer ${token}`;
+        }
+      }
     } catch (error) {
-      console.error('Error submitting feedback:', error.response?.data || error.message);
+      console.error('Error submitting feedback:', error.message);
       const errorMessage = error.response?.data?.error || 'Failed to submit feedback. Please try again.';
       Alert.alert('Error', errorMessage);
     } finally {
@@ -302,6 +404,16 @@ export default function SettingsScreen() {
       return () => {};
     }, [])
   );
+
+  const profilePictureSource = useMemo(() => {
+    if (profileImageError || 
+        typeof userData?.profile_picture !== 'string' || 
+        userData?.profile_picture.includes('undefined') || 
+        userData?.profile_picture.includes('null')) {
+      return require('../assets/profiledefault.jpg');
+    }
+    return { uri: userData.profile_picture };
+  }, [userData?.profile_picture, profileImageError]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -328,12 +440,12 @@ export default function SettingsScreen() {
                     <ActivityIndicator size="small" color="#1f219c" style={styles.loadingIndicator} />
                   ) : null}
                   <Image
-                    source={
-                      userData?.profile_picture
-                        ? { uri: userData.profile_picture }
-                        : require('../assets/profiledefault.jpg')
-                    }
+                    source={profilePictureSource}
                     style={styles.profileImage}
+                    onError={() => {
+                      console.error('SettingsScreen: Profile image loading error:', userData?.profile_picture);
+                      setProfileImageError(true);
+                    }}
                   />
                 </View>
               </TouchableOpacity>
@@ -389,6 +501,7 @@ export default function SettingsScreen() {
                   onValueChange={toggleNotifications}
                   value={notificationsEnabled}
                   style={styles.switch}
+                  accessibilityLabel="Push Notifications"
                 />
               </View>
 
@@ -409,6 +522,7 @@ export default function SettingsScreen() {
                   onValueChange={toggleEmailNotifications}
                   value={emailNotifications}
                   style={styles.switch}
+                  accessibilityLabel="Email Notifications"
                 />
               </View>
             </View>
@@ -796,6 +910,7 @@ export default function SettingsScreen() {
     </SafeAreaView>
   );
 }
+
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,

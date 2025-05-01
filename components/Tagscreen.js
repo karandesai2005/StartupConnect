@@ -15,6 +15,10 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { NGROK_URL } from "@env";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "../services/supabase";
+import * as FileSystem from "expo-file-system";
+
+const isDev = __DEV__;
+const log = (...args) => isDev && console.log(...args);
 
 const entrepreneurTechTags = [
   "Entrepreneurship",
@@ -66,13 +70,26 @@ export default function SelectTagsScreen() {
     }
   };
 
-  // In your SelectTagsScreen.js, update the uploadPost function:
-
   const uploadPost = async () => {
     try {
       setLoading(true);
+
+      const fileInfo = await FileSystem.getInfoAsync(media);
+      if (!fileInfo.exists) {
+        throw new Error("Media file not found.");
+      }
+      const mediaSize = fileInfo.size;
+
+      const maxSizeBytes = mediaType === "video" ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
+      if (mediaSize > maxSizeBytes) {
+        throw new Error(
+          `Media size exceeds limit (${mediaType === "video" ? "50MB" : "10MB"}). Please choose a smaller file.`
+        );
+      }
+
       let token = await AsyncStorage.getItem("token");
       if (!token) {
+        log("No token, refreshing session");
         const {
           data: { session },
           error,
@@ -86,12 +103,15 @@ export default function SelectTagsScreen() {
       formData.append("content", caption || "");
       formData.append("tags", JSON.stringify(selectedTags));
 
-      // Improved file object for upload
-      const fileExtension = mediaType === "video" ? "mp4" : "jpg";
+      const uriParts = media.split(".");
+      const fileExtension = uriParts.length > 1 ? uriParts.pop().toLowerCase() : (mediaType === "video" ? "mp4" : "jpg");
       const fileName = `post-${Date.now()}.${fileExtension}`;
-
-      // Create a proper file object with the correct type
-      const fileType = mediaType === "video" ? "video/mp4" : "image/jpeg";
+      let fileType;
+      if (mediaType === "video") {
+        fileType = fileExtension === "mp4" ? "video/mp4" : "video/*";
+      } else {
+        fileType = fileExtension === "png" ? "image/png" : "image/jpeg";
+      }
 
       formData.append("media", {
         uri: media,
@@ -99,13 +119,10 @@ export default function SelectTagsScreen() {
         name: fileName,
       });
 
-      const baseUrl = NGROK_URL.replace(/\/+$/, "").replace(
-        "https://",
-        "http://"
-      );
+      const baseUrl = NGROK_URL.replace(/\/+$/, "");
       const url = `${baseUrl}/api/posts`;
 
-      console.log("Uploading post:", {
+      log("Uploading post:", {
         url,
         media,
         mediaType,
@@ -115,55 +132,88 @@ export default function SelectTagsScreen() {
         tags: selectedTags,
       });
 
-      // Add timeout to prevent indefinite waiting
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/json",
-        },
-        body: formData,
-        timeout: 60000, // 60 second timeout
-      });
+      let retryCount = 0;
+      const maxRetries = 3;
+      const timeout = 60000;
 
-      // Log the response status and headers for debugging
-      console.log("Response status:", response.status);
-      console.log("Response headers:", response.headers);
+      while (retryCount < maxRetries) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-      // Check content type to avoid JSON parse errors
-      const contentType = response.headers.get("content-type");
-      let responseData;
+          const response = await fetch(url, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: "application/json",
+            },
+            body: formData,
+            signal: controller.signal,
+          });
 
-      if (contentType && contentType.includes("application/json")) {
-        responseData = await response.json();
-      } else {
-        // Handle non-JSON responses
-        const textResponse = await response.text();
-        console.log("Non-JSON response:", textResponse.substring(0, 500)); // Log first 500 chars
-        responseData = { message: "Server returned non-JSON response" };
+          clearTimeout(timeoutId);
+
+          log("Response status:", response.status);
+          log("Response headers:", response.headers);
+
+          const contentType = response.headers.get("content-type");
+          let responseData;
+
+          if (contentType && contentType.includes("application/json")) {
+            responseData = await response.json();
+          } else {
+            const textResponse = await response.text();
+            log("Non-JSON response:", textResponse.substring(0, 500));
+            responseData = { message: "Server returned non-JSON response" };
+          }
+
+          log("Post response:", responseData);
+
+          if (!response.ok) {
+            throw new Error(
+              responseData.message || `Failed to upload post (Status: ${response.status})`
+            );
+          }
+
+          Alert.alert("Success", "Post uploaded successfully!");
+          navigation.navigate("Main", { forceRefresh: true });
+          break;
+        } catch (error) {
+          retryCount++;
+          if (retryCount === maxRetries) {
+            throw error;
+          }
+          log(`Retry ${retryCount}/${maxRetries} for uploading post:`, error.message);
+          await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retryCount)));
+
+          const {
+            data: { session },
+            error: refreshError,
+          } = await supabase.auth.refreshSession();
+          if (refreshError || !session) {
+            throw new Error("Session refresh failed during retry");
+          }
+          token = session.access_token;
+          await AsyncStorage.setItem("token", token);
+        }
       }
-
-      console.log("Post response:", responseData);
-
-      if (!response.ok) {
-        throw new Error(
-          responseData.message ||
-            `Failed to upload post (Status: ${response.status})`
-        );
-      }
-
-      Alert.alert("Success", "Post uploaded successfully!");
-      navigation.navigate("Main", { forceRefresh: true });
     } catch (error) {
-      console.error("Error uploading post:", error);
-      Alert.alert(
-        "Upload Failed",
-        error.message || "An unexpected error occurred"
-      );
+      console.error("Error uploading post:", error.message);
+      let errorMessage = "An unexpected error occurred";
+      if (error.name === "AbortError") {
+        errorMessage = "Upload timed out. Please check your network and try again.";
+      } else if (error.message.includes("Network request failed")) {
+        errorMessage = "Network error. Please check your connection and try again.";
+      } else {
+        errorMessage = error.message || errorMessage;
+      }
+      Alert.alert("Upload Failed", errorMessage);
     } finally {
       setLoading(false);
     }
   };
+
+  const canPost = loading || (selectedTags.length === 0 && !(fromEvent && eventTag));
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -178,8 +228,8 @@ export default function SelectTagsScreen() {
         <Text style={styles.headerText}>Add Tags</Text>
         <TouchableOpacity
           onPress={uploadPost}
-          disabled={loading}
-          style={[styles.postButton, loading && styles.postButtonDisabled]}
+          disabled={canPost}
+          style={[styles.postButton, canPost && styles.postButtonDisabled]}
         >
           {loading ? (
             <ActivityIndicator size="small" color="#fff" />
@@ -218,6 +268,11 @@ export default function SelectTagsScreen() {
           ))}
         </View>
       </ScrollView>
+      {loading && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color="#0095f6" />
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -252,12 +307,26 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: "#f0f0f0",
   },
-  tagButtonSelected: { backgroundColor: "#00cc00" },
+  tagButtonSelected: { 
+    backgroundColor: "#00cc00",
+    borderWidth: 2,
+    borderColor: "#008800",
+  },
   tagText: { fontSize: 14, color: "#262626" },
   tagTextSelected: { color: "#fff" },
   eventTagButton: {
     backgroundColor: "#00cc00",
     borderWidth: 2,
     borderColor: "#008800",
+  },
+  loadingOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(255, 255, 255, 0.8)",
+    justifyContent: "center",
+    alignItems: "center",
   },
 });

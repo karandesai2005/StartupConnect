@@ -18,10 +18,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import Modal from 'react-native-modal';
 import { debounce } from 'lodash';
+import { supabase } from '../services/supabase';
 
 const { width } = Dimensions.get('window');
 const NGROK_URL = 'https://pitch-backend-avb7geahhvfteqf9.centralindia-01.azurewebsites.net/';
 const FIXED_MEDIA_HEIGHT = width * 5 / 4;
+
+const isDev = __DEV__;
+const log = (...args) => isDev && console.log(...args);
 
 const formatTimestamp = (timestamp) => {
   if (!timestamp) return 'Just now';
@@ -42,6 +46,8 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
   const videoRef = useRef(null);
   const animatedScale = useRef(new Animated.Value(1)).current;
   const [isLoading, setIsLoading] = useState(true);
+  const [mediaLoadError, setMediaLoadError] = useState(false);
+  const [profileImageError, setProfileImageError] = useState(false);
   const [isLiked, setIsLiked] = useState(item.isLiked || false);
   const [likeCount, setLikeCount] = useState(item.likeCount || item.likes || 0);
   const [isLikeLoading, setIsLikeLoading] = useState(false);
@@ -50,35 +56,30 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
   const [isCommentModalVisible, setIsCommentModalVisible] = useState(false);
   const [isMoreModalVisible, setIsMoreModalVisible] = useState(false);
   const [newComment, setNewComment] = useState('');
-  const [isVideo, setIsVideo] = useState(item.media_type === 'video');
   const [isMeasured, setIsMeasured] = useState(false);
   const [shouldShowMore, setShouldShowMore] = useState(false);
 
   const isUserPost = item.username === currentUsername;
 
   useEffect(() => {
-    const mediaUrl = item.image_url || item.media_url;
-    if (typeof mediaUrl === 'string') {
-      if (mediaUrl.match(/\.(mp4|mov|avi|wmv|3gp|mkv)$/i)) {
-        setIsVideo(true);
-      } else if (mediaUrl.startsWith('http')) {
-        Image.getSize(
-          mediaUrl,
-          () => setIsLoading(false),
-          (error) => {
-            console.log('Error getting image size:', error);
-            setIsLoading(false);
-          }
-        );
-      } else {
-        setIsLoading(false);
-      }
+    const mediaUrl = item.media_url;
+    if (typeof mediaUrl === 'string' && mediaUrl.startsWith('http')) {
+      Image.getSize(
+        mediaUrl,
+        () => setIsLoading(false),
+        (error) => {
+          log('Error getting image size:', error);
+          setIsLoading(false);
+        }
+      );
+    } else {
+      setIsLoading(false);
     }
     fetchComments();
   }, [item]);
 
   useEffect(() => {
-    if (isVideo && videoRef.current) {
+    if (item.media_type === 'video' && videoRef.current) {
       if (isVisible) {
         videoRef.current.playAsync().catch((error) => console.error('Play error:', error));
       } else {
@@ -86,21 +87,21 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
       }
     }
     return () => {
-      if (isVideo && videoRef.current) {
-        videoRef.current.pauseAsync().catch(() => {});
+      if (item.media_type === 'video' && videoRef.current) {
+        videoRef.current.unloadAsync().catch(() => {});
       }
       animatedScale.stopAnimation();
     };
-  }, [isVisible, isVideo]);
+  }, [isVisible, item.media_type]);
 
   useFocusEffect(
     React.useCallback(() => {
       return () => {
-        if (isVideo && videoRef.current) {
+        if (item.media_type === 'video' && videoRef.current) {
           videoRef.current.pauseAsync().catch((error) => console.error('Pause on unfocus error:', error));
         }
       };
-    }, [isVideo])
+    }, [item.media_type])
   );
 
   const getPostId = () => item.post_id || item._id || item.id;
@@ -111,10 +112,25 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
       const token = await AsyncStorage.getItem('token');
       const postId = getPostId();
       if (!token || !postId) return;
-      const response = await axios.get(`${NGROK_URL}/api/posts/${postId}/comments`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setComments(response.data || []);
+
+      let retryCount = 0;
+      const maxRetries = 3;
+      while (retryCount < maxRetries) {
+        try {
+          const response = await axios.get(`${NGROK_URL}/api/posts/${postId}/comments`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          setComments(response.data || []);
+          break;
+        } catch (error) {
+          retryCount++;
+          if (retryCount === maxRetries) {
+            throw error;
+          }
+          log(`Retry ${retryCount}/${maxRetries} for fetching comments:`, error.message);
+          await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retryCount)));
+        }
+      }
     } catch (error) {
       console.error('Error fetching comments:', error);
       setComments([]);
@@ -125,23 +141,43 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
 
   const handleLike = async () => {
     try {
-      const token = await AsyncStorage.getItem('token');
+      let token = await AsyncStorage.getItem('token');
       const postId = getPostId();
       if (!token || !postId) return;
       setIsLikeLoading(true);
-      console.log('Optimistic update - isLiked:', !isLiked, 'likeCount:', isLiked ? likeCount - 1 : likeCount + 1);
       setIsLiked((prev) => !prev);
       setLikeCount((prev) => (isLiked ? prev - 1 : prev + 1));
-      const response = await axios.post(
-        `${NGROK_URL}/api/posts/${postId}/toggle-like`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      if (response.data && response.data.success) {
-        console.log('Response update - liked:', response.data.liked, 'like_count:', response.data.like_count);
-        setIsLiked(response.data.liked);
-        setLikeCount(response.data.like_count);
-        if (fetchAllPosts) await fetchAllPosts(); // Sync with parent state if provided
+
+      let retryCount = 0;
+      const maxRetries = 3;
+      while (retryCount < maxRetries) {
+        try {
+          const response = await axios.post(
+            `${NGROK_URL}/api/posts/${postId}/toggle-like`,
+            {},
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          if (response.data && response.data.success) {
+            setIsLiked(response.data.liked);
+            setLikeCount(response.data.like_count);
+            if (fetchAllPosts) await fetchAllPosts();
+          }
+          break;
+        } catch (error) {
+          retryCount++;
+          if (retryCount === maxRetries) {
+            throw error;
+          }
+          log(`Retry ${retryCount}/${maxRetries} for liking post:`, error.message);
+          await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retryCount)));
+
+          const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
+          if (refreshError || !session) {
+            throw new Error('Session refresh failed during retry');
+          }
+          token = session.access_token;
+          await AsyncStorage.setItem('token', token);
+        }
       }
     } catch (error) {
       console.error('Error updating like:', error);
@@ -154,16 +190,36 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
 
   const handleDeletePost = async () => {
     try {
-      const token = await AsyncStorage.getItem('token');
+      let token = await AsyncStorage.getItem('token');
       const postId = getPostId();
       if (!token || !postId) return;
 
-      await axios.delete(`${NGROK_URL}/api/posts/${postId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      let retryCount = 0;
+      const maxRetries = 3;
+      while (retryCount < maxRetries) {
+        try {
+          await axios.delete(`${NGROK_URL}/api/posts/${postId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          setIsMoreModalVisible(false);
+          if (onDelete) onDelete(postId);
+          break;
+        } catch (error) {
+          retryCount++;
+          if (retryCount === maxRetries) {
+            throw error;
+          }
+          log(`Retry ${retryCount}/${maxRetries} for deleting post:`, error.message);
+          await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retryCount)));
 
-      setIsMoreModalVisible(false);
-      if (onDelete) onDelete(postId);
+          const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
+          if (refreshError || !session) {
+            throw new Error('Session refresh failed during retry');
+          }
+          token = session.access_token;
+          await AsyncStorage.setItem('token', token);
+        }
+      }
     } catch (error) {
       console.error('Error deleting post:', error);
       alert('Failed to delete post. Please try again.');
@@ -174,16 +230,38 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
   const debouncedHandleAddComment = debounce(async () => {
     if (!newComment.trim()) return;
     try {
-      const token = await AsyncStorage.getItem('token');
+      let token = await AsyncStorage.getItem('token');
       const postId = getPostId();
       if (!token || !postId) return;
-      await axios.post(
-        `${NGROK_URL}/api/posts/${postId}/comments`,
-        { content: newComment },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      await fetchComments();
-      setNewComment('');
+
+      let retryCount = 0;
+      const maxRetries = 3;
+      while (retryCount < maxRetries) {
+        try {
+          await axios.post(
+            `${NGROK_URL}/api/posts/${postId}/comments`,
+            { content: newComment },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          await fetchComments();
+          setNewComment('');
+          break;
+        } catch (error) {
+          retryCount++;
+          if (retryCount === maxRetries) {
+            throw error;
+          }
+          log(`Retry ${retryCount}/${maxRetries} for adding comment:`, error.message);
+          await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retryCount)));
+
+          const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
+          if (refreshError || !session) {
+            throw new Error('Session refresh failed during retry');
+          }
+          token = session.access_token;
+          await AsyncStorage.setItem('token', token);
+        }
+      }
     } catch (error) {
       console.error('Error adding comment:', error);
     }
@@ -211,11 +289,17 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
             <TouchableOpacity onPress={handleProfilePress}>
               <Image
                 source={
-                  typeof item.profile_picture === 'string' && item.profile_picture.startsWith('http')
-                    ? { uri: item.profile_picture }
-                    : require('../assets/profiledefault.jpg')
+                  profileImageError || 
+                  typeof item.profile_picture !== 'string' || 
+                  !item.profile_picture.startsWith('http')
+                    ? require('../assets/profiledefault.jpg')
+                    : { uri: item.profile_picture }
                 }
                 style={styles.avatar}
+                onError={() => {
+                  console.error('PostItem: Profile image loading error:', item.profile_picture);
+                  setProfileImageError(true);
+                }}
               />
             </TouchableOpacity>
             <View>
@@ -243,32 +327,36 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
               <ActivityIndicator size="large" color="#007AFF" />
             </View>
           )}
-          {isVideo ? (
+          {(mediaLoadError || !item.media_url || !item.media_url.startsWith('http')) ? (
+            <Image
+              source={require('../assets/PITCH.png')}
+              style={[styles.postImage, { height: FIXED_MEDIA_HEIGHT }]}
+            />
+          ) : item.media_type === 'video' ? (
             <Video
               ref={videoRef}
-              source={{ uri: item.image_url || item.media_url }}
+              source={{ uri: item.media_url }}
               style={[styles.video, { height: FIXED_MEDIA_HEIGHT }]}
               resizeMode="cover"
               isLooping={true}
               onLoad={() => setIsLoading(false)}
               onError={(error) => {
-                console.error(`Video loading error for ${item.image_url || item.media_url}:`, error);
+                console.error(`Video loading error for ${item.media_url}:`, error);
                 setIsLoading(false);
-                setIsVideo(false);
+                setMediaLoadError(true);
               }}
               useNativeControls={false}
             />
           ) : (
             <Image
-              source={
-                typeof item.image_url === 'string' && item.image_url.startsWith('http')
-                  ? { uri: item.image_url }
-                  : typeof item.media_url === 'string' && item.media_url.startsWith('http')
-                    ? { uri: item.media_url }
-                    : require('../assets/PITCH.png')
-              }
+              source={{ uri: item.media_url }}
               style={[styles.postImage, { height: FIXED_MEDIA_HEIGHT }]}
               onLoad={() => setIsLoading(false)}
+              onError={(error) => {
+                console.error(`Image loading error for ${item.media_url}:`, error.nativeEvent);
+                setIsLoading(false);
+                setMediaLoadError(true);
+              }}
             />
           )}
         </View>
@@ -297,13 +385,28 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
             ]}
           />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.actionButton} onPress={toggleCommentModal}>
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={toggleCommentModal}
+          accessibilityLabel="View comments"
+          accessibilityRole="button"
+        >
           <Image source={require('../assets/comment6.png')} style={styles.navIcon} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.actionButton} onPress={handleChatPress}>
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={handleChatPress}
+          accessibilityLabel="Share post"
+          accessibilityRole="button"
+        >
           <Image source={require('../assets/share.png')} style={styles.navIcon} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.actionButton} onPress={handleChatPress}>
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={handleChatPress}
+          accessibilityLabel="Save post"
+          accessibilityRole="button"
+        >
           <Image source={require('../assets/save.png')} style={styles.navIcon} />
         </TouchableOpacity>
       </View>
@@ -419,7 +522,6 @@ PostItem.propTypes = {
   item: PropTypes.shape({
     post_id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     username: PropTypes.string,
-    image_url: PropTypes.string,
     media_url: PropTypes.string,
     content: PropTypes.string,
     caption: PropTypes.string,
@@ -435,7 +537,7 @@ PostItem.propTypes = {
   expandedItems: PropTypes.object.isRequired,
   toggleExpand: PropTypes.func.isRequired,
   onDelete: PropTypes.func,
-  fetchAllPosts: PropTypes.func, // Added prop to sync with parent
+  fetchAllPosts: PropTypes.func,
 };
 
 const styles = StyleSheet.create({

@@ -9,12 +9,17 @@ import {
   ScrollView,
   Alert,
   SafeAreaView,
+  ActivityIndicator,
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
+import * as FileSystem from "expo-file-system";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { NGROK_URL } from "@env";
 import { supabase } from "../../../services/supabase.js";
+
+const isDev = __DEV__;
+const log = (...args) => isDev && console.log(...args);
 
 const EditProfilePage = () => {
   const navigation = useNavigation();
@@ -25,6 +30,7 @@ const EditProfilePage = () => {
   const [updatedProfileImage, setUpdatedProfileImage] = useState(
     userData?.profile_picture || null
   );
+  const [profileImageError, setProfileImageError] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleProfilePictureChange = async () => {
@@ -46,6 +52,7 @@ const EditProfilePage = () => {
 
     if (!result.canceled && result.assets?.[0]?.uri) {
       setUpdatedProfileImage(result.assets[0].uri);
+      setProfileImageError(false); // Reset error state on new image selection
     }
   };
 
@@ -54,44 +61,77 @@ const EditProfilePage = () => {
     setLoading(true);
 
     try {
-      const token = await AsyncStorage.getItem("token");
+      let token = await AsyncStorage.getItem("token");
       if (!token) {
+        log("No token, refreshing session");
         const {
           data: { session },
           error,
         } = await supabase.auth.refreshSession();
-        if (error || !session) {
-          throw new Error("Session refresh failed");
-        }
-        await AsyncStorage.setItem("token", session.access_token);
+        if (error || !session) throw new Error("Session refresh failed");
+        token = session.access_token;
+        await AsyncStorage.setItem("token", token);
       }
 
-      // Force HTTP by replacing https:// with http://
-      const baseUrl = NGROK_URL.replace(/^https:\/\//, "http://").replace(
-        /\/+$/,
-        ""
-      );
+      const baseUrl = NGROK_URL.replace(/\/+$/, "");
       let updatedUser = { ...userData };
 
       // Update bio if changed
       if (updatedBio !== userData?.bio) {
-        console.log("Updating bio at:", `${baseUrl}/api/profile`);
-        const bioResponse = await fetch(`${baseUrl}/api/profile`, {
-          method: "PUT",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ bio: updatedBio }),
-        });
+        log("Updating bio at:", `${baseUrl}/api/profile`);
+        let retryCount = 0;
+        const maxRetries = 3;
+        const timeout = 30000;
 
-        if (!bioResponse.ok) {
-          const errorText = await bioResponse.text();
-          throw new Error(`Bio update failed: ${errorText}`);
+        while (retryCount < maxRetries) {
+          try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+            const bioResponse = await fetch(`${baseUrl}/api/profile`, {
+              method: "PUT",
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ bio: updatedBio }),
+              signal: controller.signal,
+            });
+
+            clearTimeout(timeoutId);
+
+            if (!bioResponse.ok) {
+              const errorText = await bioResponse.text();
+              throw new Error(`Bio update failed: ${errorText}`);
+            }
+
+            updatedUser = await bioResponse.json();
+            log("Bio update response:", updatedUser);
+            break;
+          } catch (error) {
+            retryCount++;
+            if (retryCount === maxRetries) {
+              throw error;
+            }
+            log(
+              `Retry ${retryCount}/${maxRetries} for updating bio:`,
+              error.message
+            );
+            await new Promise((resolve) =>
+              setTimeout(resolve, 1000 * Math.pow(2, retryCount))
+            );
+
+            const {
+              data: { session },
+              error: refreshError,
+            } = await supabase.auth.refreshSession();
+            if (refreshError || !session) {
+              throw new Error("Session refresh failed during retry");
+            }
+            token = session.access_token;
+            await AsyncStorage.setItem("token", token);
+          }
         }
-
-        updatedUser = await bioResponse.json();
-        console.log("Bio update response:", updatedUser);
       }
 
       // Update profile picture if changed
@@ -100,41 +140,89 @@ const EditProfilePage = () => {
         updatedProfileImage !== userData?.profile_picture &&
         !updatedProfileImage.startsWith("http")
       ) {
-        const formData = new FormData();
-        formData.append("profile_picture", {
-          uri: updatedProfileImage,
-          type: "image/jpeg",
-          name: `profile-${Date.now()}.jpg`,
-        });
-
-        // Use HTTP endpoint for profile picture upload
-        const profilePictureUrl =
-          `${baseUrl}/api/profile/profile-picture`.replace(
-            "https://",
-            "http://"
+        const fileInfo = await FileSystem.getInfoAsync(updatedProfileImage);
+        if (!fileInfo.exists) {
+          throw new Error("Profile picture file not found.");
+        }
+        const maxSizeBytes = 5 * 1024 * 1024;
+        if (fileInfo.size > maxSizeBytes) {
+          throw new Error(
+            "Profile picture exceeds 5MB limit. Please choose a smaller image."
           );
-        console.log("Uploading profile picture to:", profilePictureUrl);
-
-        const imageResponse = await fetch(profilePictureUrl, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "multipart/form-data",
-          },
-          body: formData,
-        });
-
-        if (!imageResponse.ok) {
-          const errorText = await imageResponse.text();
-          throw new Error(`Profile picture upload failed: ${errorText}`);
         }
 
-        const imageData = await imageResponse.json();
-        updatedUser = imageData.user;
-        console.log("Profile picture update response:", updatedUser);
+        const formData = new FormData();
+        const uriParts = updatedProfileImage.split(".");
+        const fileExtension =
+          uriParts.length > 1 ? uriParts.pop().toLowerCase() : "jpg";
+        const fileName = `profile-${Date.now()}.${fileExtension}`;
+        const fileType = fileExtension === "png" ? "image/png" : "image/jpeg";
+
+        formData.append("profile_picture", {
+          uri: updatedProfileImage,
+          type: fileType,
+          name: fileName,
+        });
+
+        const profilePictureUrl = `${baseUrl}/api/profile/profile-picture`;
+        log("Uploading profile picture to:", profilePictureUrl);
+
+        let retryCount = 0;
+        const maxRetries = 3;
+        const timeout = 60000;
+
+        while (retryCount < maxRetries) {
+          try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+            const imageResponse = await fetch(profilePictureUrl, {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "multipart/form-data",
+              },
+              body: formData,
+              signal: controller.signal,
+            });
+
+            clearTimeout(timeoutId);
+
+            if (!imageResponse.ok) {
+              const errorText = await imageResponse.text();
+              throw new Error(`Profile picture upload failed: ${errorText}`);
+            }
+
+            const imageData = await imageResponse.json();
+            updatedUser = imageData.user;
+            log("Profile picture update response:", updatedUser);
+            break;
+          } catch (error) {
+            retryCount++;
+            if (retryCount === maxRetries) {
+              throw error;
+            }
+            log(
+              `Retry ${retryCount}/${maxRetries} for uploading profile picture:`,
+              error.message
+            );
+            await new Promise((resolve) =>
+              setTimeout(resolve, 1000 * Math.pow(2, retryCount))
+            );
+
+            const {
+              data: { session },
+              error: refreshError,
+            } = await supabase.auth.refreshSession();
+            if (refreshError || !session) {
+              throw new Error("Session refresh failed during retry");
+            }
+            token = session.access_token;
+            await AsyncStorage.setItem("token", token);
+          }
+        }
       }
 
-      // Store updated profile
       await AsyncStorage.setItem("userData", JSON.stringify(updatedUser));
       Alert.alert("Success", "Profile updated!");
       navigation.navigate("Profile", {
@@ -144,12 +232,28 @@ const EditProfilePage = () => {
         timestamp: Date.now(),
       });
     } catch (error) {
-      console.error("Update profile error:", error);
-      Alert.alert("Error", `Failed to update profile: ${error.message}`);
+      console.error("Update profile error:", error.message);
+      let errorMessage = "Failed to update profile";
+      if (error.name === "AbortError") {
+        errorMessage =
+          "Request timed out. Please check your network and try again.";
+      } else if (error.message.includes("Network request failed")) {
+        errorMessage =
+          "Network error. Please check your connection and try again.";
+      } else {
+        errorMessage = error.message || errorMessage;
+      }
+      Alert.alert("Error", errorMessage);
     } finally {
       setLoading(false);
     }
   };
+
+  const hasChanges =
+    updatedBio !== userData?.bio ||
+    (updatedProfileImage &&
+      updatedProfileImage !== userData?.profile_picture &&
+      !updatedProfileImage.startsWith("http"));
 
   return (
     <SafeAreaView style={styles.container}>
@@ -163,7 +267,11 @@ const EditProfilePage = () => {
         <Text style={styles.headerTitle}>Edit Profile</Text>
         <TouchableOpacity
           onPress={handleSaveProfile}
-          style={[styles.saveButton, loading && styles.saveButtonDisabled]}
+          style={[
+            styles.saveButton,
+            (loading || !hasChanges) && styles.saveButtonDisabled,
+          ]}
+          disabled={loading || !hasChanges}
         >
           <Text style={styles.saveButtonText}>
             {loading ? "Saving..." : "Save"}
@@ -178,11 +286,15 @@ const EditProfilePage = () => {
         >
           <Image
             source={
-              updatedProfileImage
-                ? { uri: updatedProfileImage }
-                : require("../../../assets/profiledefault.jpg")
+              profileImageError || !updatedProfileImage
+                ? require("../../../assets/profiledefault.jpg")
+                : { uri: updatedProfileImage }
             }
             style={styles.profileImage}
+            onError={() => {
+              log("Profile image loading error:", updatedProfileImage);
+              setProfileImageError(true);
+            }}
           />
           <Text style={styles.changePhotoText}>Change Profile Photo</Text>
         </TouchableOpacity>
@@ -192,13 +304,20 @@ const EditProfilePage = () => {
           <TextInput
             style={styles.bioInput}
             value={updatedBio}
-            onChangeText={setUpdatedBio}
+            onChangeText={(text) => setUpdatedBio(text.slice(0, 150))}
             placeholder="Write something about yourself..."
             multiline
             numberOfLines={4}
+            maxLength={150}
           />
         </View>
       </ScrollView>
+
+      {loading && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color="#007bff" />
+        </View>
+      )}
     </SafeAreaView>
   );
 };
@@ -275,6 +394,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     minHeight: 100,
     textAlignVertical: "top",
+  },
+  loadingOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(255, 255, 255, 0.8)",
+    justifyContent: "center",
+    alignItems: "center",
   },
 });
 
