@@ -1,3 +1,6 @@
 {
-  "urlRandomness": "exntcGk"
+  "urlRandomness": "exntcGk",
+  "dev": true,
+  "minify": false,
+  "https": false
 }
