@@ -8,7 +8,7 @@ const { queryDB } = require('../config/db');
 const { uploadAndConvertPostMedia, uploadProfilePicture } = require('../config/multerConfig');
 
 // Constants
-const BASE_URL = process.env.BASE_URL || 'http://pitch-backend-env.eba-ep4nstmn.ap-south-1.elasticbeanstalk.com';
+const BASE_URL = process.env.BASE_URL || 'https://pitch-backend.netlify.app';
 
 // Utility Functions
 const getUserId = async (req) => {
@@ -38,10 +38,7 @@ const validateString = (value, name, minLength, maxLength) => {
 
 const cleanUrl = (url) => {
   if (!url) return url;
-  return url
-    .replace(/\/+/g, '/') // Normalize multiple slashes
-    .replace('http:/', 'http://')
-    .replace('https:/', 'https://');
+  return url.replace(/\/+/g, '/'); // Only normalize slashes
 };
 
 // Profile Controller
@@ -218,8 +215,8 @@ const profileController = {
     try {
       const query = `
         UPDATE users
-        SET profile_picture = REPLACE(profile_picture, '//Uploads', '/Uploads')
-        WHERE profile_picture LIKE '%//Uploads%';
+        SET profile_picture = REGEXP_REPLACE(profile_picture, '//+[uU][pP][lL][oO][aA][dD][sS]', '/Uploads', 'i')
+        WHERE profile_picture ~* '//+[uU][pP][lL][oO][aA][dD][sS]';
       `;
       await queryDB(query, []);
       res.status(200).json({ message: 'Profile picture URLs normalized' });

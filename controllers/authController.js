@@ -3,15 +3,12 @@ const { supabase } = require('../services/supabase');
 const { queryDB } = require('../config/db');
 
 // Constants
-const BASE_URL = process.env.BASE_URL || 'https://pitch-backend-env.eba-ep4nstmn.ap-south-1.elasticbeanstalk.com';
+const BASE_URL = process.env.BASE_URL || 'https://pitch-backend.netlify.app';
 
 // Utility Functions
 const cleanUrl = (url) => {
   if (!url) return url;
-  return url
-    .replace(/\/+/g, '/') // Normalize multiple slashes
-    .replace('http:/', 'http://')
-    .replace('https:/', 'https://');
+  return url.replace(/\/+/g, '/'); // Only normalize slashes
 };
 
 // Password validation function
