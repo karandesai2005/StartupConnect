@@ -4,7 +4,7 @@ const User = require('../models/userModel');
 const path = require('path');
 
 // Constants
-const BASE_URL = process.env.NGROK_URL || 'https://pitch-backend.netlify.app';
+const BASE_URL = process.env.NGROK_URL || 'https://pitch-backend.netlify.app/';
 
 // Utility Functions
 const getUserId = async (req) => {
