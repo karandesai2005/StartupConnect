@@ -2,9 +2,13 @@ require('dotenv').config();
 const Post = require('../models/postModel');
 const User = require('../models/userModel');
 const path = require('path');
+const { createClient } = require('@supabase/supabase-js');
 
-// Constants
-const BASE_URL = process.env.NGROK_URL || 'https://pitch-backend.netlify.app/';
+// Initialize Supabase client
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
 // Utility Functions
 const getUserId = async (req) => {
@@ -38,8 +42,24 @@ const postController = {
       let mediaType = null;
 
       if (req.file) {
-        mediaUrl = `${BASE_URL}/uploads/posts/${req.file.filename}`;
-        mediaType = determineMediaType(req.file.filename);
+        const fileName = `post-${Date.now()}${path.extname(req.file.originalname)}`;
+        const { data, error } = await supabase.storage
+          .from('posts')
+          .upload(fileName, req.file.buffer, {
+            contentType: req.file.mimetype,
+          });
+
+        if (error) {
+          console.error('postController.js: Supabase upload error:', error);
+          return res.status(500).json({ error: 'Failed to upload file' });
+        }
+
+        const { data: urlData } = supabase.storage
+          .from('posts')
+          .getPublicUrl(fileName);
+
+        mediaUrl = urlData.publicUrl;
+        mediaType = determineMediaType(fileName);
         console.log('postController.js: Processed file:', { mediaUrl, mediaType });
       }
 
@@ -93,7 +113,7 @@ const postController = {
       const authUserId = await getUserId(req);
       if (!authUserId) return res.status(401).json({ error: 'User authentication required' });
 
-      const { user_id } = req.query; // Handle user_id from query
+      const { user_id } = req.query;
       const targetUserId = user_id ? validateId(user_id, 'User ID') : authUserId;
 
       const { page = 1, limit = 10 } = req.query;

@@ -6,9 +6,7 @@ const User = require('../models/userModel');
 const { supabase } = require('../services/supabase');
 const { queryDB } = require('../config/db');
 const { uploadAndConvertPostMedia, uploadProfilePicture } = require('../config/multerConfig');
-
-// Constants
-const BASE_URL = process.env.BASE_URL || 'https://pitch-backend.netlify.app';
+const path = require('path');
 
 // Utility Functions
 const getUserId = async (req) => {
@@ -97,8 +95,24 @@ const profileController = {
         let updates = {};
         if (bio) updates.bio = bio;
         if (profilePicture) {
-          const profilePictureUrl = cleanUrl(`${BASE_URL}/Uploads/profile_pictures/${profilePicture.filename}`);
-          updates.profile_picture = profilePictureUrl;
+          const fileName = `profile-${Date.now()}${path.extname(profilePicture.originalname)}`;
+          const { data, error } = await supabase.storage
+            .from('profile-pictures')
+            .upload(fileName, profilePicture.buffer, {
+              contentType: profilePicture.mimetype,
+            });
+
+          if (error) {
+            console.error('profileController.js: Supabase upload error:', error);
+            return res.status(500).json({ error: 'Failed to upload profile picture' });
+          }
+
+          const { data: urlData } = supabase.storage
+            .from('profile-pictures')
+            .getPublicUrl(fileName);
+
+          updates.profile_picture = urlData.publicUrl;
+          console.log('profileController.js: Profile picture uploaded:', updates.profile_picture);
         }
 
         if (Object.keys(updates).length === 0) {
@@ -129,20 +143,36 @@ const profileController = {
         const supabase_uid = req.user.id;
         if (!req.file) return res.status(400).json({ error: 'Profile picture required' });
 
-        const profilePictureUrl = cleanUrl(`${BASE_URL}/Uploads/profile_pictures/${req.file.filename}`);
+        const fileName = `profile-${Date.now()}${path.extname(req.file.originalname)}`;
+        const { data, error } = await supabase.storage
+          .from('profile-pictures')
+          .upload(fileName, req.file.buffer, {
+            contentType: req.file.mimetype,
+          });
+
+        if (error) {
+          console.error('profileController.js: Supabase upload error:', error);
+          return res.status(500).json({ error: 'Failed to upload profile picture' });
+        }
+
+        const { data: urlData } = supabase.storage
+          .from('profile-pictures')
+          .getPublicUrl(fileName);
+
+        const profilePictureUrl = urlData.publicUrl;
         console.log(`Updating profile picture for user ${supabase_uid}: ${profilePictureUrl}`);
 
-        const { data, error } = await supabase
+        const { data: updatedData, error: updateError } = await supabase
           .from('users')
           .update({ profile_picture: profilePictureUrl })
           .eq('supabase_uid', supabase_uid)
           .select('user_id, username, email, name, bio, profile_picture, is_personal, is_business')
           .single();
-        if (error) throw error;
+        if (updateError) throw updateError;
 
         res.status(200).json({
           message: 'Profile picture updated successfully',
-          user: { ...data, profile_picture: cleanUrl(data.profile_picture) },
+          user: { ...updatedData, profile_picture: cleanUrl(updatedData.profile_picture) },
         });
       } catch (error) {
         console.error('Update profile picture error:', error);
@@ -344,9 +374,26 @@ const profileController = {
         const user = await User.getUserById(userId);
         if (!user) return res.status(404).json({ error: 'User not found' });
 
+        const fileName = `story-${Date.now()}${path.extname(req.file.originalname)}`;
+        const { data, error } = await supabase.storage
+          .from('posts') // Using 'posts' bucket for stories as well
+          .upload(fileName, req.file.buffer, {
+            contentType: req.file.mimetype,
+          });
+
+        if (error) {
+          console.error('profileController.js: Supabase upload error (story):', error);
+          return res.status(500).json({ error: 'Failed to upload story media' });
+        }
+
+        const { data: urlData } = supabase.storage
+          .from('posts')
+          .getPublicUrl(fileName);
+
+        const imageUrl = urlData.publicUrl;
+
         const username = user.username;
         const section = req.body.section || 'default';
-        const imageUrl = cleanUrl(`${BASE_URL}/Uploads/posts/${req.file.filename}`);
 
         const storyId = await Story.create(userId, username, imageUrl, 1, 0, section);
         res.status(201).json({ story_id: storyId, image_url: imageUrl, section });
