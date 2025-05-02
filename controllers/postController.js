@@ -2,7 +2,6 @@ const { supabase } = require('../services/supabase');
 const { queryDB } = require('../config/db');
 const logger = require('../logger');
 const path = require('path');
-const { uploadPostMedia } = require('../config/multerConfig'); // Import the missing middleware
 
 // Constants
 const MAX_FILE_SIZE_POST = 100 * 1024 * 1024; // 100MB for posts
@@ -34,74 +33,85 @@ const cleanUrl = (url) => {
 
 // Post Controller
 const postController = {
-  createPost: [
-    uploadPostMedia, // Use the updated middleware
-    async (req, res) => {
-      try {
-        const userId = await getUserId(req);
-        if (!userId) return res.status(401).json({ error: 'User authentication required' });
-        if (!req.file) return res.status(400).json({ error: 'Media file required' });
-
-        // Validate file size
-        if (req.file.size > MAX_FILE_SIZE_POST) {
-          return res.status(400).json({ error: 'File size exceeds 100MB limit' });
-        }
-
-        // Validate file type
-        const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'video/mp4', 'video/quicktime', 'video/mov'];
-        if (!allowedTypes.includes(req.file.mimetype)) {
-          return res.status(400).json({ error: 'Only images (JPEG, PNG, GIF) and videos (MP4, MOV) allowed for posts' });
-        }
-
-        const { content } = req.body;
-        if (!content) return res.status(400).json({ error: 'Content is required' });
-
-        const fileName = `post-${Date.now()}${path.extname(req.file.originalname)}`;
-        const { data, error } = await supabase.storage
-          .from('posts')
-          .upload(fileName, req.file.buffer, {
-            contentType: req.file.mimetype,
-          });
-
-        if (error) {
-          logger.error(`Supabase upload error: ${error.message}`);
-          return res.status(500).json({ error: 'Failed to upload post media' });
-        }
-
-        const { data: urlData } = supabase.storage
-          .from('posts')
-          .getPublicUrl(fileName);
-
-        const mediaUrl = urlData.publicUrl;
-        logger.info(`Post media uploaded: ${mediaUrl}`);
-
-        const mediaType = req.file.mimetype.startsWith('video') ? 'video' : 'image';
-
-        const query = `
-          INSERT INTO posts (user_id, content, media_url, media_type, created_at)
-          VALUES ($1, $2, $3, $4, NOW())
-          RETURNING post_id, user_id, content, media_url, media_type, created_at
-        `;
-        const values = [userId, content, mediaUrl, mediaType];
-        const result = await queryDB(query, values);
-
-        const newPost = result[0];
-        logger.info('Post created:', newPost);
-
-        res.status(201).json({
-          post_id: newPost.post_id,
-          user_id: newPost.user_id,
-          content: newPost.content,
-          media_url: cleanUrl(newPost.media_url),
-          media_type: newPost.media_type,
-          created_at: newPost.created_at,
-        });
-      } catch (error) {
-        logger.error(`Create post error: ${error.message}`);
-        res.status(error.message.includes('required') ? 400 : 500).json({ error: error.message });
+  createPost: async (req, res) => {
+    try {
+      const userId = await getUserId(req);
+      if (!userId) return res.status(401).json({ error: 'User authentication required' });
+      
+      // Check if file was processed by multer
+      if (!req.file) {
+        return res.status(400).json({ error: 'Media file required' });
       }
-    },
-  ],
+
+      // Log file information for debugging
+      logger.info(`File received: ${req.file.originalname}, MIME: ${req.file.mimetype}, Size: ${req.file.size}`);
+
+      // Validate file size
+      if (req.file.size > MAX_FILE_SIZE_POST) {
+        return res.status(400).json({ error: 'File size exceeds 100MB limit' });
+      }
+
+      // Validate file type
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'video/mp4', 'video/quicktime', 'video/mov'];
+      if (!allowedTypes.includes(req.file.mimetype)) {
+        return res.status(400).json({ error: 'Only images (JPEG, PNG, GIF) and videos (MP4, MOV) allowed for posts' });
+      }
+
+      // Log request body for debugging
+      logger.info(`Request body:`, req.body);
+      
+      const { content } = req.body;
+      if (!content) {
+        return res.status(400).json({ error: 'Content is required' });
+      }
+
+      const fileName = `post-${Date.now()}${path.extname(req.file.originalname)}`;
+      
+      // Upload file to Supabase storage
+      const { data, error } = await supabase.storage
+        .from('posts')
+        .upload(fileName, req.file.buffer, {
+          contentType: req.file.mimetype,
+        });
+
+      if (error) {
+        logger.error(`Supabase upload error: ${error.message}`);
+        return res.status(500).json({ error: 'Failed to upload post media' });
+      }
+
+      const { data: urlData } = supabase.storage
+        .from('posts')
+        .getPublicUrl(fileName);
+
+      const mediaUrl = urlData.publicUrl;
+      logger.info(`Post media uploaded: ${mediaUrl}`);
+
+      const mediaType = req.file.mimetype.startsWith('video') ? 'video' : 'image';
+
+      const query = `
+        INSERT INTO posts (user_id, content, media_url, media_type, created_at)
+        VALUES ($1, $2, $3, $4, NOW())
+        RETURNING post_id, user_id, content, media_url, media_type, created_at
+      `;
+      const values = [userId, content, mediaUrl, mediaType];
+      const result = await queryDB(query, values);
+
+      const newPost = result[0];
+      logger.info('Post created:', newPost);
+
+      res.status(201).json({
+        post_id: newPost.post_id,
+        user_id: newPost.user_id,
+        content: newPost.content,
+        media_url: cleanUrl(newPost.media_url),
+        media_type: newPost.media_type,
+        created_at: newPost.created_at,
+      });
+    } catch (error) {
+      logger.error(`Create post error: ${error.message}`);
+      res.status(error.message.includes('required') ? 400 : 500).json({ error: error.message });
+    }
+  },
 
   getAllPosts: async (req, res) => {
     try {

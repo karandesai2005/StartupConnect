@@ -7,18 +7,41 @@ const memoryStorage = multer.memoryStorage();
 const imageTypes = new Set(["image/jpeg", "image/png", "image/gif"]);
 const videoTypes = new Set(["video/mp4", "video/quicktime", "video/mov"]);
 
-const profileFileFilter = (_, file, cb) =>
-  imageTypes.has(file.mimetype)
-    ? cb(null, true)
-    : cb(new Error("Only JPEG, PNG, or GIF allowed for profile pictures"), false);
+const profileFileFilter = (req, file, cb) => {
+  if (imageTypes.has(file.mimetype)) {
+    return cb(null, true);
+  } else {
+    return cb(new Error("Only JPEG, PNG, or GIF allowed for profile pictures"), false);
+  }
+};
 
-const postFileFilter = (_, file, cb) =>
-  imageTypes.has(file.mimetype) || videoTypes.has(file.mimetype)
-    ? cb(null, true)
-    : cb(
-        new Error("Only images (JPEG, PNG, GIF) and videos (MP4, MOV) allowed for posts"),
-        false
-      );
+const postFileFilter = (req, file, cb) => {
+  // For iOS recordings sometimes the mimetype might be different
+  const isImage = imageTypes.has(file.mimetype);
+  const isVideo = videoTypes.has(file.mimetype);
+  
+  // Alternative check for file extensions if mimetype is ambiguous
+  const fileExtension = file.originalname.split('.').pop().toLowerCase();
+  const isVideoByExt = ['mp4', 'mov', 'quicktime'].includes(fileExtension);
+  const isImageByExt = ['jpg', 'jpeg', 'png', 'gif'].includes(fileExtension);
+  
+  if (isImage || isVideo || isImageByExt || isVideoByExt) {
+    // Force the correct mimetype based on extension if needed
+    if (!isImage && !isVideo) {
+      if (isVideoByExt) {
+        file.mimetype = 'video/mp4'; // Default to MP4 for video extensions
+      } else if (isImageByExt) {
+        file.mimetype = 'image/jpeg'; // Default to JPEG for image extensions
+      }
+    }
+    return cb(null, true);
+  } else {
+    return cb(
+      new Error("Only images (JPEG, PNG, GIF) and videos (MP4, MOV) allowed for posts"),
+      false
+    );
+  }
+};
 
 // File size limits
 const limits = {
