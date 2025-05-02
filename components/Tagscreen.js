@@ -74,17 +74,36 @@ export default function SelectTagsScreen() {
     try {
       setLoading(true);
 
+      // Verify media file accessibility
+      log("Original Media URI:", media);
       const fileInfo = await FileSystem.getInfoAsync(media);
+      log("File Info (Original):", fileInfo);
       if (!fileInfo.exists) {
-        throw new Error("Media file not found.");
+        throw new Error("Media file not found at URI: " + media);
       }
       const mediaSize = fileInfo.size;
+      log("Media Size:", mediaSize);
 
       const maxSizeBytes = mediaType === "video" ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
       if (mediaSize > maxSizeBytes) {
         throw new Error(
           `Media size exceeds limit (${mediaType === "video" ? "50MB" : "10MB"}). Please choose a smaller file.`
         );
+      }
+
+      // Copy the file to a temporary location to ensure accessibility
+      const uriParts = media.split(".");
+      const fileExtension = uriParts.length > 1 ? uriParts.pop().toLowerCase() : (mediaType === "video" ? "mp4" : "jpg");
+      const fileName = `post-${Date.now()}.${fileExtension}`;
+      const tempUri = `${FileSystem.cacheDirectory}${fileName}`;
+      await FileSystem.copyAsync({ from: media, to: tempUri });
+      log("Copied file to temp URI:", tempUri);
+
+      // Verify the copied file
+      const tempFileInfo = await FileSystem.getInfoAsync(tempUri);
+      log("File Info (Temp):", tempFileInfo);
+      if (!tempFileInfo.exists) {
+        throw new Error("Copied media file not found at temp URI: " + tempUri);
       }
 
       let token = await AsyncStorage.getItem("token");
@@ -106,11 +125,6 @@ export default function SelectTagsScreen() {
       const contentWithTags = caption + (tagString ? ` #${tagString.replace(/, /g, " #")}` : "");
       formData.append("content", contentWithTags || "");
 
-      // Determine file extension and MIME type
-      const uriParts = media.split(".");
-      const fileExtension = uriParts.length > 1 ? uriParts.pop().toLowerCase() : (mediaType === "video" ? "mp4" : "jpg");
-      const fileName = `post-${Date.now()}.${fileExtension}`;
-      
       // Determine correct MIME type
       let fileType;
       if (mediaType === "video") {
@@ -126,11 +140,12 @@ export default function SelectTagsScreen() {
       }
 
       // Append media file with correct type
-      formData.append("media", {
-        uri: media,
+      const fileObject = {
+        uri: tempUri, // Use the temp URI
         type: fileType,
         name: fileName,
-      });
+      };
+      formData.append("media", fileObject);
 
       // Debug: Log FormData contents
       for (let [key, value] of formData.entries()) {
@@ -142,7 +157,7 @@ export default function SelectTagsScreen() {
 
       log("Uploading post:", {
         url,
-        media,
+        media: tempUri,
         mediaType,
         fileName,
         fileType,
@@ -151,7 +166,7 @@ export default function SelectTagsScreen() {
 
       let retryCount = 0;
       const maxRetries = 3;
-      const timeout = 60000;
+      const timeout = 120000; // Increased to 120 seconds
 
       while (retryCount < maxRetries) {
         try {
@@ -163,7 +178,7 @@ export default function SelectTagsScreen() {
             headers: {
               Authorization: `Bearer ${token}`,
               Accept: "application/json",
-              "Content-Type": "multipart/form-data",
+              // Remove manual Content-Type header; fetch sets it automatically with FormData
             },
             body: formData,
             signal: controller.signal,
@@ -235,7 +250,8 @@ export default function SelectTagsScreen() {
     }
   };
 
-  const canPost = selectedTags.length === 0 && !(fromEvent && eventTag);
+  // Allow posting if there's a caption or tags (or eventTag if fromEvent)
+  const canPost = loading || (!caption && selectedTags.length === 0 && !(fromEvent && eventTag));
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -297,7 +313,7 @@ export default function SelectTagsScreen() {
       )}
     </SafeAreaView>
   );
-} 
+}
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#fff" },
