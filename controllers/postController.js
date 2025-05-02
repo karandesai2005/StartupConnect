@@ -1,31 +1,38 @@
-require('dotenv').config();
-const Post = require('../models/postModel');
-const User = require('../models/userModel');
-const path = require('path');
 const { supabase } = require('../services/supabase');
-const logger = require('../logger'); // Use winston logger
+const { queryDB } = require('../config/db');
+const logger = require('./logger');
+const path = require('path');
+const { uploadPostMedia } = require('../config/multerConfig'); // Import the missing middleware
+
+// Constants
+const MAX_FILE_SIZE_POST = 100 * 1024 * 1024; // 100MB for posts
 
 // Utility Functions
 const getUserId = async (req) => {
   const uuid = req.user?.id;
-  if (!uuid) throw new Error('User authentication required');
+  if (!uuid) {
+    logger.error('getUserId: User authentication required - req.user is undefined');
+    throw new Error('User authentication required');
+  }
 
-  const user = await User.getUserByUuid(uuid);
-  return user?.user_id;
+  const { data: user, error } = await supabase
+    .from('users')
+    .select('user_id')
+    .eq('supabase_uid', uuid)
+    .single();
+  if (error || !user) {
+    logger.error(`getUserId: User not found - Supabase error: ${error?.message}`);
+    throw new Error('User not found');
+  }
+  return user.user_id;
 };
 
-const validateId = (id, name) => {
-  if (!id || isNaN(id)) throw new Error(`${name} must be a valid number`);
-  return parseInt(id);
+const cleanUrl = (url) => {
+  if (!url) return url;
+  return url.replace(/\/+/g, '/');
 };
 
-const determineMediaType = (filename) => {
-  const ext = path.extname(filename).toLowerCase();
-  if (['.mp4', '.mov', '.avi', '.wmv', '.3gp', '.mkv'].includes(ext)) return 'video';
-  if (['.jpg', '.jpeg', '.png', '.gif'].includes(ext)) return 'image';
-  return null;
-};
-
+// Post Controller
 const postController = {
   createPost: [
     uploadPostMedia, // Use the updated middleware
@@ -33,47 +40,62 @@ const postController = {
       try {
         const userId = await getUserId(req);
         if (!userId) return res.status(401).json({ error: 'User authentication required' });
+        if (!req.file) return res.status(400).json({ error: 'Media file required' });
 
-        const { content, tags } = req.body;
-        let mediaUrl = null;
-        let mediaType = null;
-
-        if (req.file) {
-          // Validate file type
-          const allowedImageTypes = ['image/jpeg', 'image/png', 'image/gif'];
-          const allowedVideoTypes = ['video/mp4', 'video/quicktime', 'video/mov', 'video/avi', 'video/mkv'];
-          const allowedTypes = [...allowedImageTypes, ...allowedVideoTypes];
-          if (!allowedTypes.includes(req.file.mimetype)) {
-            return res.status(400).json({ error: 'Only images (JPEG, PNG, GIF) and videos (MP4, MOV, AVI, MKV) allowed' });
-          }
-
-          const fileName = `post-${Date.now()}${path.extname(req.file.originalname)}`;
-          const { data, error } = await supabase.storage
-            .from('posts')
-            .upload(fileName, req.file.buffer, {
-              contentType: req.file.mimetype,
-            });
-
-          if (error) {
-            logger.error(`Supabase upload error: ${error.message}`);
-            return res.status(500).json({ error: 'Failed to upload file' });
-          }
-
-          const { data: urlData } = supabase.storage
-            .from('posts')
-            .getPublicUrl(fileName);
-
-          mediaUrl = urlData.publicUrl;
-          mediaType = determineMediaType(fileName);
-          logger.info('Processed file:', { mediaUrl, mediaType });
+        // Validate file size
+        if (req.file.size > MAX_FILE_SIZE_POST) {
+          return res.status(400).json({ error: 'File size exceeds 100MB limit' });
         }
 
-        const parsedTags = Array.isArray(tags) ? tags : (tags ? JSON.parse(tags) : []);
+        // Validate file type
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'video/mp4', 'video/quicktime', 'video/mov'];
+        if (!allowedTypes.includes(req.file.mimetype)) {
+          return res.status(400).json({ error: 'Only images (JPEG, PNG, GIF) and videos (MP4, MOV) allowed for posts' });
+        }
 
-        const newPost = await Post.create(content || '', mediaUrl, mediaType, userId, parsedTags);
+        const { content } = req.body;
+        if (!content) return res.status(400).json({ error: 'Content is required' });
+
+        const fileName = `post-${Date.now()}${path.extname(req.file.originalname)}`;
+        const { data, error } = await supabase.storage
+          .from('posts')
+          .upload(fileName, req.file.buffer, {
+            contentType: req.file.mimetype,
+          });
+
+        if (error) {
+          logger.error(`Supabase upload error: ${error.message}`);
+          return res.status(500).json({ error: 'Failed to upload post media' });
+        }
+
+        const { data: urlData } = supabase.storage
+          .from('posts')
+          .getPublicUrl(fileName);
+
+        const mediaUrl = urlData.publicUrl;
+        logger.info(`Post media uploaded: ${mediaUrl}`);
+
+        const mediaType = req.file.mimetype.startsWith('video') ? 'video' : 'image';
+
+        const query = `
+          INSERT INTO posts (user_id, content, media_url, media_type, created_at)
+          VALUES ($1, $2, $3, $4, NOW())
+          RETURNING post_id, user_id, content, media_url, media_type, created_at
+        `;
+        const values = [userId, content, mediaUrl, mediaType];
+        const result = await queryDB(query, values);
+
+        const newPost = result[0];
         logger.info('Post created:', newPost);
 
-        res.status(201).json(newPost);
+        res.status(201).json({
+          post_id: newPost.post_id,
+          user_id: newPost.user_id,
+          content: newPost.content,
+          media_url: cleanUrl(newPost.media_url),
+          media_type: newPost.media_type,
+          created_at: newPost.created_at,
+        });
       } catch (error) {
         logger.error(`Create post error: ${error.message}`);
         res.status(error.message.includes('required') ? 400 : 500).json({ error: error.message });
@@ -81,75 +103,29 @@ const postController = {
     },
   ],
 
-  deletePost: async (req, res) => {
-    try {
-      const userId = await getUserId(req);
-      if (!userId) return res.status(401).json({ error: 'User authentication required' });
-
-      const { postId } = req.params;
-      const result = await Post.deletePost(validateId(postId, 'Post ID'), userId);
-      logger.info('Post deleted:', { postId, userId });
-
-      res.status(200).json({ message: 'Post deleted successfully', result });
-    } catch (error) {
-      logger.error(`Delete post error: ${error.message}`);
-      if (error.message.includes('not found') || error.message.includes('unauthorized')) {
-        return res.status(403).json({ error: 'Post not found or unauthorized' });
-      }
-      res.status(error.message.includes('valid number') ? 400 : 500).json({ error: error.message });
-    }
-  },
-
   getAllPosts: async (req, res) => {
     try {
-      const { page = 1, limit = 10 } = req.query;
-      const offset = (page - 1) * limit;
-      const posts = await Post.getAllPosts({ limit: parseInt(limit), offset });
-      logger.info('Fetched all posts:', { page, limit, count: posts.length });
+      const query = `
+        SELECT p.post_id, p.user_id, u.username, u.name, p.media_url, p.content, p.created_at, p.media_type,
+               (SELECT COUNT(*) FROM likes WHERE post_id = p.post_id) AS like_count,
+               (SELECT COUNT(*) FROM comments WHERE post_id = p.post_id) AS comment_count,
+               u.profile_picture
+        FROM posts p
+        JOIN users u ON p.user_id = u.user_id
+        ORDER BY p.created_at DESC
+      `;
+      const posts = await queryDB(query, []);
 
-      res.status(200).json(posts);
+      res.json(posts.map(post => ({
+        ...post,
+        media_url: cleanUrl(post.media_url),
+        profile_picture: cleanUrl(post.profile_picture || ''),
+        name: post.name || post.username,
+        comment_count: Number(post.comment_count) || 0,
+        like_count: Number(post.like_count) || 0,
+      })));
     } catch (error) {
       logger.error(`Get all posts error: ${error.message}`);
-      res.status(500).json({ error: 'Server error' });
-    }
-  },
-
-  getUserPosts: async (req, res) => {
-    try {
-      const authUserId = await getUserId(req);
-      if (!authUserId) return res.status(401).json({ error: 'User authentication required' });
-
-      const { user_id } = req.query;
-      const targetUserId = user_id ? validateId(user_id, 'User ID') : authUserId;
-
-      const { page = 1, limit = 10 } = req.query;
-      const offset = (page - 1) * limit;
-      const posts = await Post.getPostsByUserId(targetUserId, { limit: parseInt(limit), offset });
-      logger.info('Fetched user posts:', { userId: targetUserId, page, limit, count: posts.length });
-
-      res.status(200).json(posts);
-    } catch (error) {
-      logger.error(`Get user posts error: ${error.message}`);
-      res.status(500).json({ error: 'Server error' });
-    }
-  },
-
-  getPostsByUsername: async (req, res) => {
-    try {
-      const { username } = req.params;
-      if (!username) return res.status(400).json({ error: 'Username required' });
-
-      const { page = 1, limit = 10 } = req.query;
-      const offset = (page - 1) * limit;
-      const posts = await Post.getPostsByUsername(username, { limit: parseInt(limit), offset });
-      logger.info('Fetched posts by username:', { username, page, limit, count: posts.length });
-
-      res.status(200).json(posts);
-    } catch (error) {
-      logger.error(`Get posts by username error: ${error.message}`);
-      if (error.message.includes('User not found')) {
-        return res.status(404).json({ error: 'User not found' });
-      }
       res.status(500).json({ error: 'Server error' });
     }
   },
@@ -160,85 +136,149 @@ const postController = {
       if (!userId) return res.status(401).json({ error: 'User authentication required' });
 
       const { postId } = req.params;
-      logger.info('ToggleLike attempt - Post ID:', postId, 'User ID:', userId);
-      const result = await Post.toggleLike(validateId(postId, 'Post ID'), userId);
-      logger.info('ToggleLike result:', result);
+      if (!postId || isNaN(postId)) {
+        return res.status(400).json({ error: 'Post ID must be a valid number' });
+      }
 
-      res.status(200).json({ success: true, liked: result.liked, like_count: result.like_count });
-    } catch (error) {
-      logger.error(`Toggle like error: ${error.message}`);
-      if (error.message.includes('Post not found')) {
+      const postQuery = 'SELECT user_id FROM posts WHERE post_id = $1';
+      const postResult = await queryDB(postQuery, [postId]);
+      if (postResult.length === 0) {
         return res.status(404).json({ error: 'Post not found' });
       }
-      res.status(error.message.includes('valid number') ? 400 : 500).json({ error: error.message });
+
+      const checkLikeQuery = 'SELECT * FROM likes WHERE user_id = $1 AND post_id = $2';
+      const likeResult = await queryDB(checkLikeQuery, [userId, postId]);
+      let liked = likeResult.length > 0;
+
+      if (liked) {
+        const deleteLikeQuery = 'DELETE FROM likes WHERE user_id = $1 AND post_id = $2';
+        await queryDB(deleteLikeQuery, [userId, postId]);
+        liked = false;
+      } else {
+        const insertLikeQuery = 'INSERT INTO likes (user_id, post_id) VALUES ($1, $2)';
+        await queryDB(insertLikeQuery, [userId, postId]);
+        liked = true;
+      }
+
+      const likeCountQuery = 'SELECT COUNT(*) as count FROM likes WHERE post_id = $1';
+      const likeCountResult = await queryDB(likeCountQuery, [postId]);
+      const likeCount = Number(likeCountResult[0].count) || 0;
+
+      res.status(200).json({ success: true, liked, like_count: likeCount });
+    } catch (error) {
+      logger.error(`Toggle like error: ${error.message}`);
+      res.status(error.message.includes('Post ID') ? 400 : 500).json({ error: error.message });
     }
   },
 
-  getLikeStatus: async (req, res) => {
+  getLikes: async (req, res) => {
     try {
       const userId = await getUserId(req);
       if (!userId) return res.status(401).json({ error: 'User authentication required' });
 
       const { postId } = req.params;
-      const status = await Post.getLikeStatus(validateId(postId, 'Post ID'), userId);
-      logger.info('Fetched like status:', { postId, userId, status });
+      if (!postId || isNaN(postId)) {
+        return res.status(400).json({ error: 'Post ID must be a valid number' });
+      }
 
-      res.status(200).json(status);
-    } catch (error) {
-      logger.error(`Get like status error: ${error.message}`);
-      if (error.message.includes('Post not found')) {
+      const postQuery = 'SELECT user_id FROM posts WHERE post_id = $1';
+      const postResult = await queryDB(postQuery, [postId]);
+      if (postResult.length === 0) {
         return res.status(404).json({ error: 'Post not found' });
       }
-      res.status(error.message.includes('valid number') ? 400 : 500).json({ error: error.message });
+
+      const likeCountQuery = 'SELECT COUNT(*) as count FROM likes WHERE post_id = $1';
+      const likeCountResult = await queryDB(likeCountQuery, [postId]);
+      const likeCount = Number(likeCountResult[0].count) || 0;
+
+      const userLikedQuery = 'SELECT 1 FROM likes WHERE user_id = $1 AND post_id = $2 LIMIT 1';
+      const userLikedResult = await queryDB(userLikedQuery, [userId, postId]);
+      const isLiked = userLikedResult.length > 0 ? 1 : 0;
+
+      res.status(200).json({ likeCount, isLiked });
+    } catch (error) {
+      logger.error(`Get likes error: ${error.message}`);
+      res.status(error.message.includes('Post ID') ? 400 : 500).json({ error: error.message });
+    }
+  },
+
+  addComment: async (req, res) => {
+    try {
+      const userId = await getUserId(req);
+      if (!userId) return res.status(401).json({ error: 'User authentication required' });
+
+      const { postId } = req.params;
+      if (!postId || isNaN(postId)) {
+        return res.status(400).json({ error: 'Post ID must be a valid number' });
+      }
+
+      const { content } = req.body;
+      if (!content || content.length < 1 || content.length > 500) {
+        return res.status(400).json({ error: 'Comment must be 1-500 characters' });
+      }
+
+      const postQuery = 'SELECT user_id FROM posts WHERE post_id = $1';
+      const postResult = await queryDB(postQuery, [postId]);
+      if (postResult.length === 0) {
+        return res.status(404).json({ error: 'Post not found' });
+      }
+
+      const query = `
+        INSERT INTO comments (post_id, user_id, content, created_at)
+        VALUES ($1, $2, $3, NOW())
+        RETURNING comment_id, post_id, user_id, content, created_at
+      `;
+      const values = [postId, userId, content];
+      const result = await queryDB(query, values);
+
+      const newComment = result[0];
+      res.status(201).json(newComment);
+    } catch (error) {
+      logger.error(`Add comment error: ${error.message}`);
+      res.status(error.message.includes('Post ID') || error.message.includes('Comment') ? 400 : 500).json({ error: error.message });
     }
   },
 
   getComments: async (req, res) => {
     try {
-      const userId = await getUserId(req);
-      if (!userId) return res.status(401).json({ error: 'User authentication required' });
-
       const { postId } = req.params;
-      logger.info('Get comments for Post ID:', postId);
-      const { limit = 10, offset = 0 } = req.query;
-      const comments = await Post.getCommentsByPostId(validateId(postId, 'Post ID'), { limit: parseInt(limit), offset });
-      logger.info('Comments fetched:', comments);
+      if (!postId || isNaN(postId)) {
+        return res.status(400).json({ error: 'Post ID must be a valid number' });
+      }
 
-      res.status(200).json(comments);
-    } catch (error) {
-      logger.error(`Get comments error: ${error.message}`);
-      if (error.message.includes('Post not found')) {
+      const postQuery = 'SELECT user_id FROM posts WHERE post_id = $1';
+      const postResult = await queryDB(postQuery, [postId]);
+      if (postResult.length === 0) {
         return res.status(404).json({ error: 'Post not found' });
       }
-      res.status(error.message.includes('valid number') ? 400 : 500).json({ error: error.message });
+
+      const query = `
+        SELECT c.comment_id, c.post_id, c.user_id, u.username, c.content, c.created_at
+        FROM comments c
+        JOIN users u ON c.user_id = u.user_id
+        WHERE c.post_id = $1
+        ORDER BY c.created_at DESC
+      `;
+      const comments = await queryDB(query, [postId]);
+
+      res.json(comments);
+    } catch (error) {
+      logger.error(`Get comments error: ${error.message}`);
+      res.status(error.message.includes('Post ID') ? 400 : 500).json({ error: error.message });
     }
   },
 
-  createComment: async (req, res) => {
+  fixMediaURLs: async (req, res) => {
     try {
-      const userId = await getUserId(req);
-      if (!userId) return res.status(401).json({ error: 'User authentication required' });
-
-      const { postId } = req.params;
-      const { content } = req.body;
-      logger.info('Create comment for Post ID:', postId, 'Content:', content);
-
-      const newComment = await Post.createComment(
-        validateId(postId, 'Post ID'),
-        userId,
-        content
-      );
-      logger.info('New comment created:', newComment);
-
-      res.status(201).json(newComment);
+      const query = `
+        UPDATE posts
+        SET media_url = REGEXP_REPLACE(media_url, '//+[uU][pP][lL][oO][aA][dD][sS]', '/Uploads', 'i')
+        WHERE media_url ~* '//+[uU][pP][lL][oO][aA][dD][sS]';
+      `;
+      await queryDB(query, []);
+      res.status(200).json({ message: 'Media URLs normalized' });
     } catch (error) {
-      logger.error(`Create comment error: ${error.message}`);
-      if (error.message.includes('Post not found')) {
-        return res.status(404).json({ error: 'Post not found' });
-      }
-      if (error.message.includes('Foreign key') || error.message.includes('required')) {
-        return res.status(400).json({ error: error.message });
-      }
+      logger.error(`Fix media URLs error: ${error.message}`);
       res.status(500).json({ error: 'Server error' });
     }
   },
