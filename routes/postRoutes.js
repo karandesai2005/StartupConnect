@@ -3,7 +3,7 @@ const router = express.Router();
 const postController = require('../controllers/postController');
 const authenticateJWT = require('../middleware/authenticateJWT');
 const { uploadPostMedia } = require('../config/multerConfig');
-const multer = require('multer'); // Import multer to check for MulterError
+const multer = require('multer');
 
 // Debug middleware
 const debugMiddleware = (req, res, next) => {
@@ -11,8 +11,8 @@ const debugMiddleware = (req, res, next) => {
   console.log('Route:', req.originalUrl, '| Method:', req.method);
   console.log('User:', req.user);
   console.log('Query:', req.query);
-  console.log('Body:', req.body); // Log the body to inspect 'content'
-  console.log('Headers:', req.headers); // Log headers to inspect Content-Type
+  console.log('Body:', req.body);
+  console.log('Headers:', req.headers);
   if (req.file) {
     console.log('Processed File:', req.file.originalname, '| Type:', req.file.mimetype, '| Size:', req.file.size);
   } else if (req.method === 'POST') {
@@ -38,21 +38,27 @@ router.route('/')
   .get(authenticateJWT, debugMiddleware, postController.getAllPosts)
   .post(
     authenticateJWT,
-    debugMiddleware, // Log request details before multer processes it
+    debugMiddleware,
     uploadPostMedia,
-    handleMulterError, // Catch multer errors
+    handleMulterError,
     postController.createPost
   );
 
 router.route('/all')
   .get(debugMiddleware, postController.getAllPosts);
 
+// Route to fetch user's own posts
+router.route('/myposts')
+  .get(authenticateJWT, debugMiddleware, postController.getMyPosts);
+
+// Like Routes
 router.route('/:postId/likes')
   .get(authenticateJWT, debugMiddleware, postController.getLikes);
 
 router.route('/:postId/toggle-like')
   .post(authenticateJWT, debugMiddleware, postController.toggleLike);
 
+// Comment Routes
 router.route('/:postId/comments')
   .get(authenticateJWT, debugMiddleware, postController.getComments)
   .post(authenticateJWT, debugMiddleware, postController.addComment);

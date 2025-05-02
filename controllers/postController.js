@@ -38,26 +38,21 @@ const postController = {
       const userId = await getUserId(req);
       if (!userId) return res.status(401).json({ error: 'User authentication required' });
       
-      // Check if file was processed by multer
       if (!req.file) {
         return res.status(400).json({ error: 'Media file required' });
       }
 
-      // Log file information for debugging
       logger.info(`File received: ${req.file.originalname}, MIME: ${req.file.mimetype}, Size: ${req.file.size}`);
 
-      // Validate file size
       if (req.file.size > MAX_FILE_SIZE_POST) {
         return res.status(400).json({ error: 'File size exceeds 100MB limit' });
       }
 
-      // Validate file type
       const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'video/mp4', 'video/quicktime', 'video/mov'];
       if (!allowedTypes.includes(req.file.mimetype)) {
         return res.status(400).json({ error: 'Only images (JPEG, PNG, GIF) and videos (MP4, MOV) allowed for posts' });
       }
 
-      // Log request body for debugging
       logger.info(`Request body:`, req.body);
       
       const { content } = req.body;
@@ -67,7 +62,6 @@ const postController = {
 
       const fileName = `post-${Date.now()}${path.extname(req.file.originalname)}`;
       
-      // Upload file to Supabase storage
       const { data, error } = await supabase.storage
         .from('posts')
         .upload(fileName, req.file.buffer, {
@@ -137,6 +131,51 @@ const postController = {
     } catch (error) {
       logger.error(`Get all posts error: ${error.message}`);
       res.status(500).json({ error: 'Server error' });
+    }
+  },
+
+  getMyPosts: async (req, res) => {
+    try {
+      let userId;
+
+      // Check if user_id is provided in query params (for testing or admin purposes)
+      if (req.query.user_id) {
+        userId = req.query.user_id;
+        if (isNaN(userId)) {
+          return res.status(400).json({ error: 'User ID must be a valid number' });
+        }
+      } else {
+        // Otherwise, get user_id from authenticated user
+        userId = await getUserId(req);
+        if (!userId) {
+          return res.status(401).json({ error: 'User authentication required' });
+        }
+      }
+
+      const query = `
+        SELECT p.post_id, p.user_id, u.username, u.name, p.media_url, p.content, p.created_at, p.media_type,
+               (SELECT COUNT(*) FROM likes WHERE post_id = p.post_id) AS like_count,
+               (SELECT COUNT(*) FROM comments WHERE post_id = p.post_id) AS comment_count,
+               u.profile_picture
+        FROM posts p
+        JOIN users u ON p.user_id = u.user_id
+        WHERE p.user_id = $1
+        ORDER BY p.created_at DESC
+      `;
+      const values = [userId];
+      const posts = await queryDB(query, values);
+
+      res.json(posts.map(post => ({
+        ...post,
+        media_url: cleanUrl(post.media_url),
+        profile_picture: cleanUrl(post.profile_picture || ''),
+        name: post.name || post.username,
+        comment_count: Number(post.comment_count) || 0,
+        like_count: Number(post.like_count) || 0,
+      })));
+    } catch (error) {
+      logger.error(`Get my posts error: ${error.message}`);
+      res.status(error.message.includes('User ID') || error.message.includes('authentication') ? 400 : 500).json({ error: error.message });
     }
   },
 
