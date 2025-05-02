@@ -1,6 +1,6 @@
 const { supabase } = require('../services/supabase');
 const { queryDB } = require('../config/db');
-const logger = require('./logger');
+const logger = require('../logger');
 const path = require('path');
 const { uploadPostMedia } = require('../config/multerConfig'); // Import the missing middleware
 
