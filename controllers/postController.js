@@ -2,7 +2,8 @@ require('dotenv').config();
 const Post = require('../models/postModel');
 const User = require('../models/userModel');
 const path = require('path');
-const { supabase } = require('../services/supabase'); // Use centralized Supabase client
+const { supabase } = require('../services/supabase');
+const logger = require('../logger'); // Use winston logger
 
 // Utility Functions
 const getUserId = async (req) => {
@@ -26,48 +27,59 @@ const determineMediaType = (filename) => {
 };
 
 const postController = {
-  createPost: async (req, res) => {
-    try {
-      const userId = await getUserId(req);
-      if (!userId) return res.status(401).json({ error: 'User authentication required' });
+  createPost: [
+    uploadPostMedia, // Use the updated middleware
+    async (req, res) => {
+      try {
+        const userId = await getUserId(req);
+        if (!userId) return res.status(401).json({ error: 'User authentication required' });
 
-      const { content, tags } = req.body;
-      let mediaUrl = null;
-      let mediaType = null;
+        const { content, tags } = req.body;
+        let mediaUrl = null;
+        let mediaType = null;
 
-      if (req.file) {
-        const fileName = `post-${Date.now()}${path.extname(req.file.originalname)}`;
-        const { data, error } = await supabase.storage
-          .from('posts')
-          .upload(fileName, req.file.buffer, {
-            contentType: req.file.mimetype,
-          });
+        if (req.file) {
+          // Validate file type
+          const allowedImageTypes = ['image/jpeg', 'image/png', 'image/gif'];
+          const allowedVideoTypes = ['video/mp4', 'video/quicktime', 'video/mov', 'video/avi', 'video/mkv'];
+          const allowedTypes = [...allowedImageTypes, ...allowedVideoTypes];
+          if (!allowedTypes.includes(req.file.mimetype)) {
+            return res.status(400).json({ error: 'Only images (JPEG, PNG, GIF) and videos (MP4, MOV, AVI, MKV) allowed' });
+          }
 
-        if (error) {
-          console.error('postController.js: Supabase upload error:', error.message);
-          return res.status(500).json({ error: 'Failed to upload file' });
+          const fileName = `post-${Date.now()}${path.extname(req.file.originalname)}`;
+          const { data, error } = await supabase.storage
+            .from('posts')
+            .upload(fileName, req.file.buffer, {
+              contentType: req.file.mimetype,
+            });
+
+          if (error) {
+            logger.error(`Supabase upload error: ${error.message}`);
+            return res.status(500).json({ error: 'Failed to upload file' });
+          }
+
+          const { data: urlData } = supabase.storage
+            .from('posts')
+            .getPublicUrl(fileName);
+
+          mediaUrl = urlData.publicUrl;
+          mediaType = determineMediaType(fileName);
+          logger.info('Processed file:', { mediaUrl, mediaType });
         }
 
-        const { data: urlData } = supabase.storage
-          .from('posts')
-          .getPublicUrl(fileName);
+        const parsedTags = Array.isArray(tags) ? tags : (tags ? JSON.parse(tags) : []);
 
-        mediaUrl = urlData.publicUrl;
-        mediaType = determineMediaType(fileName);
-        console.log('postController.js: Processed file:', { mediaUrl, mediaType });
+        const newPost = await Post.create(content || '', mediaUrl, mediaType, userId, parsedTags);
+        logger.info('Post created:', newPost);
+
+        res.status(201).json(newPost);
+      } catch (error) {
+        logger.error(`Create post error: ${error.message}`);
+        res.status(error.message.includes('required') ? 400 : 500).json({ error: error.message });
       }
-
-      const parsedTags = Array.isArray(tags) ? tags : (tags ? JSON.parse(tags) : []);
-
-      const newPost = await Post.create(content || '', mediaUrl, mediaType, userId, parsedTags);
-      console.log('postController.js: Post created:', newPost);
-
-      res.status(201).json(newPost);
-    } catch (error) {
-      console.error('postController.js: Create post error:', error.message);
-      res.status(error.message.includes('required') ? 400 : 500).json({ error: error.message });
-    }
-  },
+    },
+  ],
 
   deletePost: async (req, res) => {
     try {
@@ -76,11 +88,11 @@ const postController = {
 
       const { postId } = req.params;
       const result = await Post.deletePost(validateId(postId, 'Post ID'), userId);
-      console.log('postController.js: Post deleted:', { postId, userId });
+      logger.info('Post deleted:', { postId, userId });
 
       res.status(200).json({ message: 'Post deleted successfully', result });
     } catch (error) {
-      console.error('postController.js: Delete post error:', error.message);
+      logger.error(`Delete post error: ${error.message}`);
       if (error.message.includes('not found') || error.message.includes('unauthorized')) {
         return res.status(403).json({ error: 'Post not found or unauthorized' });
       }
@@ -93,11 +105,11 @@ const postController = {
       const { page = 1, limit = 10 } = req.query;
       const offset = (page - 1) * limit;
       const posts = await Post.getAllPosts({ limit: parseInt(limit), offset });
-      console.log('postController.js: Fetched all posts:', { page, limit, count: posts.length });
+      logger.info('Fetched all posts:', { page, limit, count: posts.length });
 
       res.status(200).json(posts);
     } catch (error) {
-      console.error('postController.js: Get all posts error:', error.message);
+      logger.error(`Get all posts error: ${error.message}`);
       res.status(500).json({ error: 'Server error' });
     }
   },
@@ -113,11 +125,11 @@ const postController = {
       const { page = 1, limit = 10 } = req.query;
       const offset = (page - 1) * limit;
       const posts = await Post.getPostsByUserId(targetUserId, { limit: parseInt(limit), offset });
-      console.log('postController.js: Fetched user posts:', { userId: targetUserId, page, limit, count: posts.length });
+      logger.info('Fetched user posts:', { userId: targetUserId, page, limit, count: posts.length });
 
       res.status(200).json(posts);
     } catch (error) {
-      console.error('postController.js: Get user posts error:', error.message);
+      logger.error(`Get user posts error: ${error.message}`);
       res.status(500).json({ error: 'Server error' });
     }
   },
@@ -130,11 +142,11 @@ const postController = {
       const { page = 1, limit = 10 } = req.query;
       const offset = (page - 1) * limit;
       const posts = await Post.getPostsByUsername(username, { limit: parseInt(limit), offset });
-      console.log('postController.js: Fetched posts by username:', { username, page, limit, count: posts.length });
+      logger.info('Fetched posts by username:', { username, page, limit, count: posts.length });
 
       res.status(200).json(posts);
     } catch (error) {
-      console.error('postController.js: Get posts by username error:', error.message);
+      logger.error(`Get posts by username error: ${error.message}`);
       if (error.message.includes('User not found')) {
         return res.status(404).json({ error: 'User not found' });
       }
@@ -148,13 +160,13 @@ const postController = {
       if (!userId) return res.status(401).json({ error: 'User authentication required' });
 
       const { postId } = req.params;
-      console.log('postController.js: ToggleLike attempt - Post ID:', postId, 'User ID:', userId);
+      logger.info('ToggleLike attempt - Post ID:', postId, 'User ID:', userId);
       const result = await Post.toggleLike(validateId(postId, 'Post ID'), userId);
-      console.log('postController.js: ToggleLike result:', result);
+      logger.info('ToggleLike result:', result);
 
       res.status(200).json({ success: true, liked: result.liked, like_count: result.like_count });
     } catch (error) {
-      console.error('postController.js: Toggle like error:', error.message);
+      logger.error(`Toggle like error: ${error.message}`);
       if (error.message.includes('Post not found')) {
         return res.status(404).json({ error: 'Post not found' });
       }
@@ -162,22 +174,22 @@ const postController = {
     }
   },
 
-  getLikeStatus: async (req, response) => {
+  getLikeStatus: async (req, res) => {
     try {
       const userId = await getUserId(req);
-      if (!userId) return response.status(401).json({ error: 'User authentication required' });
+      if (!userId) return res.status(401).json({ error: 'User authentication required' });
 
       const { postId } = req.params;
       const status = await Post.getLikeStatus(validateId(postId, 'Post ID'), userId);
-      console.log('postController.js: Fetched like status:', { postId, userId, status });
+      logger.info('Fetched like status:', { postId, userId, status });
 
-      response.status(200).json(status);
+      res.status(200).json(status);
     } catch (error) {
-      console.error('postController.js: Get like status error:', error.message);
+      logger.error(`Get like status error: ${error.message}`);
       if (error.message.includes('Post not found')) {
-        return response.status(404).json({ error: 'Post not found' });
+        return res.status(404).json({ error: 'Post not found' });
       }
-      response.status(error.message.includes('valid number') ? 400 : 500).json({ error: error.message });
+      res.status(error.message.includes('valid number') ? 400 : 500).json({ error: error.message });
     }
   },
 
@@ -187,14 +199,14 @@ const postController = {
       if (!userId) return res.status(401).json({ error: 'User authentication required' });
 
       const { postId } = req.params;
-      console.log('postController.js: Get comments for Post ID:', postId);
+      logger.info('Get comments for Post ID:', postId);
       const { limit = 10, offset = 0 } = req.query;
       const comments = await Post.getCommentsByPostId(validateId(postId, 'Post ID'), { limit: parseInt(limit), offset });
-      console.log('postController.js: Comments fetched:', comments);
+      logger.info('Comments fetched:', comments);
 
       res.status(200).json(comments);
     } catch (error) {
-      console.error('postController.js: Get comments error:', error.message);
+      logger.error(`Get comments error: ${error.message}`);
       if (error.message.includes('Post not found')) {
         return res.status(404).json({ error: 'Post not found' });
       }
@@ -209,18 +221,18 @@ const postController = {
 
       const { postId } = req.params;
       const { content } = req.body;
-      console.log('postController.js: Create comment for Post ID:', postId, 'Content:', content);
+      logger.info('Create comment for Post ID:', postId, 'Content:', content);
 
       const newComment = await Post.createComment(
         validateId(postId, 'Post ID'),
         userId,
         content
       );
-      console.log('postController.js: New comment created:', newComment);
+      logger.info('New comment created:', newComment);
 
       res.status(201).json(newComment);
     } catch (error) {
-      console.error('postController.js: Create comment error:', error.message);
+      logger.error(`Create comment error: ${error.message}`);
       if (error.message.includes('Post not found')) {
         return res.status(404).json({ error: 'Post not found' });
       }
