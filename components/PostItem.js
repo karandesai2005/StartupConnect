@@ -15,13 +15,12 @@ import { Video } from 'expo-av';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import PropTypes from 'prop-types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from 'axios';
 import Modal from 'react-native-modal';
 import { debounce } from 'lodash';
 import { supabase } from '../services/supabase';
+import { NGROK_URL } from "@env";
 
 const { width } = Dimensions.get('window');
-const NGROK_URL = 'https://pitch-backend-avb7geahhvfteqf9.centralindia-01.azurewebsites.net/';
 const FIXED_MEDIA_HEIGHT = width * 5 / 4;
 
 const isDev = __DEV__;
@@ -41,7 +40,7 @@ const formatTimestamp = (timestamp) => {
   return postDate.toLocaleDateString();
 };
 
-const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems, toggleExpand, onDelete, fetchAllPosts }) => {
+const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems, toggleExpand, onDelete }) => {
   const navigation = useNavigation();
   const videoRef = useRef(null);
   const animatedScale = useRef(new Animated.Value(1)).current;
@@ -70,10 +69,13 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
         (error) => {
           log('Error getting image size:', error);
           setIsLoading(false);
+          setMediaLoadError(true);
         }
       );
     } else {
+      log('Media URL invalid:', mediaUrl);
       setIsLoading(false);
+      setMediaLoadError(true);
     }
     fetchComments();
   }, [item]);
@@ -113,14 +115,24 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
       const postId = getPostId();
       if (!token || !postId) return;
 
+      const baseUrl = NGROK_URL.replace(/\/+$/, "");
+      const headers = {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      };
+
       let retryCount = 0;
       const maxRetries = 3;
       while (retryCount < maxRetries) {
         try {
-          const response = await axios.get(`${NGROK_URL}/api/posts/${postId}/comments`, {
-            headers: { Authorization: `Bearer ${token}` },
+          const response = await fetch(`${baseUrl}/api/posts/${postId}/comments`, {
+            method: "GET",
+            headers,
+            credentials: "include",
           });
-          setComments(response.data || []);
+          if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+          const data = await response.json();
+          setComments(data || []);
           break;
         } catch (error) {
           retryCount++;
@@ -148,19 +160,26 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
       setIsLiked((prev) => !prev);
       setLikeCount((prev) => (isLiked ? prev - 1 : prev + 1));
 
+      const baseUrl = NGROK_URL.replace(/\/+$/, "");
+      const headers = {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      };
+
       let retryCount = 0;
       const maxRetries = 3;
       while (retryCount < maxRetries) {
         try {
-          const response = await axios.post(
-            `${NGROK_URL}/api/posts/${postId}/toggle-like`,
-            {},
-            { headers: { Authorization: `Bearer ${token}` } }
-          );
-          if (response.data && response.data.success) {
-            setIsLiked(response.data.liked);
-            setLikeCount(response.data.like_count);
-            if (fetchAllPosts) await fetchAllPosts();
+          const response = await fetch(`${baseUrl}/api/posts/${postId}/toggle-like`, {
+            method: "POST",
+            headers,
+            credentials: "include",
+          });
+          if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+          const data = await response.json();
+          if (data && data.success) {
+            setIsLiked(data.liked);
+            setLikeCount(data.like_count);
           }
           break;
         } catch (error) {
@@ -177,6 +196,7 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
           }
           token = session.access_token;
           await AsyncStorage.setItem('token', token);
+          headers["Authorization"] = `Bearer ${token}`;
         }
       }
     } catch (error) {
@@ -194,13 +214,22 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
       const postId = getPostId();
       if (!token || !postId) return;
 
+      const baseUrl = NGROK_URL.replace(/\/+$/, "");
+      const headers = {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      };
+
       let retryCount = 0;
       const maxRetries = 3;
       while (retryCount < maxRetries) {
         try {
-          await axios.delete(`${NGROK_URL}/api/posts/${postId}`, {
-            headers: { Authorization: `Bearer ${token}` },
+          const response = await fetch(`${baseUrl}/api/posts/${postId}`, {
+            method: "DELETE",
+            headers,
+            credentials: "include",
           });
+          if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
           setIsMoreModalVisible(false);
           if (onDelete) onDelete(postId);
           break;
@@ -218,6 +247,7 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
           }
           token = session.access_token;
           await AsyncStorage.setItem('token', token);
+          headers["Authorization"] = `Bearer ${token}`;
         }
       }
     } catch (error) {
@@ -234,15 +264,23 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
       const postId = getPostId();
       if (!token || !postId) return;
 
+      const baseUrl = NGROK_URL.replace(/\/+$/, "");
+      const headers = {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      };
+
       let retryCount = 0;
       const maxRetries = 3;
       while (retryCount < maxRetries) {
         try {
-          await axios.post(
-            `${NGROK_URL}/api/posts/${postId}/comments`,
-            { content: newComment },
-            { headers: { Authorization: `Bearer ${token}` } }
-          );
+          const response = await fetch(`${baseUrl}/api/posts/${postId}/comments`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ content: newComment }),
+            credentials: "include",
+          });
+          if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
           await fetchComments();
           setNewComment('');
           break;
@@ -260,6 +298,7 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
           }
           token = session.access_token;
           await AsyncStorage.setItem('token', token);
+          headers["Authorization"] = `Bearer ${token}`;
         }
       }
     } catch (error) {
@@ -537,7 +576,6 @@ PostItem.propTypes = {
   expandedItems: PropTypes.object.isRequired,
   toggleExpand: PropTypes.func.isRequired,
   onDelete: PropTypes.func,
-  fetchAllPosts: PropTypes.func,
 };
 
 const styles = StyleSheet.create({

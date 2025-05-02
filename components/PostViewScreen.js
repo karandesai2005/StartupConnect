@@ -14,6 +14,7 @@ import { useNavigation } from "@react-navigation/native";
 import PropTypes from "prop-types";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import PostItem from "./PostItem";
+import { NGROK_URL } from "@env";
 
 const { width } = Dimensions.get("window");
 const FIXED_MEDIA_HEIGHT = (width * 5) / 4;
@@ -36,6 +37,7 @@ const PostViewScreen = ({ route }) => {
 
   useEffect(() => {
     const initializePosts = () => {
+      const baseUrl = NGROK_URL.replace(/\/+$/, "");
       const validPosts = initialPosts
         .filter((post) => {
           const hasId = post && (post.post_id || post._id || post.id);
@@ -44,13 +46,21 @@ const PostViewScreen = ({ route }) => {
           }
           return hasId;
         })
-        .map((post) => ({
-          ...post,
-          isLiked: false,
-          likeCount: post.likes || 0,
-          comments: post.comments || [],
-          media_type: post.media_type || "image",
-        }));
+        .map((post) => {
+          // Rename image_url to media_url and ensure it's a full URL
+          let mediaUrl = post.image_url;
+          if (mediaUrl && !mediaUrl.startsWith("http")) {
+            mediaUrl = `${baseUrl}${mediaUrl.startsWith("/") ? "" : "/"}${mediaUrl}`;
+          }
+          return {
+            ...post,
+            media_url: mediaUrl,
+            isLiked: false,
+            likeCount: post.likes || 0,
+            comments: post.comments || [],
+            media_type: post.media_type || "image",
+          };
+        });
       log("Initialized posts:", validPosts.length, validPosts);
       setPosts(validPosts);
       setIsLoading(false);
@@ -234,13 +244,20 @@ const PostViewScreen = ({ route }) => {
             setIsRefreshing(true);
             const refreshedPosts = initialPosts
               .filter((post) => post && (post.post_id || post._id || post.id))
-              .map((post) => ({
-                ...post,
-                isLiked: false,
-                likeCount: post.likes || 0,
-                comments: post.comments || [],
-                media_type: post.media_type || "image",
-              }));
+              .map((post) => {
+                let mediaUrl = post.image_url;
+                if (mediaUrl && !mediaUrl.startsWith("http")) {
+                  mediaUrl = `${NGROK_URL.replace(/\/+$/, "")}${mediaUrl.startsWith("/") ? "" : "/"}${mediaUrl}`;
+                }
+                return {
+                  ...post,
+                  media_url: mediaUrl,
+                  isLiked: false,
+                  likeCount: post.likes || 0,
+                  comments: post.comments || [],
+                  media_type: post.media_type || "image",
+                };
+              });
             setPosts(refreshedPosts);
             setCurrentIndex(initialIndex);
             setIsRefreshing(false);

@@ -265,14 +265,13 @@ const Profile = ({ route }) => {
       const { username } = route.params || {};
       const isViewingOtherUser =
         username && parsedUser && username !== parsedUser.username;
-      const userId = isViewingOtherUser ? undefined : parsedUser?.user_id;
 
       const profileUrl = isViewingOtherUser
         ? `${baseUrl}/api/profile/user/${username}`
-        : `${baseUrl}/api/profile${userId ? `?user_id=${userId}` : ""}`;
+        : `${baseUrl}/api/profile`;
       const postsUrl = isViewingOtherUser
         ? `${baseUrl}/api/profile/posts/user/${username}`
-        : `${baseUrl}/api/posts/myposts${userId ? `?user_id=${userId}` : ""}`;
+        : `${baseUrl}/api/posts/myposts`;
 
       log("Fetching profile from:", profileUrl);
       log("Fetching posts from:", postsUrl);
@@ -282,12 +281,12 @@ const Profile = ({ route }) => {
 
       while (retryCount < maxRetries) {
         const [profileResponse, postsResponse] = await Promise.all([
-          fetch(profileUrl, { method: "GET", headers }).catch((e) => ({
+          fetch(profileUrl, { method: "GET", headers, credentials: "include" }).catch((e) => ({
             ok: false,
             status: 500,
             text: () => Promise.resolve(e.message),
           })),
-          fetch(postsUrl, { method: "GET", headers }).catch((e) => ({
+          fetch(postsUrl, { method: "GET", headers, credentials: "include" }).catch((e) => ({
             ok: false,
             status: 500,
             text: () => Promise.resolve(e.message),
@@ -404,6 +403,8 @@ const Profile = ({ route }) => {
               setRefreshing(false);
             }
             break;
+          } else if (profileResponse.status === 429 || postsResponse.status === 429) {
+            throw new Error("Rate limit exceeded, please try again later.");
           } else {
             throw new Error(
               `Fetch failed: Profile ${profileResponse.status} - ${
@@ -421,7 +422,9 @@ const Profile = ({ route }) => {
         setUserPosts([]);
         Alert.alert(
           "Error",
-          `Failed to fetch data: ${error.message}. Please check your network and try again.`
+          error.message === "Rate limit exceeded, please try again later."
+            ? error.message
+            : `Failed to fetch data: ${error.message}. Please check your network and try again.`
         );
         setIsLoading(false);
         setRefreshing(false);
@@ -443,10 +446,14 @@ const Profile = ({ route }) => {
       return false;
     }
     const { username } = route.params || {};
-    const result =
-      !username ||
-      username === currentUser.username ||
-      userData.username === currentUser.username;
+    // Warn if route.params.username and userData.username mismatch
+    if (username && userData.username && username !== userData.username) {
+      log("Warning: Username mismatch detected", {
+        routeUsername: username,
+        userDataUsername: userData.username,
+      });
+    }
+    const result = !username || username === currentUser.username;
     log("isOwnProfile calculated:", {
       routeUsername: username,
       currentUser: currentUser?.username,
@@ -456,23 +463,11 @@ const Profile = ({ route }) => {
     return result;
   }, [currentUser, userData, route.params]);
 
-  useEffect(() => {
-    if (currentUser && userData && !isLoading) {
-      log("Data loaded, forcing re-render:", {
-        currentUser: currentUser.username,
-        userData: userData.username,
-      });
-      setIsLoading(false);
-    }
-  }, [currentUser, userData, isLoading]);
-
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
     fetchInitialData();
   }, [fetchInitialData]);
 
-  // Instead of defining the whole render function inline with hooks,
-  // we now just create a callback that will be passed to our separate GridItem component
   const renderGridItem = useCallback(
     ({ item, index }) => (
       <GridItem
@@ -532,6 +527,7 @@ const Profile = ({ route }) => {
                         Authorization: `Bearer ${token}`,
                         "Content-Type": "application/json",
                       },
+                      credentials: "include",
                     }
                   );
                   const result = await response.json();
