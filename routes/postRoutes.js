@@ -63,4 +63,4 @@ router.route('/:postId/comments')
   .get(authenticateJWT, debugMiddleware, postController.getComments)
   .post(authenticateJWT, debugMiddleware, postController.addComment);
 
-module.exports = router;
+module.exports = router;  
