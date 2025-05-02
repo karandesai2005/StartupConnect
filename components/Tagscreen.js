@@ -100,24 +100,42 @@ export default function SelectTagsScreen() {
       }
 
       const formData = new FormData();
-      formData.append("content", caption || "");
-      formData.append("tags", JSON.stringify(selectedTags));
+      
+      // Add content (tags added to content)
+      const tagString = selectedTags.join(", ");
+      const contentWithTags = caption + (tagString ? ` #${tagString.replace(/, /g, " #")}` : "");
+      formData.append("content", contentWithTags || "");
 
+      // Determine file extension and MIME type
       const uriParts = media.split(".");
       const fileExtension = uriParts.length > 1 ? uriParts.pop().toLowerCase() : (mediaType === "video" ? "mp4" : "jpg");
       const fileName = `post-${Date.now()}.${fileExtension}`;
+      
+      // Determine correct MIME type
       let fileType;
       if (mediaType === "video") {
-        fileType = fileExtension === "mp4" ? "video/mp4" : "video/*";
+        if (fileExtension === "mp4") {
+          fileType = "video/mp4";
+        } else if (fileExtension === "mov") {
+          fileType = "video/quicktime";
+        } else {
+          fileType = "video/mp4"; // Default to mp4 for unknown video extensions
+        }
       } else {
         fileType = fileExtension === "png" ? "image/png" : "image/jpeg";
       }
 
+      // Append media file with correct type
       formData.append("media", {
         uri: media,
         type: fileType,
         name: fileName,
       });
+
+      // Debug: Log FormData contents
+      for (let [key, value] of formData.entries()) {
+        log(`${key}:`, value);
+      }
 
       const baseUrl = NGROK_URL.replace(/\/+$/, "");
       const url = `${baseUrl}/api/posts`;
@@ -128,8 +146,7 @@ export default function SelectTagsScreen() {
         mediaType,
         fileName,
         fileType,
-        caption,
-        tags: selectedTags,
+        caption: contentWithTags,
       });
 
       let retryCount = 0;
@@ -146,6 +163,7 @@ export default function SelectTagsScreen() {
             headers: {
               Authorization: `Bearer ${token}`,
               Accept: "application/json",
+              "Content-Type": "multipart/form-data",
             },
             body: formData,
             signal: controller.signal,
@@ -154,7 +172,11 @@ export default function SelectTagsScreen() {
           clearTimeout(timeoutId);
 
           log("Response status:", response.status);
-          log("Response headers:", response.headers);
+          const allHeaders = {};
+          response.headers.forEach((value, key) => {
+            allHeaders[key] = value;
+          });
+          log("Response headers:", allHeaders);
 
           const contentType = response.headers.get("content-type");
           let responseData;
@@ -213,7 +235,7 @@ export default function SelectTagsScreen() {
     }
   };
 
-  const canPost = loading || (selectedTags.length === 0 && !(fromEvent && eventTag));
+  const canPost = selectedTags.length === 0 && !(fromEvent && eventTag);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -275,7 +297,7 @@ export default function SelectTagsScreen() {
       )}
     </SafeAreaView>
   );
-}
+} 
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#fff" },
