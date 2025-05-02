@@ -135,6 +135,87 @@ const ProfileHeader = React.memo(
   }
 );
 
+// Extract the grid item into a separate component
+const GridItem = React.memo(({ item, index, itemSize, onPress }) => {
+  const [mediaError, setMediaError] = useState(false);
+  const [isMediaLoading, setIsMediaLoading] = useState(true);
+
+  const mediaSource = useMemo(() => {
+    if (
+      typeof item.image_url === "string" &&
+      !item.image_url.includes("undefined") &&
+      !item.image_url.includes("null")
+    ) {
+      return { uri: item.image_url };
+    }
+    return require("../../../assets/profiledefault.jpg");
+  }, [item.image_url]);
+
+  log(`GridItem: Rendering post ${item._id}:`, {
+    image_url: item.image_url,
+    media_type: item.media_type,
+  });
+
+  return (
+    <TouchableOpacity
+      style={[styles.gridItem, { width: itemSize, height: itemSize }]}
+      onPress={onPress}
+    >
+      {isMediaLoading && !mediaError && (
+        <View style={styles.gridItem}>
+          <ActivityIndicator size="small" color="#007BFF" />
+        </View>
+      )}
+      {mediaError ? (
+        <View style={styles.gridItem}>
+          <Text style={styles.errorText}>Failed to load</Text>
+        </View>
+      ) : item.media_type === "video" ? (
+        <View style={styles.videoContainer}>
+          <Video
+            source={mediaSource}
+            style={styles.gridImage}
+            resizeMode="cover"
+            shouldPlay={false}
+            isMuted={true}
+            useNativeControls={false}
+            onLoad={() => setIsMediaLoading(false)}
+            onError={(error) => {
+              console.error(
+                `GridItem: Video loading error for post ${item._id}:`,
+                error
+              );
+              setIsMediaLoading(false);
+              setMediaError(true);
+            }}
+          />
+          <View style={styles.playIconContainer}>
+            <Image
+              source={require("../../../assets/play-button.png")}
+              style={styles.playIcon}
+            />
+          </View>
+        </View>
+      ) : (
+        <Image
+          source={mediaSource}
+          style={styles.gridImage}
+          resizeMode="cover"
+          onLoad={() => setIsMediaLoading(false)}
+          onError={(e) => {
+            console.error(
+              `GridItem: Image loading error for post ${item._id}:`,
+              e.nativeEvent.error
+            );
+            setIsMediaLoading(false);
+            setMediaError(true);
+          }}
+        />
+      )}
+    </TouchableOpacity>
+  );
+});
+
 const Profile = ({ route }) => {
   const navigation = useNavigation();
   const [userData, setUserData] = useState(null);
@@ -390,92 +471,23 @@ const Profile = ({ route }) => {
     fetchInitialData();
   }, [fetchInitialData]);
 
+  // Instead of defining the whole render function inline with hooks,
+  // we now just create a callback that will be passed to our separate GridItem component
   const renderGridItem = useCallback(
-    ({ item, index }) => {
-      const [mediaError, setMediaError] = useState(false);
-      const [isMediaLoading, setIsMediaLoading] = useState(true);
-
-      const mediaSource = useMemo(() => {
-        if (
-          typeof item.image_url === "string" &&
-          !item.image_url.includes("undefined") &&
-          !item.image_url.includes("null")
-        ) {
-          return { uri: item.image_url };
-        }
-        return require("../../../assets/profiledefault.jpg");
-      }, [item.image_url]);
-
-      log(`renderGridItem: Rendering post ${item._id}:`, {
-        image_url: item.image_url,
-        media_type: item.media_type,
-      });
-
-      return (
-        <TouchableOpacity
-          style={[styles.gridItem, { width: itemSize, height: itemSize }]}
-          onPress={() => {
-            const stablePosts = [...userPosts];
-            navigation.navigate("PostView", {
-              posts: stablePosts,
-              initialIndex: index,
-            });
-          }}
-        >
-          {isMediaLoading && !mediaError && (
-            <View style={styles.gridItem}>
-              <ActivityIndicator size="small" color="#007BFF" />
-            </View>
-          )}
-          {mediaError ? (
-            <View style={styles.gridItem}>
-              <Text style={styles.errorText}>Failed to load</Text>
-            </View>
-          ) : item.media_type === "video" ? (
-            <View style={styles.videoContainer}>
-              <Video
-                source={mediaSource}
-                style={styles.gridImage}
-                resizeMode="cover"
-                shouldPlay={false}
-                isMuted={true}
-                useNativeControls={false}
-                onLoad={() => setIsMediaLoading(false)}
-                onError={(error) => {
-                  console.error(
-                    `renderGridItem: Video loading error for post ${item._id}:`,
-                    error
-                  );
-                  setIsMediaLoading(false);
-                  setMediaError(true);
-                }}
-              />
-              <View style={styles.playIconContainer}>
-                <Image
-                  source={require("../../../assets/play-button.png")}
-                  style={styles.playIcon}
-                />
-              </View>
-            </View>
-          ) : (
-            <Image
-              source={mediaSource}
-              style={styles.gridImage}
-              resizeMode="cover"
-              onLoad={() => setIsMediaLoading(false)}
-              onError={(e) => {
-                console.error(
-                  `renderGridItem: Image loading error for post ${item._id}:`,
-                  e.nativeEvent.error
-                );
-                setIsMediaLoading(false);
-                setMediaError(true);
-              }}
-            />
-          )}
-        </TouchableOpacity>
-      );
-    },
+    ({ item, index }) => (
+      <GridItem
+        item={item}
+        index={index}
+        itemSize={itemSize}
+        onPress={() => {
+          const stablePosts = [...userPosts];
+          navigation.navigate("PostView", {
+            posts: stablePosts,
+            initialIndex: index,
+          });
+        }}
+      />
+    ),
     [itemSize, navigation, userPosts]
   );
 
