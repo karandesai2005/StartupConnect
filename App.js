@@ -8,7 +8,6 @@ import SplashScreen from './components/SplashScreen';
 import LoginScreen from './components/LoginScreen';
 import Bottomnav from './components/Bottomnav';
 import SearchScreen from './components/SearchScreen';
-import ChatScreen from './components/Chat';
 import Register1 from './components/Register1';
 import Register2 from './components/Register2';
 import Profile from './components/Profile/P_Profile/Profile';
@@ -170,7 +169,6 @@ const App = () => {
               <Stack.Screen name="Login" component={LoginScreen} />
               <Stack.Screen name="Main" component={Bottomnav} />
               <Stack.Screen name="Search" component={SearchScreen} />
-              <Stack.Screen name="Chat" component={ChatScreen} />
               <Stack.Screen name="Register1" component={Register1} />
               <Stack.Screen name="Register2" component={Register2} />
               <Stack.Screen name="Profile" component={Profile} options={{ animation: 'fade' }} />

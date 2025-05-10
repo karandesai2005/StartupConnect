@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/PITCH1.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "splash": {
       "image": "./assets/PITCH.png",
       "resizeMode": "contain",
@@ -16,7 +16,6 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.croww.StartupConnect",
       "infoPlist": {
-        "UIBackgroundModes": ["remote-notification"],
         "ITSAppUsesNonExemptEncryption": false
       }
     },
@@ -30,21 +29,9 @@
         "READ_EXTERNAL_STORAGE",
         "NOTIFICATIONS"
       ],
-      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/PITCH1.png",
         "backgroundColor": "#ffffff"
-      },
-      "networkSecurityConfig": {
-        "cleartextTrafficPermitted": true,
-        "domainRules": [
-          {
-            "includeSubdomains": true,
-            "domains": [
-              "pitch-backend-env.eba-ep4nstmn.ap-south-1.elasticbeanstalk.com"
-            ]
-          }
-        ]
       }
     },
     "web": {
@@ -67,20 +54,11 @@
           "mode": "production"
         }
       ],
-      "./plugins/withFirebaseNotificationColorFix",
       [
         "expo-build-properties",
         {
           "ios": {
-            "useFrameworks": "static",
-            "extraPodFileDefinitions": {
-              "pod 'GoogleUtilities', :modular_headers => true": null,
-              "pod 'FirebaseCoreInternal', :modular_headers => true": null,
-              "pod 'FirebaseCore', :modular_headers => true": null,
-              "pod 'FirebaseCoreExtension', :modular_headers => true": null,
-              "pod 'FirebaseFirestoreInternal', :modular_headers => true": null,
-              "pod 'FirebaseFirestore', :modular_headers => true": null
-            }
+            "useFrameworks": "static"
           },
           "android": {
             "extraProguardRules": "-keep class com.facebook.react.** { *; }\n-keep class expo.modules.** { *; }\n-dontwarn com.facebook.react.**"

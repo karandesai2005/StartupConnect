@@ -1,0 +1,50 @@
+diff --git a/node_modules/@supabase/realtime-js/dist/main/RealtimeClient.js b/node_modules/@supabase/realtime-js/dist/main/RealtimeClient.js
+index e0c43db..1e47029 100644
+--- a/node_modules/@supabase/realtime-js/dist/main/RealtimeClient.js
++++ b/node_modules/@supabase/realtime-js/dist/main/RealtimeClient.js
+@@ -1,18 +1,18 @@
+ "use strict";
+-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
++var __createBinding = (this && this.__createBinding) || (Object.create ? (function (o, m, k, k2) {
+     if (k2 === undefined) k2 = k;
+     var desc = Object.getOwnPropertyDescriptor(m, k);
+     if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+-      desc = { enumerable: true, get: function() { return m[k]; } };
++        desc = { enumerable: true, get: function () { return m[k]; } };
+     }
+     Object.defineProperty(o, k2, desc);
+-}) : (function(o, m, k, k2) {
++}) : (function (o, m, k, k2) {
+     if (k2 === undefined) k2 = k;
+     o[k2] = m[k];
+ }));
+-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
++var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function (o, v) {
+     Object.defineProperty(o, "default", { enumerable: true, value: v });
+-}) : function(o, v) {
++}) : function (o, v) {
+     o["default"] = v;
+ });
+ var __importStar = (this && this.__importStar) || function (mod) {
+@@ -168,17 +168,11 @@ class RealtimeClient {
+             this.setupConnection();
+             return;
+         }
+-        this.conn = new WSWebSocketDummy(this.endpointURL(), undefined, {
+-            close: () => {
+-                this.conn = null;
+-            },
+-        });
+-        Promise.resolve().then(() => __importStar(require('ws'))).then(({ default: WS }) => {
+-            this.conn = new WS(this.endpointURL(), undefined, {
+-                headers: this.headers,
+-            });
+-            this.setupConnection();
++        const { WebSocket: WS } = require('react-native');
++        this.conn = new WS(this.endpointURL(), undefined, {
++            headers: this.headers,
+         });
++        this.setupConnection();
+     }
+     /**
+      * Returns the URL of the websocket.
