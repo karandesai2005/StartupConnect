@@ -13,10 +13,10 @@ import {
   Dimensions,
   Modal,
   TextInput,
-  SafeAreaView,
   StatusBar,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { SafeAreaView } from 'react-native-safe-area-context'; // Import from react-native-safe-area-context
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { NGROK_URL } from '@env';
@@ -416,8 +416,12 @@ export default function SettingsScreen() {
   }, [userData?.profile_picture, profileImageError]);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="white" />
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor="white"
+        translucent={false} // Add translucent={false}
+      />
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Settings</Text>
         <View style={styles.placeholder} />
@@ -921,7 +925,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingVertical: 15,
+    paddingVertical: 5,
     borderBottomWidth: 1,
     borderBottomColor: '#E9ECEF',
     backgroundColor: 'white',
@@ -931,6 +935,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1a1a1a',
     fontFamily: 'AvenirNextCyr',
+    marginTop: ""
   },
   placeholder: {
     width: 20,
@@ -941,7 +946,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   scrollContent: {
-    paddingBottom: 10,
+    paddingBottom: 20, // Increased paddingBottom for better spacing
   },
   profileSection: {
     paddingVertical: 12,

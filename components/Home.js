@@ -14,7 +14,6 @@ import {
   Animated,
   ScrollView,
   BackHandler,
-  SafeAreaView,
   KeyboardAvoidingView,
   StatusBar,
   Alert,
@@ -27,6 +26,8 @@ import { Video } from "expo-av";
 import { debounce } from "lodash";
 import Modal from "react-native-modal";
 import { supabase } from "../services/supabase";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context"; // Import from react-native-safe-area-context
+
 const { width } = Dimensions.get("window");
 
 const formatTimestamp = (timestamp) => {
@@ -91,16 +92,14 @@ const PostCard = memo(
     useEffect(() => {
       const rawMediaUrl = item.image_url || item.media_url;
       console.log(
-        `PostCard: Processing media for post ${
-          item.post_id || item.login?.uuid
+        `PostCard: Processing media for post ${item.post_id || item.login?.uuid
         }:`,
         { rawMediaUrl, media_type: item.media_type }
       );
 
       if (!rawMediaUrl) {
         console.warn(
-          `PostCard: Invalid media_url for post ${
-            item.post_id || item.login?.uuid
+          `PostCard: Invalid media_url for post ${item.post_id || item.login?.uuid
           }`,
           { rawMediaUrl }
         );
@@ -114,8 +113,8 @@ const PostCard = memo(
         isStringUrl && rawMediaUrl.startsWith("http")
           ? rawMediaUrl
           : isStringUrl
-          ? `${NGROK_URL}${rawMediaUrl}`
-          : null;
+            ? `${NGROK_URL}${rawMediaUrl}`
+            : null;
 
       const isVideoPost =
         item.media_type === "video" ||
@@ -134,16 +133,14 @@ const PostCard = memo(
               setImageHeight(width / aspectRatio);
               setIsLoading(false);
               console.log(
-                `PostCard: Image size for post ${
-                  item.post_id || item.login?.uuid
+                `PostCard: Image size for post ${item.post_id || item.login?.uuid
                 }:`,
                 { width: originalWidth, height: originalHeight }
               );
             },
             (error) => {
               console.error(
-                `PostCard: Error getting image size for post ${
-                  item.post_id || item.login?.uuid
+                `PostCard: Error getting image size for post ${item.post_id || item.login?.uuid
                 }:`,
                 error
               );
@@ -166,8 +163,7 @@ const PostCard = memo(
             .playAsync()
             .catch((error) =>
               console.error(
-                `PostCard: Play error for post ${
-                  item.post_id || item.login?.uuid
+                `PostCard: Play error for post ${item.post_id || item.login?.uuid
                 }:`,
                 error
               )
@@ -177,8 +173,7 @@ const PostCard = memo(
             .pauseAsync()
             .catch((error) =>
               console.error(
-                `PostCard: Pause error for post ${
-                  item.post_id || item.login?.uuid
+                `PostCard: Pause error for post ${item.post_id || item.login?.uuid
                 }:`,
                 error
               )
@@ -193,10 +188,10 @@ const PostCard = memo(
           "hardwareBackPress",
           () => {
             setIsCommentModalVisible(false);
-            return true;
+            return true; // Prevent default back button behavior
           }
         );
-        return () => backHandler.remove();
+        return () => backHandler.remove(); // Correctly remove the event listener
       }
     }, [isCommentModalVisible]);
 
@@ -316,8 +311,8 @@ const PostCard = memo(
       const username = isUserPost
         ? item.username
         : item.name
-        ? `${item.name.first} ${item.name.last || ""}`
-        : "User";
+          ? `${item.name.first} ${item.name.last || ""}`
+          : "User";
       navigation.navigate("Profile", { username, isOtherUser: true });
     };
 
@@ -362,9 +357,9 @@ const PostCard = memo(
 
     const mediaSource =
       (item.image_url || item.media_url) &&
-      typeof (item.image_url || item.media_url) === "string" &&
-      !(item.image_url || item.media_url).includes("undefined") &&
-      !(item.image_url || item.media_url).includes("null")
+        typeof (item.image_url || item.media_url) === "string" &&
+        !(item.image_url || item.media_url).includes("undefined") &&
+        !(item.image_url || item.media_url).includes("null")
         ? { uri: item.image_url || item.media_url }
         : require("../assets/PITCH.png");
 
@@ -404,8 +399,7 @@ const PostCard = memo(
                   style={styles.avatar}
                   onError={(e) =>
                     console.error(
-                      `PostCard: Profile picture error for post ${
-                        item.post_id || item.login?.uuid
+                      `PostCard: Profile picture error for post ${item.post_id || item.login?.uuid
                       }:`,
                       e.nativeEvent.error
                     )
@@ -417,8 +411,8 @@ const PostCard = memo(
                   {isUserPost
                     ? item.username
                     : item.name
-                    ? item.name.first
-                    : "User"}
+                      ? item.name.first
+                      : "User"}
                 </Text>
                 <Text style={styles.timeStamp}>
                   {formatTimestamp(item.created_at)}
@@ -459,15 +453,13 @@ const PostCard = memo(
                 onLoad={() => {
                   setIsLoading(false);
                   console.log(
-                    `PostCard: Video loaded for post ${
-                      item.post_id || item.login?.uuid
+                    `PostCard: Video loaded for post ${item.post_id || item.login?.uuid
                     }`
                   );
                 }}
                 onError={(error) => {
                   console.error(
-                    `PostCard: Video loading error for post ${
-                      item.post_id || item.login?.uuid
+                    `PostCard: Video loading error for post ${item.post_id || item.login?.uuid
                     }:`,
                     error
                   );
@@ -483,15 +475,13 @@ const PostCard = memo(
                 onLoad={() => {
                   setIsLoading(false);
                   console.log(
-                    `PostCard: Image loaded for post ${
-                      item.post_id || item.login?.uuid
+                    `PostCard: Image loaded for post ${item.post_id || item.login?.uuid
                     }`
                   );
                 }}
                 onError={(e) => {
                   console.error(
-                    `PostCard: Image loading error for post ${
-                      item.post_id || item.login?.uuid
+                    `PostCard: Image loading error for post ${item.post_id || item.login?.uuid
                     }:`,
                     e.nativeEvent.error
                   );
@@ -561,8 +551,8 @@ const PostCard = memo(
                 {isUserPost
                   ? item.username
                   : item.name
-                  ? item.name.first
-                  : "User"}{" "}
+                    ? item.name.first
+                    : "User"}{" "}
               </Text>
               {item.content || item.caption}
             </Text>
@@ -578,8 +568,8 @@ const PostCard = memo(
                 {isUserPost
                   ? item.username
                   : item.name
-                  ? item.name.first
-                  : "User"}{" "}
+                    ? item.name.first
+                    : "User"}{" "}
               </Text>
               {item.content || item.caption}
             </Text>
@@ -832,8 +822,8 @@ export default function Home() {
                 (post.media_url?.match(/\.(mp4|mov|avi|wmv|3gp|mkv)$/i)
                   ? "video"
                   : post.media_url?.match(/\.(jpg|jpeg|png|gif)$/i)
-                  ? "image"
-                  : null),
+                    ? "image"
+                    : null),
               content: post.content || "",
               created_at: post.created_at,
               likes: post.like_count || post.likes || 0,
@@ -908,7 +898,7 @@ export default function Home() {
   }, [navigation]);
 
   useEffect(() => {
-    loadUsers(); // Fetch mock posts when currentPage changes
+    loadUsers();
   }, [currentPage, loadUsers]);
 
   useFocusEffect(
@@ -1022,128 +1012,134 @@ export default function Home() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-      <View style={styles.topBar}>
-        <TouchableOpacity onPress={handleProfilePress}>
-          <Image
-            source={
-              userData?.profile_picture &&
-              typeof userData.profile_picture === "string"
-                ? { uri: userData.profile_picture }
-                : require("../assets/profiledefault.jpg")
-            }
-            style={styles.profilePic}
-          />
-        </TouchableOpacity>
-        <View style={styles.searchContainer}>
-          <TextInput
-            style={styles.searchBar}
-            placeholder="Search..."
-            placeholderTextColor="#aaa"
-            onFocus={handleSearchFocus}
-            editable={true}
-          />
-        </View>
-        <View style={styles.iconsContainer}>
-          <TouchableOpacity onPress={handleChatPress}>
-            <Image
-              source={require("../assets/Arrow.png")}
-              style={styles.chatIcon}
-            />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.iconSpacing}
-            onPress={() => {
-              setTempSelectedFields(selectedFields);
-              setFieldsModalVisible(true);
-            }}
-          >
-            <Image
-              source={require("../assets/options.png")}
-              style={styles.filterIcon}
-            />
-          </TouchableOpacity>
-        </View>
-      </View>
-      <KeyboardAvoidingView
-        style={styles.keyboardAvoid}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-      >
-        {postsError && (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>Error: {postsError}</Text>
-          </View>
-        )}
-        <FlatList
-          data={combinedData}
-          extraData={combinedData}
-          renderItem={({ item, index }) => (
-            <PostCard
-              item={item}
-              index={index}
-              toggleExpand={toggleExpand}
-              expandedItems={expandedItems}
-              isVisible={viewableItems.includes(index)}
-              navigation={navigation}
-              fetchAllPosts={fetchAllPosts}
-            />
-          )}
-          keyExtractor={keyExtractor}
-          onEndReached={() => setCurrentPage((prev) => prev + 1)}
-          onEndReachedThreshold={0.5}
-          ListFooterComponent={renderFooter}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.listContentContainer}
-          onViewableItemsChanged={onViewableItemsChanged}
-          viewabilityConfig={viewabilityConfig}
-          ListEmptyComponent={
-            <Text style={styles.noPostsText}>No posts available</Text>
-          }
+    <SafeAreaProvider>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        <StatusBar
+          barStyle="dark-content"
+          backgroundColor="#fff"
+          translucent={false}
         />
-      </KeyboardAvoidingView>
-      <Modal
-        isVisible={isFieldsModalVisible}
-        onBackdropPress={handleFieldsClose}
-        style={styles.modal}
-      >
-        <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>Select Fields</Text>
-          <ScrollView contentContainerStyle={styles.fieldsContainer}>
-            {FIELDS.map((field) => (
-              <TouchableOpacity
-                key={field}
-                style={[
-                  styles.fieldBubble,
-                  tempSelectedFields.includes(field) &&
-                    styles.selectedFieldBubble,
-                ]}
-                onPress={() => toggleTempField(field)}
-              >
-                <Text style={styles.fieldBubbleText}>{field}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-          <View style={styles.modalActionButtons}>
-            <TouchableOpacity
-              style={styles.modalCloseButton}
-              onPress={handleFieldsClose}
-            >
-              <Text style={styles.modalCloseButtonText}>Close</Text>
+        <View style={styles.topBar}>
+          <TouchableOpacity onPress={handleProfilePress}>
+            <Image
+              source={
+                userData?.profile_picture &&
+                typeof userData.profile_picture === "string"
+                  ? { uri: userData.profile_picture }
+                  : require("../assets/profiledefault.jpg")
+              }
+              style={styles.profilePic}
+            />
+          </TouchableOpacity>
+          <View style={styles.searchContainer}>
+            <TextInput
+              style={styles.searchBar}
+              placeholder="Search..."
+              placeholderTextColor="#aaa"
+              onFocus={handleSearchFocus}
+              editable={true}
+            />
+          </View>
+          <View style={styles.iconsContainer}>
+            <TouchableOpacity onPress={handleChatPress}>
+              <Image
+                source={require("../assets/Arrow.png")}
+                style={styles.chatIcon}
+              />
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.modalDoneButton}
-              onPress={handleFieldsDone}
+              style={styles.iconSpacing}
+              onPress={() => {
+                setTempSelectedFields(selectedFields);
+                setFieldsModalVisible(true);
+              }}
             >
-              <Text style={styles.modalDoneButtonText}>Done</Text>
+              <Image
+                source={require("../assets/options.png")}
+                style={styles.filterIcon}
+              />
             </TouchableOpacity>
           </View>
         </View>
-      </Modal>
-    </SafeAreaView>
+        <KeyboardAvoidingView
+          style={styles.keyboardAvoid}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
+          {postsError && (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>Error: {postsError}</Text>
+            </View>
+          )}
+          <FlatList
+            data={combinedData}
+            extraData={combinedData}
+            renderItem={({ item, index }) => (
+              <PostCard
+                item={item}
+                index={index}
+                toggleExpand={toggleExpand}
+                expandedItems={expandedItems}
+                isVisible={viewableItems.includes(index)}
+                navigation={navigation}
+                fetchAllPosts={fetchAllPosts}
+              />
+            )}
+            keyExtractor={keyExtractor}
+            onEndReached={() => setCurrentPage((prev) => prev + 1)}
+            onEndReachedThreshold={0.5}
+            ListFooterComponent={renderFooter}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            }
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.listContentContainer}
+            onViewableItemsChanged={onViewableItemsChanged}
+            viewabilityConfig={viewabilityConfig}
+            ListEmptyComponent={
+              <Text style={styles.noPostsText}>No posts available</Text>
+            }
+          />
+        </KeyboardAvoidingView>
+        <Modal
+          isVisible={isFieldsModalVisible}
+          onBackdropPress={handleFieldsClose}
+          style={styles.modal}
+        >
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Select Fields</Text>
+            <ScrollView contentContainerStyle={styles.fieldsContainer}>
+              {FIELDS.map((field) => (
+                <TouchableOpacity
+                  key={field}
+                  style={[
+                    styles.fieldBubble,
+                    tempSelectedFields.includes(field) &&
+                      styles.selectedFieldBubble,
+                  ]}
+                  onPress={() => toggleTempField(field)}
+                >
+                  <Text style={styles.fieldBubbleText}>{field}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <View style={styles.modalActionButtons}>
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={handleFieldsClose}
+              >
+                <Text style={styles.modalCloseButtonText}>Close</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalDoneButton}
+                onPress={handleFieldsDone}
+              >
+                <Text style={styles.modalDoneButtonText}>Done</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      </SafeAreaView>
+    </SafeAreaProvider>
   );
 }
 

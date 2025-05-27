@@ -9,12 +9,12 @@ import {
   ActivityIndicator,
   Platform,
   Alert,
-  SafeAreaView,
-  StatusBar,
+  StatusBar, // Add StatusBar import
   KeyboardAvoidingView,
   ScrollView,
   Keyboard,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context"; // Import from react-native-safe-area-context
 import { Video } from "expo-av";
 import * as ImagePicker from "expo-image-picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -23,6 +23,7 @@ import { useNavigation } from "@react-navigation/native";
 import * as FileSystem from "expo-file-system";
 import { Ionicons, Feather } from "@expo/vector-icons";
 import { useRoute } from "@react-navigation/native";
+
 const getFileUri = async (uri) => {
   if (Platform.OS === "android" && uri.startsWith("content://")) {
     const fileUri = `${FileSystem.cacheDirectory}tempUpload`;
@@ -119,11 +120,8 @@ export default function CreatePostScreen() {
     };
   }, []);
 
-  // Update the pickMedia function in CreatePostScreen.js to handle videos better
-
   const pickMedia = async () => {
     try {
-      // Check permission before launching the picker
       const { status } =
         await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
@@ -139,15 +137,13 @@ export default function CreatePostScreen() {
         allowsEditing: true,
         aspect: [4, 5],
         quality: 1,
-        // Add these options for better video handling
-        videoMaxDuration: 60, // Limit to 60 seconds to avoid large file issues
-        videoExportPreset: ImagePicker.VideoExportPreset.MediumQuality, // Reduce file size
+        videoMaxDuration: 60,
+        videoExportPreset: ImagePicker.VideoExportPreset.MediumQuality,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const selectedMedia = result.assets[0];
 
-        // Log detailed information about the selected media
         console.log("Selected media:", {
           uri: selectedMedia.uri,
           type: selectedMedia.type,
@@ -157,7 +153,6 @@ export default function CreatePostScreen() {
           duration: selectedMedia.duration,
         });
 
-        // Check file size for videos to avoid upload issues
         if (
           selectedMedia.type === "video" &&
           selectedMedia.fileSize &&
@@ -192,18 +187,23 @@ export default function CreatePostScreen() {
   };
 
   const route = useRoute();
-  const eventTag = route.params?.eventTag || null; // Get eventTag if available
+  const eventTag = route.params?.eventTag || null;
 
   const nextStep = () => {
     if (!media) {
       Alert.alert("No Media", "Please select an image or video first");
       return;
     }
-    navigation.navigate("SelectTags", { media, mediaType, caption, eventTag }); // Pass eventTag
+    navigation.navigate("SelectTags", { media, mediaType, caption, eventTag });
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor="#fff"
+        translucent={false}
+      />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.keyboardAvoid}
@@ -333,7 +333,7 @@ export default function CreatePostScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#fff", // Remove paddingTop: 50
+    backgroundColor: "#fff",
   },
   keyboardAvoid: { flex: 1 },
   header: {

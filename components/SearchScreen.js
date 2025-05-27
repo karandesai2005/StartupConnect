@@ -9,11 +9,11 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
-  StatusBar,
-  SafeAreaView,
   Alert,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
+import { SafeAreaView } from "react-native-safe-area-context"; // Import from react-native-safe-area-context
+import { StatusBar } from "react-native"; // Already imported
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { NGROK_URL } from "@env";
@@ -133,8 +133,12 @@ const SearchScreen = () => {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor="#fff"
+        translucent={false} // Add translucent={false}
+      />
       <View style={styles.topBar}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
@@ -170,6 +174,7 @@ const SearchScreen = () => {
             keyExtractor={(item) => item.user_id.toString()}
             style={styles.searchResultsList}
             keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.listContent} // Added contentContainerStyle
           />
         )}
       </KeyboardAvoidingView>
@@ -185,24 +190,25 @@ const styles = StyleSheet.create({
   topBar: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 12,
-    paddingRight: 80,
     backgroundColor: "#fff",
     borderBottomWidth: 1,
     borderBottomColor: "#E9ECEF",
+  },
+  backButton: {
+    marginRight: 10, // Adjusted for spacing between button and search bar
   },
   backButtonText: {
     fontSize: 32,
     color: "#000",
   },
   searchBar: {
+    flex: 1, // Adjusted to take remaining space
     paddingHorizontal: 15,
     backgroundColor: "#eee",
     borderRadius: 20,
     height: 40,
-    width: 270,
   },
   keyboardAvoid: {
     flex: 1,
@@ -210,10 +216,14 @@ const styles = StyleSheet.create({
   searchResultsList: {
     flex: 1,
   },
+  listContent: {
+    paddingHorizontal: 16, // Added padding to match other screens
+    paddingBottom: 20, // Added padding to match other screens
+  },
   searchResultItem: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 10,
+    paddingVertical: 10, // Adjusted for better spacing
     borderBottomWidth: 1,
     borderBottomColor: "#eee",
   },

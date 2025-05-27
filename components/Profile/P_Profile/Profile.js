@@ -10,10 +10,10 @@ import {
   RefreshControl,
   Alert,
   Dimensions,
-  SafeAreaView,
   StatusBar,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
+import { SafeAreaView } from "react-native-safe-area-context"; // Import from react-native-safe-area-context
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { NGROK_URL } from "@env";
 import { Video } from "expo-av";
@@ -488,15 +488,19 @@ const Profile = ({ route }) => {
 
   if (isLoading || !currentUser || !userData) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         <ActivityIndicator size="large" color="#007BFF" />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor="#fff"
+        translucent={false} // Add translucent={false}
+      />
       <FlatList
         ListHeaderComponent={
           <>
@@ -593,7 +597,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     width: "100%",
     paddingHorizontal: 20,
-    marginTop: 25,
+    marginTop: 10, // Reduced marginTop to minimize gap
   },
   avatarMultiVariants: { width: 96, height: 96, marginHorizontal: 20 },
   profileImage: { width: "100%", height: "100%", borderRadius: 48 },
@@ -628,7 +632,7 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "600",
   },
-  backButton: { position: "absolute", left: 5, top: 5, zIndex: 1 },
+  backButton: { position: "absolute", left: 10, top: 10, zIndex: 1 }, // Adjusted left and top for better positioning
   backButtonText: { fontSize: 32, color: "#000", marginRight: 9 },
   postsHeading: {
     fontSize: 18,

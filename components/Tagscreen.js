@@ -5,12 +5,12 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  SafeAreaView,
-  StatusBar,
   ActivityIndicator,
   Alert,
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
+import { SafeAreaView } from "react-native-safe-area-context"; // Import from react-native-safe-area-context
+import { StatusBar } from "react-native"; // Already imported
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { NGROK_URL } from "@env";
 import { Ionicons } from "@expo/vector-icons";
@@ -254,8 +254,12 @@ export default function SelectTagsScreen() {
   const canPost = loading || (!caption && selectedTags.length === 0 && !(fromEvent && eventTag));
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor="#fff"
+        translucent={false} // Add translucent={false}
+      />
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
@@ -322,7 +326,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    height: 60,
+    paddingVertical: 12, // Adjusted to match other screens
     borderBottomWidth: 1,
     borderBottomColor: "#dbdbdb",
     backgroundColor: "#fff",
@@ -337,7 +341,7 @@ const styles = StyleSheet.create({
   },
   postButtonDisabled: { backgroundColor: "#0095f660" },
   postButtonText: { fontSize: 16, fontWeight: "600", color: "#fff" },
-  scrollContainer: { padding: 16, flexGrow: 1 },
+  scrollContainer: { paddingHorizontal: 16, paddingBottom: 20, flexGrow: 1 }, // Added paddingHorizontal and paddingBottom
   tagsContainer: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   tagButton: {
     paddingVertical: 8,

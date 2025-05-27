@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context'; // Add this import
 import { UserRegistrationProvider } from './context/UserRegistrationContext';
 import { ThemeProvider } from './components/ThemeContext';
 import SplashScreen from './components/SplashScreen';
@@ -138,61 +139,63 @@ const App = () => {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <ThemeProvider>
-        <UserRegistrationProvider>
-          <NavigationContainer
-            onStateChange={(state) => {
-              console.log('Navigation state:', JSON.stringify(state, null, 2));
-              if (!state) {
-                console.error('Navigation state is undefined');
-              }
-            }}
-            onUnhandledAction={(action) => {
-              console.error('Unhandled navigation action:', JSON.stringify(action, null, 2));
-            }}
-          >
-            <Stack.Navigator
-              initialRouteName={initialRoute}
-              screenOptions={{
-                headerShown: false,
-                cardStyle: { backgroundColor: 'white' },
-                transitionSpec: {
-                  open: { animation: 'timing', config: { duration: 200 } },
-                  close: { animation: 'timing', config: { duration: 200 } },
-                },
-                cardStyleInterpolator: ({ current }) => ({
-                  cardStyle: { opacity: current.progress },
-                }),
+      <SafeAreaProvider> {/* Wrap the entire app with SafeAreaProvider */}
+        <ThemeProvider>
+          <UserRegistrationProvider>
+            <NavigationContainer
+              onStateChange={(state) => {
+                console.log('Navigation state:', JSON.stringify(state, null, 2));
+                if (!state) {
+                  console.error('Navigation state is undefined');
+                }
+              }}
+              onUnhandledAction={(action) => {
+                console.error('Unhandled navigation action:', JSON.stringify(action, null, 2));
               }}
             >
-              <Stack.Screen name="Splash" component={SplashScreen} />
-              <Stack.Screen name="Login" component={LoginScreen} />
-              <Stack.Screen name="Main" component={Bottomnav} />
-              <Stack.Screen name="Search" component={SearchScreen} />
-              <Stack.Screen name="Register1" component={Register1} />
-              <Stack.Screen name="Register2" component={Register2} />
-              <Stack.Screen name="Profile" component={Profile} options={{ animation: 'fade' }} />
-              <Stack.Screen name="BusinessProfile" component={BusinessProfile} options={{ animation: 'fade' }} />
-              <Stack.Screen name="username" component={Username} />
-              <Stack.Screen name="preference" component={Preference} />
-              <Stack.Screen name="field" component={Field} />
-              <Stack.Screen name="EditProfilePage" component={EditProfilePage} />
-              <Stack.Screen name="CreatePost" component={CreatePostScreen} />
-              <Stack.Screen name="PostView" component={PostViewScreen} />
-              <Stack.Screen name="Settings" component={Settings} />
-              <Stack.Screen name="Events" component={Events} />
-              <Stack.Screen name="AddStory" component={AddStory} />
-              <Stack.Screen name="SelectTags" component={SelectTagsScreen} />
-              <Stack.Screen name="ViewStory" component={ViewStory} options={{ headerShown: false }} />
-              <Stack.Screen name="EventDetails" component={EventDetails} />
-              <Stack.Screen name="ReelScreen" component={ReelScreen} options={{ headerShown: false }} />
-              <Stack.Screen name="PostItem" component={PostItem} />
-              <Stack.Screen name="handlePersonal" component={HandlePersonal} />
-              <Stack.Screen name="handleBusiness" component={HandleBusiness} />
-            </Stack.Navigator>
-          </NavigationContainer>
-        </UserRegistrationProvider>
-      </ThemeProvider>
+              <Stack.Navigator
+                initialRouteName={initialRoute}
+                screenOptions={{
+                  headerShown: false,
+                  cardStyle: { backgroundColor: 'white' },
+                  transitionSpec: {
+                    open: { animation: 'timing', config: { duration: 200 } },
+                    close: { animation: 'timing', config: { duration: 200 } },
+                  },
+                  cardStyleInterpolator: ({ current }) => ({
+                    cardStyle: { opacity: current.progress },
+                  }),
+                }}
+              >
+                <Stack.Screen name="Splash" component={SplashScreen} />
+                <Stack.Screen name="Login" component={LoginScreen} />
+                <Stack.Screen name="Main" component={Bottomnav} />
+                <Stack.Screen name="Search" component={SearchScreen} />
+                <Stack.Screen name="Register1" component={Register1} />
+                <Stack.Screen name="Register2" component={Register2} />
+                <Stack.Screen name="Profile" component={Profile} options={{ animation: 'fade' }} />
+                <Stack.Screen name="BusinessProfile" component={BusinessProfile} options={{ animation: 'fade' }} />
+                <Stack.Screen name="username" component={Username} />
+                <Stack.Screen name="preference" component={Preference} />
+                <Stack.Screen name="field" component={Field} />
+                <Stack.Screen name="EditProfilePage" component={EditProfilePage} />
+                <Stack.Screen name="CreatePost" component={CreatePostScreen} />
+                <Stack.Screen name="PostView" component={PostViewScreen} />
+                <Stack.Screen name="Settings" component={Settings} />
+                <Stack.Screen name="Events" component={Events} />
+                <Stack.Screen name="AddStory" component={AddStory} />
+                <Stack.Screen name="SelectTags" component={SelectTagsScreen} />
+                <Stack.Screen name="ViewStory" component={ViewStory} options={{ headerShown: false }} />
+                <Stack.Screen name="EventDetails" component={EventDetails} />
+                <Stack.Screen name="ReelScreen" component={ReelScreen} options={{ headerShown: false }} />
+                <Stack.Screen name="PostItem" component={PostItem} />
+                <Stack.Screen name="handlePersonal" component={HandlePersonal} />
+                <Stack.Screen name="handleBusiness" component={HandleBusiness} />
+              </Stack.Navigator>
+            </NavigationContainer>
+          </UserRegistrationProvider>
+        </ThemeProvider>
+      </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 };

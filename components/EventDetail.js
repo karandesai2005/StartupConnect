@@ -6,9 +6,10 @@ import {
   Image,
   TouchableOpacity,
   ScrollView,
-  SafeAreaView,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { SafeAreaView } from 'react-native-safe-area-context'; // Import from react-native-safe-area-context
+import { StatusBar } from 'react-native'; // Add StatusBar import
 import { Ionicons } from '@expo/vector-icons';
 
 // Participation steps
@@ -43,7 +44,12 @@ const EventDetailsScreen = () => {
   );
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor="#fff"
+        translucent={false} // Add StatusBar
+      />
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#000" />
@@ -90,7 +96,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    height: 44,
+    height: 44, // Matches CreatePostScreen
     borderBottomWidth: 0.5,
     borderBottomColor: '#dbdbdb',
   },
@@ -107,7 +113,7 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     flexGrow: 1,
-    paddingBottom: 20,
+    paddingBottom: 20, // Matches other screens
   },
   eventImage: {
     width: '100%',
@@ -117,7 +123,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0f0f0',
   },
   detailsContainer: {
-    padding: 20,
+    paddingHorizontal: 20, // Adjusted to match SettingsScreen
+    paddingTop: 20,
   },
   eventTitle: {
     fontSize: 24,

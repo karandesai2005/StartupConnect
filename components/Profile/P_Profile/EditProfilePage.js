@@ -8,10 +8,11 @@ import {
   Image,
   ScrollView,
   Alert,
-  SafeAreaView,
   ActivityIndicator,
+  StatusBar, // Add StatusBar import
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
+import { SafeAreaView } from "react-native-safe-area-context"; // Import from react-native-safe-area-context
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -256,7 +257,12 @@ const EditProfilePage = () => {
       !updatedProfileImage.startsWith("http"));
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor="#fff"
+        translucent={false} // Add StatusBar
+      />
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
@@ -279,7 +285,7 @@ const EditProfilePage = () => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content}>
+      <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 20 }}>
         <TouchableOpacity
           onPress={handleProfilePictureChange}
           style={styles.imageContainer}
@@ -331,12 +337,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 10,
+    paddingHorizontal: 16, // Increased padding for consistency
+    paddingVertical: 12,   // Adjusted to match other screens
     borderBottomWidth: 1,
     borderBottomColor: "#eee",
   },
   backButton: {
-    paddingLeft: 8,
+    paddingLeft: 0, // Adjusted paddingLeft to 0 since paddingHorizontal is now on header
   },
   backButtonText: {
     color: "#666",
@@ -347,7 +354,8 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   saveButton: {
-    padding: 8,
+    paddingHorizontal: 8, // Adjusted for better touch area
+    paddingVertical: 4,
   },
   saveButtonDisabled: {
     opacity: 0.5,
@@ -358,7 +366,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   content: {
-    padding: 16,
+    paddingHorizontal: 16, // Added paddingHorizontal to match other screens
   },
   imageContainer: {
     alignItems: "center",
