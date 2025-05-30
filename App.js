@@ -31,7 +31,7 @@ import HandlePersonal from './components/Profile/P_Profile/handlePersonal';
 import HandleBusiness from './components/Profile/B_Profile/handleBusiness';
 import { supabase } from './services/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
+import FollowListScreen from "./components/FollowListScreen";
 const Stack = createStackNavigator();
 
 const App = () => {
@@ -191,6 +191,7 @@ const App = () => {
                 <Stack.Screen name="PostItem" component={PostItem} />
                 <Stack.Screen name="handlePersonal" component={HandlePersonal} />
                 <Stack.Screen name="handleBusiness" component={HandleBusiness} />
+                <Stack.Screen name="FollowList" component={FollowListScreen} options={{ headerShown: false }}/>
               </Stack.Navigator>
             </NavigationContainer>
           </UserRegistrationProvider>

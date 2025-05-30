@@ -21,7 +21,7 @@ import { supabase } from "../../../services/supabase";
 
 const isDev = __DEV__;
 const log = (...args) => isDev && console.log(...args);
-
+// In Profile.js, update ProfileHeader component
 const ProfileHeader = React.memo(
   ({ userData, navigation, isOwnProfile, onFollow }) => {
     const isBusinessProfile = userData?.account_type === "business";
@@ -58,10 +58,18 @@ const ProfileHeader = React.memo(
     return (
       <View style={styles.profile}>
         <View style={styles.profileSection}>
-          <View style={styles.statsContainer}>
+          <TouchableOpacity
+            style={styles.statsContainer}
+            onPress={() =>
+              navigation.navigate("FollowList", {
+                username: userData?.username,
+                type: "followers",
+              })
+            }
+          >
             <Text style={styles.statsNumber}>{userData?.followers || "0"}</Text>
             <Text style={styles.statsLabel}>Followers</Text>
-          </View>
+          </TouchableOpacity>
           <View style={styles.avatarMultiVariants}>
             <View style={avatarStyle}>
               <Image
@@ -76,10 +84,18 @@ const ProfileHeader = React.memo(
               />
             </View>
           </View>
-          <View style={styles.statsContainer}>
+          <TouchableOpacity
+            style={styles.statsContainer}
+            onPress={() =>
+              navigation.navigate("FollowList", {
+                username: userData?.username,
+                type: "following",
+              })
+            }
+          >
             <Text style={styles.statsNumber}>{userData?.following || "0"}</Text>
             <Text style={styles.statsLabel}>Following</Text>
-          </View>
+          </TouchableOpacity>
         </View>
         <View style={styles.text}>
           <View style={styles.id}>
