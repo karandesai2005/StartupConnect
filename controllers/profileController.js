@@ -45,25 +45,37 @@ const cleanUrl = (url) => {
 
 // Profile Controller
 const profileController = {
+
   getProfile: async (req, res) => {
-    try {
-      const supabase_uid = req.user.id;
+  try {
+    const supabase_uid = req.user.id;
 
-      const { data, error } = await supabase
-        .from('users')
-        .select('user_id, username, email, name, bio, profile_picture, is_personal, is_business, reel_url')
-        .eq('supabase_uid', supabase_uid)
-        .single();
-      if (error || !data) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-
-      res.json({ ...data, profile_picture: cleanUrl(data.profile_picture) });
-    } catch (error) {
-      logger.error(`Get profile error: ${error.message}`);
-      res.status(500).json({ error: 'Server error' });
+    // Fetch user_id from Supabase
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('user_id, username')
+      .eq('supabase_uid', supabase_uid)
+      .single();
+    if (error || !user) {
+      return res.status(404).json({ error: 'User not found' });
     }
-  },
+
+    // Use User model to get full user data including followers and following
+    const userData = await User.getUserByUsername(user.username);
+    if (!userData) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({
+      ...userData,
+      profile_picture: cleanUrl(userData.profile_picture),
+      isFollowing: false,
+    });
+  } catch (error) {
+    logger.error(`Get profile error: ${error.message}`);
+    res.status(500).json({ error: 'Server error' });
+  }
+},
 
   getUserProfile: async (req, res) => {
     try {
