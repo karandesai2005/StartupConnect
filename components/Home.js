@@ -26,7 +26,31 @@ import { Video } from "expo-av";
 import { debounce } from "lodash";
 import Modal from "react-native-modal";
 import { supabase } from "../services/supabase";
-import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context"; // Import from react-native-safe-area-context
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+
+// CHANGED: Add ErrorBoundary component
+class ErrorBoundary extends React.Component {
+  state = { hasError: false, error: null };
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error("ErrorBoundary caught:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>Something went wrong with this post.</Text>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const { width } = Dimensions.get("window");
 
@@ -51,6 +75,9 @@ const handleChatPress = () => {
     [{ text: "OK" }]
   );
 };
+
+// Memoized Post Card Component
+// ... (imports, ErrorBoundary, formatTimestamp, handleChatPress unchanged)
 
 // Memoized Post Card Component
 const PostCard = memo(
@@ -82,6 +109,9 @@ const PostCard = memo(
     const [fullTextHeight, setFullTextHeight] = useState(0);
     const [lastTap, setLastTap] = useState(null);
 
+    // CHANGED: Add modal animation value
+    const modalOpacity = new Animated.Value(0);
+
     const isUserPost =
       item.hasOwnProperty("caption") || item.hasOwnProperty("content");
 
@@ -92,15 +122,13 @@ const PostCard = memo(
     useEffect(() => {
       const rawMediaUrl = item.image_url || item.media_url;
       console.log(
-        `PostCard: Processing media for post ${item.post_id || item.login?.uuid
-        }:`,
+        `PostCard: Processing media for post ${item.post_id || item.login?.uuid}:`,
         { rawMediaUrl, media_type: item.media_type }
       );
 
       if (!rawMediaUrl) {
         console.warn(
-          `PostCard: Invalid media_url for post ${item.post_id || item.login?.uuid
-          }`,
+          `PostCard: Invalid media_url for post ${item.post_id || item.login?.uuid}`,
           { rawMediaUrl }
         );
         setImageHeight(width);
@@ -113,8 +141,8 @@ const PostCard = memo(
         isStringUrl && rawMediaUrl.startsWith("http")
           ? rawMediaUrl
           : isStringUrl
-            ? `${NGROK_URL}${rawMediaUrl}`
-            : null;
+          ? `${NGROK_URL}${rawMediaUrl}`
+          : null;
 
       const isVideoPost =
         item.media_type === "video" ||
@@ -124,7 +152,6 @@ const PostCard = memo(
         setImageHeight((width * 5) / 4);
         setIsLoading(false);
       } else {
-        // Handle local assets or URLs
         if (isStringUrl && mediaUrl) {
           Image.getSize(
             mediaUrl,
@@ -133,15 +160,13 @@ const PostCard = memo(
               setImageHeight(width / aspectRatio);
               setIsLoading(false);
               console.log(
-                `PostCard: Image size for post ${item.post_id || item.login?.uuid
-                }:`,
+                `PostCard: Image size for post ${item.post_id || item.login?.uuid}:`,
                 { width: originalWidth, height: originalHeight }
               );
             },
             (error) => {
               console.error(
-                `PostCard: Error getting image size for post ${item.post_id || item.login?.uuid
-                }:`,
+                `PostCard: Error getting image size for post ${item.post_id || item.login?.uuid}:`,
                 error
               );
               setImageHeight(width);
@@ -149,8 +174,7 @@ const PostCard = memo(
             }
           );
         } else {
-          // Assume local asset
-          setImageHeight(width); // Default for local assets
+          setImageHeight(width);
           setIsLoading(false);
         }
       }
@@ -163,8 +187,7 @@ const PostCard = memo(
             .playAsync()
             .catch((error) =>
               console.error(
-                `PostCard: Play error for post ${item.post_id || item.login?.uuid
-                }:`,
+                `PostCard: Play error for post ${item.post_id || item.login?.uuid}:`,
                 error
               )
             );
@@ -173,8 +196,7 @@ const PostCard = memo(
             .pauseAsync()
             .catch((error) =>
               console.error(
-                `PostCard: Pause error for post ${item.post_id || item.login?.uuid
-                }:`,
+                `PostCard: Pause error for post ${item.post_id || item.login?.uuid}:`,
                 error
               )
             );
@@ -188,10 +210,24 @@ const PostCard = memo(
           "hardwareBackPress",
           () => {
             setIsCommentModalVisible(false);
-            return true; // Prevent default back button behavior
+            return true;
           }
         );
-        return () => backHandler.remove(); // Correctly remove the event listener
+        // CHANGED: Animate modal in
+        Animated.timing(modalOpacity, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }).start();
+        return () => {
+          backHandler.remove();
+          // CHANGED: Reset modal animation
+          Animated.timing(modalOpacity, {
+            toValue: 0,
+            duration: 200,
+            useNativeDriver: true,
+          }).start();
+        };
       }
     }, [isCommentModalVisible]);
 
@@ -236,12 +272,17 @@ const PostCard = memo(
       try {
         setIsCommentsLoading(true);
         const token = await AsyncStorage.getItem("token");
-        if (!token || !item.post_id) return;
+        if (!token || !item.post_id) {
+          console.warn(`PostCard: Missing token or post_id for post ${item.post_id}`);
+          setIsCommentsLoading(false);
+          return;
+        }
         const baseUrl = NGROK_URL.replace(/\/+$/, "");
         const response = await axios.get(
           `${baseUrl}/api/posts/${item.post_id}/comments`,
           {
             headers: { Authorization: `Bearer ${token}` },
+            timeout: 5000, // CHANGED: Add timeout
           }
         );
         setComments(response.data || []);
@@ -252,9 +293,10 @@ const PostCard = memo(
       } catch (error) {
         console.error(
           `PostCard: Error fetching comments for post ${item.post_id}:`,
-          error
+          error.message
         );
         setComments([]);
+        Alert.alert("Error", "Failed to load comments. Please try again.");
       } finally {
         setIsCommentsLoading(false);
       }
@@ -311,12 +353,13 @@ const PostCard = memo(
       const username = isUserPost
         ? item.username
         : item.name
-          ? `${item.name.first} ${item.name.last || ""}`
-          : "User";
+        ? `${item.name.first} ${item.name.last || ""}`
+        : "User";
       navigation.navigate("Profile", { username, isOtherUser: true });
     };
 
     const toggleCommentModal = () => {
+      console.log(`PostCard: Toggling comment modal for post ${item.post_id || item.login?.uuid}`);
       if (!isCommentModalVisible) {
         fetchComments();
       }
@@ -327,13 +370,17 @@ const PostCard = memo(
       if (!isUserPost || !newComment.trim()) return;
       try {
         const token = await AsyncStorage.getItem("token");
-        if (!token || !item.post_id) return;
+        if (!token || !item.post_id) {
+          console.warn(`PostCard: Missing token or post_id for comment on post ${item.post_id}`);
+          return;
+        }
         const baseUrl = NGROK_URL.replace(/\/+$/, "");
         const response = await axios.post(
           `${baseUrl}/api/posts/${item.post_id}/comments`,
           { content: newComment },
           { headers: { Authorization: `Bearer ${token}` } }
         );
+        console.log(`PostCard: Comment added for post ${item.post_id}:`, response.data);
         if (response.data) {
           await fetchComments();
           setNewComment("");
@@ -341,8 +388,9 @@ const PostCard = memo(
       } catch (error) {
         console.error(
           `PostCard: Error adding comment for post ${item.post_id}:`,
-          error
+          error.message
         );
+        Alert.alert("Error", "Failed to add comment. Please try again.");
       }
     };
 
@@ -357,13 +405,12 @@ const PostCard = memo(
 
     const mediaSource =
       (item.image_url || item.media_url) &&
-        typeof (item.image_url || item.media_url) === "string" &&
-        !(item.image_url || item.media_url).includes("undefined") &&
-        !(item.image_url || item.media_url).includes("null")
+      typeof (item.image_url || item.media_url) === "string" &&
+      !(item.image_url || item.media_url).includes("undefined") &&
+      !(item.image_url || item.media_url).includes("null")
         ? { uri: item.image_url || item.media_url }
         : require("../assets/PITCH.png");
 
-    // Debug profile picture
     console.log(
       `PostCard: Profile picture for post ${item.post_id || item.login?.uuid}:`,
       {
@@ -381,276 +428,289 @@ const PostCard = memo(
         !item.profile_picture.includes("undefined") &&
         !item.profile_picture.includes("null")
       ) {
-        return { uri: item.profile_picture }; // Use the absolute Supabase URL directly
+        return { uri: item.profile_picture };
       }
       return require("../assets/profiledefault.jpg");
     })();
 
+    // CHANGED: Debug transform
+    console.log(
+      `PostCard: Transform for post ${item.post_id || item.login?.uuid}:`,
+      [{ scale: animatedScale._value }]
+    );
+
     return (
-      <Animated.View
-        style={[styles.card, { transform: [{ scale: animatedScale }] }]}
-      >
-        <TouchableOpacity onPress={handleProfilePress} activeOpacity={0.7}>
-          <View style={styles.cardHeader}>
-            <View style={styles.userInfo}>
-              <TouchableOpacity onPress={handleProfilePress}>
-                <Image
-                  source={profilePictureSource}
-                  style={styles.avatar}
-                  onError={(e) =>
-                    console.error(
-                      `PostCard: Profile picture error for post ${item.post_id || item.login?.uuid
-                      }:`,
-                      e.nativeEvent.error
-                    )
-                  }
-                />
+      <ErrorBoundary>
+        <Animated.View
+          style={[
+            styles.card,
+            {
+              transform: [{ scale: animatedScale }].filter(Boolean),
+            },
+          ]}
+        >
+          <TouchableOpacity onPress={handleProfilePress} activeOpacity={0.7}>
+            <View style={styles.cardHeader}>
+              <View style={styles.userInfo}>
+                <TouchableOpacity onPress={handleProfilePress}>
+                  <Image
+                    source={profilePictureSource}
+                    style={styles.avatar}
+                    onError={(e) =>
+                      console.error(
+                        `PostCard: Profile picture error for post ${item.post_id || item.login?.uuid}:`,
+                        e.nativeEvent.error
+                      )
+                    }
+                  />
+                </TouchableOpacity>
+                <View>
+                  <Text style={styles.name}>
+                    {isUserPost
+                      ? item.username
+                      : item.name
+                      ? item.name.first
+                      : "User"}
+                  </Text>
+                  <Text style={styles.timeStamp}>
+                    {formatTimestamp(item.created_at)}
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                style={styles.moreButton}
+                onPress={(e) => e.stopPropagation()}
+              >
+                <Text style={styles.moreButtonText}>•••</Text>
               </TouchableOpacity>
-              <View>
-                <Text style={styles.name}>
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.95}
+            onPressIn={handlePressIn}
+            onPressOut={handlePressOut}
+            onPress={handleDoubleTap}
+          >
+            <View style={[styles.imageContainer, { height: imageHeight }]}>
+              {isLoading && (
+                <View style={styles.imageLoader}>
+                  <ActivityIndicator size="large" color="#007AFF" />
+                </View>
+              )}
+              {isVideo ? (
+                <Video
+                  ref={videoRef}
+                  source={
+                    typeof mediaSource === "string"
+                      ? { uri: mediaSource }
+                      : mediaSource
+                  }
+                  style={[styles.video, { height: imageHeight }]}
+                  resizeMode="cover"
+                  isLooping={true}
+                  onLoad={() => {
+                    setIsLoading(false);
+                    console.log(
+                      `PostCard: Video loaded for post ${item.post_id || item.login?.uuid}`
+                    );
+                  }}
+                  onError={(error) => {
+                    console.error(
+                      `PostCard: Video loading error for post ${item.post_id || item.login?.uuid}:`,
+                      error
+                    );
+                    setIsLoading(false);
+                    setIsVideo(false);
+                  }}
+                />
+              ) : (
+                <Image
+                  source={mediaSource}
+                  style={[styles.postImage, { height: imageHeight }]}
+                  resizeMode="cover"
+                  onLoad={() => {
+                    setIsLoading(false);
+                    console.log(
+                      `PostCard: Image loaded for post ${item.post_id || item.login?.uuid}`
+                    );
+                  }}
+                  onError={(e) => {
+                    console.error(
+                      `PostCard: Image loading error for post ${item.post_id || item.login?.uuid}:`,
+                      e.nativeEvent.error
+                    );
+                    setIsLoading(false);
+                  }}
+                />
+              )}
+            </View>
+          </TouchableOpacity>
+          <View style={styles.cardFooter}>
+            <Text style={styles.likes}>👍 {likeCount} Likes</Text>
+            <Text style={styles.comments}>
+              💬 {item.comment_count || comments.length || 0} Comments
+            </Text>
+          </View>
+          <View style={styles.actions}>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={debouncedHandleLike}
+              activeOpacity={0.7}
+              disabled={isLikeLoading}
+            >
+              <Image
+                source={require("../assets/icon-like.png")}
+                style={[
+                  styles.navIcon,
+                  { tintColor: isLiked ? "#1f219c" : "#000000" },
+                  isLikeLoading && { opacity: 0.5 },
+                ]}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={toggleCommentModal}
+            >
+              <Image
+                source={require("../assets/comment6.png")}
+                style={styles.navIcon}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={handleChatPress}
+            >
+              <Image
+                source={require("../assets/share.png")}
+                style={styles.navIcon}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={handleChatPress}
+            >
+              <Image
+                source={require("../assets/save.png")}
+                style={styles.navIcon}
+              />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.captionContainer}>
+            {!isMeasured && (
+              <Text
+                style={[styles.caption, styles.measureText]}
+                onLayout={handleTextLayout}
+              >
+                <Text style={styles.username}>
                   {isUserPost
                     ? item.username
                     : item.name
-                      ? item.name.first
-                      : "User"}
-                </Text>
-                <Text style={styles.timeStamp}>
-                  {formatTimestamp(item.created_at)}
-                </Text>
-              </View>
-            </View>
-            <TouchableOpacity
-              style={styles.moreButton}
-              onPress={(e) => e.stopPropagation()}
-            >
-              <Text style={styles.moreButtonText}>•••</Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-        <TouchableOpacity
-          activeOpacity={0.95}
-          onPressIn={handlePressIn}
-          onPressOut={handlePressOut}
-          onPress={handleDoubleTap}
-        >
-          <View style={[styles.imageContainer, { height: imageHeight }]}>
-            {isLoading && (
-              <View style={styles.imageLoader}>
-                <ActivityIndicator size="large" color="#007AFF" />
-              </View>
-            )}
-            {isVideo ? (
-              <Video
-                ref={videoRef}
-                source={
-                  typeof mediaSource === "string"
-                    ? { uri: mediaSource }
-                    : mediaSource
-                }
-                style={[styles.video, { height: imageHeight }]}
-                resizeMode="cover"
-                isLooping={true}
-                onLoad={() => {
-                  setIsLoading(false);
-                  console.log(
-                    `PostCard: Video loaded for post ${item.post_id || item.login?.uuid
-                    }`
-                  );
-                }}
-                onError={(error) => {
-                  console.error(
-                    `PostCard: Video loading error for post ${item.post_id || item.login?.uuid
-                    }:`,
-                    error
-                  );
-                  setIsLoading(false);
-                  setIsVideo(false);
-                }}
-              />
-            ) : (
-              <Image
-                source={mediaSource}
-                style={[styles.postImage, { height: imageHeight }]}
-                resizeMode="cover"
-                onLoad={() => {
-                  setIsLoading(false);
-                  console.log(
-                    `PostCard: Image loaded for post ${item.post_id || item.login?.uuid
-                    }`
-                  );
-                }}
-                onError={(e) => {
-                  console.error(
-                    `PostCard: Image loading error for post ${item.post_id || item.login?.uuid
-                    }:`,
-                    e.nativeEvent.error
-                  );
-                  setIsLoading(false);
-                }}
-              />
-            )}
-          </View>
-        </TouchableOpacity>
-        <View style={styles.cardFooter}>
-          <Text style={styles.likes}>👍 {likeCount} Likes</Text>
-          <Text style={styles.comments}>
-            💬 {item.comment_count || comments.length || 0} Comments
-          </Text>
-        </View>
-        <View style={styles.actions}>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={debouncedHandleLike}
-            activeOpacity={0.7}
-            disabled={isLikeLoading}
-          >
-            <Image
-              source={require("../assets/icon-like.png")}
-              style={[
-                styles.navIcon,
-                { tintColor: isLiked ? "#1f219c" : "#000000" },
-                isLikeLoading && { opacity: 0.5 },
-              ]}
-            />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={toggleCommentModal}
-          >
-            <Image
-              source={require("../assets/comment6.png")}
-              style={styles.navIcon}
-            />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={handleChatPress}
-          >
-            <Image
-              source={require("../assets/share.png")}
-              style={styles.navIcon}
-            />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={handleChatPress}
-          >
-            <Image
-              source={require("../assets/save.png")}
-              style={styles.navIcon}
-            />
-          </TouchableOpacity>
-        </View>
-        <View style={styles.captionContainer}>
-          {!isMeasured && (
-            <Text
-              style={[styles.caption, styles.measureText]}
-              onLayout={handleTextLayout}
-            >
-              <Text style={styles.username}>
-                {isUserPost
-                  ? item.username
-                  : item.name
                     ? item.name.first
                     : "User"}{" "}
+                </Text>
+                {item.content || item.caption}
               </Text>
-              {item.content || item.caption}
-            </Text>
-          )}
-          {isMeasured && (
-            <Text
-              style={styles.caption}
-              numberOfLines={
-                shouldShowMore && !expandedItems[index] ? 2 : undefined
-              }
-            >
-              <Text style={styles.username}>
-                {isUserPost
-                  ? item.username
-                  : item.name
-                    ? item.name.first
-                    : "User"}{" "}
-              </Text>
-              {item.content || item.caption}
-            </Text>
-          )}
-          {shouldShowMore && (
-            <TouchableOpacity onPress={() => toggleExpand(index)}>
-              <Text style={styles.showMoreText}>
-                {expandedItems[index] ? "Show less" : "Show more"}
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-        <Modal
-          isVisible={isCommentModalVisible}
-          onBackdropPress={toggleCommentModal}
-          onSwipeComplete={toggleCommentModal}
-          swipeDirection="down"
-          backdropOpacity={0.5}
-          backdropColor="#000"
-          style={styles.commentModal}
-          animationIn="slideInUp"
-          animationOut="slideOutDown"
-          useNativeDriver={true}
-        >
-          <View style={styles.commentModalContent}>
-            <View style={styles.commentModalHeader}>
-              <Text style={styles.commentModalTitle}>Comments</Text>
-              <TouchableOpacity onPress={toggleCommentModal}>
-                <Text style={styles.closeButtonText}>Close</Text>
-              </TouchableOpacity>
-            </View>
-            {isCommentsLoading ? (
-              <ActivityIndicator
-                size="large"
-                color="#007AFF"
-                style={styles.commentLoader}
-              />
-            ) : (
-              <FlatList
-                data={comments}
-                renderItem={({ item }) => (
-                  <View style={styles.commentItem}>
-                    <Text style={styles.commentUsername}>
-                      {item.username || "User"}
-                    </Text>
-                    <Text style={styles.commentText}>{item.content}</Text>
-                    <Text style={styles.commentTimestamp}>
-                      {formatTimestamp(item.created_at)}
-                    </Text>
-                  </View>
-                )}
-                keyExtractor={(item) => item.comment_id.toString()}
-                style={styles.commentList}
-                contentContainerStyle={styles.commentListContent}
-                ListEmptyComponent={
-                  <Text style={styles.noCommentsText}>No comments yet.</Text>
-                }
-              />
             )}
-            <View style={styles.commentInputContainer}>
-              <TextInput
-                style={styles.commentInput}
-                placeholder="Add a comment..."
-                value={newComment}
-                onChangeText={setNewComment}
-                onSubmitEditing={handleAddComment}
-                returnKeyType="send"
-              />
-              <TouchableOpacity
-                style={styles.postCommentButton}
-                onPress={handleAddComment}
+            {isMeasured && (
+              <Text
+                style={styles.caption}
+                numberOfLines={
+                  shouldShowMore && !expandedItems[index] ? 2 : undefined
+                }
               >
-                <Text style={styles.postCommentText}>Post</Text>
+                <Text style={styles.username}>
+                  {isUserPost
+                    ? item.username
+                    : item.name
+                    ? item.name.first
+                    : "User"}{" "}
+                </Text>
+                {item.content || item.caption}
+              </Text>
+            )}
+            {shouldShowMore && (
+              <TouchableOpacity onPress={() => toggleExpand(index)}>
+                <Text style={styles.showMoreText}>
+                  {expandedItems[index] ? "Show less" : "Show more"}
+                </Text>
               </TouchableOpacity>
-            </View>
+            )}
           </View>
-        </Modal>
-      </Animated.View>
+          <Animated.View style={{ opacity: modalOpacity }}>
+            <Modal
+              isVisible={isCommentModalVisible}
+              onBackdropPress={toggleCommentModal}
+              // CHANGED: Remove swipe gesture
+              // swipeDirection="down"
+              backdropOpacity={0.5}
+              backdropColor="#000"
+              style={styles.commentModal}
+              animationIn="fadeIn"
+              animationOut="fadeOut"
+              useNativeDriver={true}
+              avoidKeyboard={true}
+            >
+              <View style={styles.commentModalContent}>
+                <View style={styles.commentModalHeader}>
+                  <Text style={styles.commentModalTitle}>Comments</Text>
+                  <TouchableOpacity onPress={toggleCommentModal}>
+                    <Text style={styles.closeButtonText}>Close</Text>
+                  </TouchableOpacity>
+                </View>
+                {isCommentsLoading ? (
+                  <ActivityIndicator
+                    size="large"
+                    color="#007AFF"
+                    style={styles.commentLoader}
+                  />
+                ) : (
+                  <FlatList
+                    data={comments}
+                    renderItem={({ item }) => (
+                      <View style={styles.commentItem}>
+                        <Text style={styles.commentUsername}>
+                          {item.username || "User"}
+                        </Text>
+                        <Text style={styles.commentText}>{item.content}</Text>
+                        <Text style={styles.commentTimestamp}>
+                          {formatTimestamp(item.created_at)}
+                        </Text>
+                      </View>
+                    )}
+                    keyExtractor={(item) => item.comment_id.toString()}
+                    style={styles.commentList}
+                    contentContainerStyle={styles.commentListContent}
+                    ListEmptyComponent={
+                      <Text style={styles.noCommentsText}>No comments yet.</Text>
+                    }
+                  />
+                )}
+                <View style={styles.commentInputContainer}>
+                  <TextInput
+                    style={styles.commentInput}
+                    placeholder="Add a comment..."
+                    value={newComment}
+                    onChangeText={setNewComment}
+                    onSubmitEditing={handleAddComment}
+                    returnKeyType="send"
+                  />
+                  <TouchableOpacity
+                    style={styles.postCommentButton}
+                    onPress={handleAddComment}
+                  >
+                    <Text style={styles.postCommentText}>Post</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </Modal>
+          </Animated.View>
+        </Animated.View>
+      </ErrorBoundary>
     );
   }
 );
+
+// ... (rest of Home.js unchanged: Home component, styles)
 
 export default function Home() {
   const [users, setUsers] = useState([]);
@@ -822,8 +882,8 @@ export default function Home() {
                 (post.media_url?.match(/\.(mp4|mov|avi|wmv|3gp|mkv)$/i)
                   ? "video"
                   : post.media_url?.match(/\.(jpg|jpeg|png|gif)$/i)
-                    ? "image"
-                    : null),
+                  ? "image"
+                  : null),
               content: post.content || "",
               created_at: post.created_at,
               likes: post.like_count || post.likes || 0,
