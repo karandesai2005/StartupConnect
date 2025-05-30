@@ -216,6 +216,60 @@ const profileController = {
     }
   },
 
+  getFollowers: async (req, res) => {
+    try {
+      const { username } = req.params;
+      validateString(username, 'Username', 3, 20);
+
+      // Fetch the user by username to get their user_id
+      const user = await User.getUserByUsername(username);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      // Fetch followers using User model
+      const followers = await User.getFollowers(user.user_id);
+
+      // Clean profile picture URLs
+      const cleanedFollowers = followers.map(follower => ({
+        ...follower,
+        profile_picture: cleanUrl(follower.profile_picture || ''),
+      }));
+
+      res.status(200).json(cleanedFollowers);
+    } catch (error) {
+      logger.error(`Get followers error: ${error.message}`);
+      res.status(error.message.includes('Username') ? 400 : 500).json({ error: error.message });
+    }
+  },
+
+  getFollowing: async (req, res) => {
+    try {
+      const { username } = req.params;
+      validateString(username, 'Username', 3, 20);
+
+      // Fetch the user by username to get their user_id
+      const user = await User.getUserByUsername(username);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      // Fetch following users using User model
+      const following = await User.getFollowing(user.user_id);
+
+      // Clean profile picture URLs
+      const cleanedFollowing = following.map(follow => ({
+        ...follow,
+        profile_picture: cleanUrl(follow.profile_picture || ''),
+      }));
+
+      res.status(200).json(cleanedFollowing);
+    } catch (error) {
+      logger.error(`Get following error: ${error.message}`);
+      res.status(error.message.includes('Username') ? 400 : 500).json({ error: error.message });
+    }
+  },
+
   searchUsers: async (req, res) => {
     try {
       const { q } = req.query;

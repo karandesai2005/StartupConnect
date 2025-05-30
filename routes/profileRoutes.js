@@ -27,7 +27,7 @@ router.route('/user/:username')
 
 router.route('/profile-picture')
   .post(authMiddleware, debugMiddleware, profileController.updateProfilePicture);
-
+2
 router.route('/posts/user/:username')
   .get(authMiddleware, debugMiddleware, profileController.getUserPostsByUsername);
 
@@ -36,6 +36,13 @@ router.route('/search-users')
 
 router.route('/fix-profile-picture-urls')
   .post(authMiddleware, debugMiddleware, profileController.fixProfilePictureURLs);
+
+// Follower/Following Routes
+router.route('/followers/:username')
+  .get(authMiddleware, debugMiddleware, profileController.getFollowers);
+
+router.route('/following/:username')
+  .get(authMiddleware, debugMiddleware, profileController.getFollowing);
 
 // Story Routes
 router.route('/stories')
