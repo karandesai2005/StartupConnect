@@ -45,51 +45,25 @@ const cleanUrl = (url) => {
 
 // Profile Controller
 const profileController = {
-  // In controllers/profileController.js
-getProfile: async (req, res) => {
-  try {
-    const supabase_uid = req.user.id;
+  getProfile: async (req, res) => {
+    try {
+      const supabase_uid = req.user.id;
 
-    // Use the same query as getUserByUsername to include followers and following
-    const { data, error } = await supabase
-      .from('users')
-      .select(`
-        user_id,
-        username,
-        email,
-        name,
-        bio,
-        profile_picture,
-        is_personal,
-        is_business,
-        reel_url,
-        is_founder,
-        is_investor,
-        interests,
-        followers:followers!public_followers_followee_id_fkey(count),
-        following:followers!public_followers_follower_id_fkey(count)
-      `)
-      .eq('supabase_uid', supabase_uid)
-      .single();
+      const { data, error } = await supabase
+        .from('users')
+        .select('user_id, username, email, name, bio, profile_picture, is_personal, is_business, reel_url')
+        .eq('supabase_uid', supabase_uid)
+        .single();
+      if (error || !data) {
+        return res.status(404).json({ error: 'User not found' });
+      }
 
-    if (error || !data) {
-      return res.status(404).json({ error: 'User not found' });
+      res.json({ ...data, profile_picture: cleanUrl(data.profile_picture) });
+    } catch (error) {
+      logger.error(`Get profile error: ${error.message}`);
+      res.status(500).json({ error: 'Server error' });
     }
-
-    // Format followers and following counts
-    const formattedData = {
-      ...data,
-      profile_picture: cleanUrl(data.profile_picture),
-      followers: data.followers.count || 0,
-      following: data.following.count || 0,
-    };
-
-    res.json(formattedData);
-  } catch (error) {
-    logger.error(`Get profile error: ${error.message}`);
-    res.status(500).json({ error: 'Server error' });
-  }
-},
+  },
 
   getUserProfile: async (req, res) => {
     try {
