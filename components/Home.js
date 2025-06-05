@@ -141,8 +141,8 @@ const PostCard = memo(
         isStringUrl && rawMediaUrl.startsWith("http")
           ? rawMediaUrl
           : isStringUrl
-          ? `${NGROK_URL}${rawMediaUrl}`
-          : null;
+            ? `${NGROK_URL}${rawMediaUrl}`
+            : null;
 
       const isVideoPost =
         item.media_type === "video" ||
@@ -353,8 +353,8 @@ const PostCard = memo(
       const username = isUserPost
         ? item.username
         : item.name
-        ? `${item.name.first} ${item.name.last || ""}`
-        : "User";
+          ? `${item.name.first} ${item.name.last || ""}`
+          : "User";
       navigation.navigate("Profile", { username, isOtherUser: true });
     };
 
@@ -405,9 +405,9 @@ const PostCard = memo(
 
     const mediaSource =
       (item.image_url || item.media_url) &&
-      typeof (item.image_url || item.media_url) === "string" &&
-      !(item.image_url || item.media_url).includes("undefined") &&
-      !(item.image_url || item.media_url).includes("null")
+        typeof (item.image_url || item.media_url) === "string" &&
+        !(item.image_url || item.media_url).includes("undefined") &&
+        !(item.image_url || item.media_url).includes("null")
         ? { uri: item.image_url || item.media_url }
         : require("../assets/PITCH.png");
 
@@ -469,8 +469,8 @@ const PostCard = memo(
                     {isUserPost
                       ? item.username
                       : item.name
-                      ? item.name.first
-                      : "User"}
+                        ? item.name.first
+                        : "User"}
                   </Text>
                   <Text style={styles.timeStamp}>
                     {formatTimestamp(item.created_at)}
@@ -605,8 +605,8 @@ const PostCard = memo(
                   {isUserPost
                     ? item.username
                     : item.name
-                    ? item.name.first
-                    : "User"}{" "}
+                      ? item.name.first
+                      : "User"}{" "}
                 </Text>
                 {item.content || item.caption}
               </Text>
@@ -622,8 +622,8 @@ const PostCard = memo(
                   {isUserPost
                     ? item.username
                     : item.name
-                    ? item.name.first
-                    : "User"}{" "}
+                      ? item.name.first
+                      : "User"}{" "}
                 </Text>
                 {item.content || item.caption}
               </Text>
@@ -882,8 +882,8 @@ export default function Home() {
                 (post.media_url?.match(/\.(mp4|mov|avi|wmv|3gp|mkv)$/i)
                   ? "video"
                   : post.media_url?.match(/\.(jpg|jpeg|png|gif)$/i)
-                  ? "image"
-                  : null),
+                    ? "image"
+                    : null),
               content: post.content || "",
               created_at: post.created_at,
               likes: post.like_count || post.likes || 0,
@@ -1084,7 +1084,7 @@ export default function Home() {
             <Image
               source={
                 userData?.profile_picture &&
-                typeof userData.profile_picture === "string"
+                  typeof userData.profile_picture === "string"
                   ? { uri: userData.profile_picture }
                   : require("../assets/profiledefault.jpg")
               }
@@ -1101,7 +1101,7 @@ export default function Home() {
             />
           </View>
           <View style={styles.iconsContainer}>
-            <TouchableOpacity onPress={handleChatPress}>
+            <TouchableOpacity onPress={() => navigation.navigate('Messages')}>
               <Image
                 source={require("../assets/Arrow.png")}
                 style={styles.chatIcon}
@@ -1174,7 +1174,7 @@ export default function Home() {
                   style={[
                     styles.fieldBubble,
                     tempSelectedFields.includes(field) &&
-                      styles.selectedFieldBubble,
+                    styles.selectedFieldBubble,
                   ]}
                   onPress={() => toggleTempField(field)}
                 >

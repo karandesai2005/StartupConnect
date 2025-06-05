@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { SafeAreaProvider } from 'react-native-safe-area-context'; // Add this import
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { UserRegistrationProvider } from './context/UserRegistrationContext';
 import { ThemeProvider } from './components/ThemeContext';
 import SplashScreen from './components/SplashScreen';
@@ -31,7 +31,10 @@ import HandlePersonal from './components/Profile/P_Profile/handlePersonal';
 import HandleBusiness from './components/Profile/B_Profile/handleBusiness';
 import { supabase } from './services/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import FollowListScreen from "./components/FollowListScreen";
+import FollowListScreen from './components/FollowListScreen';
+import MessagesScreen from './components/MessagesScreen'; // Updated path
+import ChatScreen from './components/ChatScreen'; // Updated path
+
 const Stack = createStackNavigator();
 
 const App = () => {
@@ -42,7 +45,7 @@ const App = () => {
     const checkAuthStatus = async () => {
       try {
         console.log('App.js: Checking auth status');
-        // await AsyncStorage.clear(); // Uncomment to test with fresh storage (remove for production)
+        // await AsyncStorage.clear(); // Uncomment to test fresh storage
         const accessToken = await AsyncStorage.getItem('token');
         const refreshToken = await AsyncStorage.getItem('refresh_token');
         console.log('App.js: Stored token:', accessToken ? 'Found' : 'Not found');
@@ -51,14 +54,14 @@ const App = () => {
         let session = null;
 
         if (accessToken && refreshToken) {
-          // Try to restore session with stored tokens
+          console.log('App.js: Attempting to set session with stored tokens');
           const { data, error } = await supabase.auth.setSession({
             access_token: accessToken,
             refresh_token: refreshToken,
           });
           if (error) {
             console.error('App.js: Set session error:', error.message);
-            // Attempt to refresh the session
+            console.log('App.js: Attempting to refresh session');
             const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession({
               refresh_token: refreshToken,
             });
@@ -73,7 +76,7 @@ const App = () => {
             session = data.session;
           }
         } else {
-          // Check for existing session
+          console.log('App.js: No stored tokens, checking existing session');
           const { data, error } = await supabase.auth.getSession();
           if (error) {
             console.error('App.js: Get session error:', error.message);
@@ -95,7 +98,7 @@ const App = () => {
           setInitialRoute('Login');
         }
       } catch (error) {
-        console.error('App.js: Error checking auth status:', error);
+        console.error('App.js: Error checking auth status:', error.message, error.stack);
         await AsyncStorage.multiRemove(['token', 'refresh_token']);
         setInitialRoute('Login');
       } finally {
@@ -105,7 +108,6 @@ const App = () => {
 
     checkAuthStatus();
 
-    // Listen for auth state changes
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('App.js: Auth event:', event);
       try {
@@ -139,7 +141,7 @@ const App = () => {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider> {/* Wrap the entire app with SafeAreaProvider */}
+      <SafeAreaProvider>
         <ThemeProvider>
           <UserRegistrationProvider>
             <NavigationContainer
@@ -191,7 +193,15 @@ const App = () => {
                 <Stack.Screen name="PostItem" component={PostItem} />
                 <Stack.Screen name="handlePersonal" component={HandlePersonal} />
                 <Stack.Screen name="handleBusiness" component={HandleBusiness} />
-                <Stack.Screen name="FollowList" component={FollowListScreen} options={{ headerShown: false }}/>
+                <Stack.Screen name="FollowList" component={FollowListScreen} options={{ headerShown: false }} />
+                <Stack.Screen name="Messages" component={MessagesScreen} options={{ title: 'Messages' }} />
+                <Stack.Screen
+                  name="Chat"
+                  component={ChatScreen}
+                  options={({ route }) => ({
+                    title: route.params?.otherUser?.username || 'Chat',
+                  })}
+                />
               </Stack.Navigator>
             </NavigationContainer>
           </UserRegistrationProvider>
