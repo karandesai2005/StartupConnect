@@ -7,9 +7,10 @@ import {
   Image,
   ActivityIndicator,
   StyleSheet,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useIsFocused } from '@react-navigation/native';
 import { supabase } from '../services/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -17,29 +18,12 @@ const MessagesScreen = () => {
   const [chats, setChats] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState(null);
-  // Add currentUserId state
   const navigation = useNavigation();
+  const isFocused = useIsFocused();
 
   useEffect(() => {
     fetchChats();
-
-    // Set up real-time updates for messages
-    const messageSubscription = supabase
-      .channel('messages')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, async (payload) => {
-        console.log('MessagesScreen: New message received:', payload);
-        await fetchChatsData(); // Re-fetch chats to update the list
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'chats' }, async (payload) => {
-        console.log('MessagesScreen: Chat updated:', payload);
-        await fetchChatsData(); // Re-fetch chats when updated_at changes
-      })
-      .subscribe();
-
-    return () => {
-      messageSubscription.unsubscribe();
-    };
-  }, []);
+  }, [isFocused]);
 
   const fetchChatsData = async () => {
     try {
@@ -71,10 +55,11 @@ const MessagesScreen = () => {
 
       const followingIds = followingData.map((item) => item.followee_id);
       const followerIds = followersData.map((item) => item.follower_id);
+      // Ensure relatedUserIds are unique using Set
       const relatedUserIds = [...new Set([...followingIds, ...followerIds])].filter(
         (id) => id !== currentUserData.user_id
       );
-      console.log('Related user IDs:', relatedUserIds);
+      console.log('Related user IDs (deduplicated):', relatedUserIds);
 
       if (relatedUserIds.length === 0) {
         console.log('No followers or following found');
@@ -119,30 +104,42 @@ const MessagesScreen = () => {
         .limit(1, { per: 'chat_id' });
       if (messagesError) throw messagesError;
 
-      const existingChats = participantsData.map((item) => {
+      const existingChatsMap = new Map(); // Use Map to avoid duplicates by other_user.user_id
+      participantsData.forEach((item) => {
         const otherParticipant = otherParticipantsData.find((op) => op.chat_id === item.chat_id);
         const userInfo = usersData.find((u) => u.user_id === otherParticipant?.user_id) || {
           username: 'Unknown',
           user_id: 'unknown',
         };
         const latestMessage = messagesData.find((msg) => msg.chat_id === item.chat_id) || null;
-        return {
-          chat_id: item.chat_id,
-          other_user: userInfo,
-          latest_message: latestMessage,
-          updated_at: item.chats.updated_at,
-        };
+
+        // Only add if this user_id hasn't been seen before
+        if (!existingChatsMap.has(userInfo.user_id)) {
+          existingChatsMap.set(userInfo.user_id, {
+            chat_id: item.chat_id,
+            other_user: userInfo,
+            latest_message: latestMessage,
+            updated_at: item.chats.updated_at,
+          });
+        }
       });
+      const existingChats = Array.from(existingChatsMap.values());
 
       const existingChatUserIds = existingChats.map((chat) => chat.other_user.user_id);
-      const potentialChats = usersData
+      const potentialChatsMap = new Map(); // Use Map for potential chats to avoid duplicates
+      usersData
         .filter((u) => !existingChatUserIds.includes(u.user_id))
-        .map((u) => ({
-          chat_id: null,
-          other_user: u,
-          latest_message: null,
-          updated_at: null,
-        }));
+        .forEach((u) => {
+          if (!potentialChatsMap.has(u.user_id)) {
+            potentialChatsMap.set(u.user_id, {
+              chat_id: null,
+              other_user: u,
+              latest_message: null,
+              updated_at: null,
+            });
+          }
+        });
+      const potentialChats = Array.from(potentialChatsMap.values());
 
       const allChats = [...existingChats, ...potentialChats].sort((a, b) => {
         if (!a.updated_at) return 1;

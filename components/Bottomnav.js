@@ -1,16 +1,17 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Image, Platform } from 'react-native';
-import Home from '../components/Home'; // Adjusted path
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Home from '../components/Home';
 import CreatePostScreen from '../components/CreatePostScreen';
 import Events from '../components/Events';
 import Settings from '../components/settings';
 
-
-
 const Tab = createBottomTabNavigator();
 
 export default function Bottomnav() {
+  const insets = useSafeAreaInsets();
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -29,27 +30,26 @@ export default function Bottomnav() {
             <Image
               source={iconSource}
               style={{
-                width: route.name === 'Events' ? 25 : 22, // 25 for Events, 22 for others
-                height: route.name === 'Events' ? 25 : 22, // 25 for Events, 22 for others
-                tintColor: focused ? '#1f219c' : 'black', // Active/inactive color
+                width: route.name === 'Events' ? 25 : 22,
+                height: route.name === 'Events' ? 25 : 22,
+                tintColor: focused ? '#1f219c' : 'black',
               }}
             />
           );
         },
         tabBarStyle: {
           paddingVertical: Platform.OS === 'ios' ? 12 : 10,
-          paddingBottom: Platform.OS === 'ios' ? 30 : 12,
+          paddingBottom: Platform.OS === 'ios' ? Math.max(insets.bottom, 12) : insets.bottom + 8,
           paddingHorizontal: 20,
           borderTopWidth: 0.5,
           borderTopColor: '#E0E0E0',
           backgroundColor: '#FFFFFF',
-          height: Platform.OS === 'ios' ? 80 : 60,
-          position: 'absolute',
+          height: Platform.OS === 'ios' ? 80 + insets.bottom : 60 + insets.bottom,
           zIndex: 10,
           paddingTop: 15,
         },
-        tabBarShowLabel: false, // Hide labels, just show icons
-        headerShown: false, // Hide headers for tab screens
+        tabBarShowLabel: false,
+        headerShown: false,
       })}
     >
       <Tab.Screen name="Home" component={Home} />

@@ -13,7 +13,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../services/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useIsFocused } from '@react-navigation/native';
 
 const ChatScreen = ({ route }) => {
   const { chat_id, otherUser } = route.params;
@@ -23,29 +23,26 @@ const ChatScreen = ({ route }) => {
   const flatListRef = useRef(null);
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const isFocused = useIsFocused(); // Check if screen is focused
 
   useEffect(() => {
     fetchCurrentUser();
     fetchMessages();
 
-    // Set up real-time subscription for new messages
-    const messageSubscription = supabase
-      .channel(`chat:${chat_id}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages', filter: `chat_id=eq.${chat_id}` },
-        (payload) => {
-          console.log('ChatScreen: New message received:', payload);
-          setMessages((prevMessages) => [...prevMessages, payload.new]);
-          flatListRef.current?.scrollToEnd({ animated: true });
-        }
-      )
-      .subscribe();
+    // Polling: Fetch messages every 5 seconds when the screen is focused
+    let pollingInterval;
+    if (isFocused) {
+      pollingInterval = setInterval(() => {
+        fetchMessages();
+      }, 5000); // Poll every 5 seconds
+    }
 
     return () => {
-      messageSubscription.unsubscribe();
+      if (pollingInterval) {
+        clearInterval(pollingInterval); // Clean up polling on unmount or when screen loses focus
+      }
     };
-  }, [chat_id]);
+  }, [chat_id, isFocused]);
 
   const fetchCurrentUser = async () => {
     try {
@@ -79,7 +76,11 @@ const ChatScreen = ({ route }) => {
         .eq('chat_id', chat_id)
         .order('created_at', { ascending: true });
       if (error) throw error;
-      setMessages(data);
+
+      // Only update state if the fetched messages are different to avoid unnecessary re-renders
+      if (JSON.stringify(messages) !== JSON.stringify(data)) {
+        setMessages(data);
+      }
     } catch (error) {
       console.error('ChatScreen: Error fetching messages:', error.message);
     }
@@ -125,8 +126,9 @@ const ChatScreen = ({ route }) => {
         .update({ updated_at: new Date() })
         .eq('id', chat_id);
 
+      // Optimistically update the UI by adding the new message
+      setMessages((prevMessages) => [...prevMessages, newMessageData]);
       setNewMessage('');
-      // No need to call fetchMessages here since the subscription will handle it
       flatListRef.current?.scrollToEnd({ animated: true });
     } catch (error) {
       console.error('ChatScreen: Error sending message:', error.message);

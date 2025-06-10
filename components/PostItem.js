@@ -90,7 +90,7 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
     }
     return () => {
       if (item.media_type === 'video' && videoRef.current) {
-        videoRef.current.unloadAsync().catch(() => {});
+        videoRef.current.unloadAsync().catch(() => { });
       }
       animatedScale.stopAnimation();
     };
@@ -328,9 +328,9 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
             <TouchableOpacity onPress={handleProfilePress}>
               <Image
                 source={
-                  profileImageError || 
-                  typeof item.profile_picture !== 'string' || 
-                  !item.profile_picture.startsWith('http')
+                  profileImageError ||
+                    typeof item.profile_picture !== 'string' ||
+                    !item.profile_picture.startsWith('http')
                     ? require('../assets/profiledefault.jpg')
                     : { uri: item.profile_picture }
                 }
@@ -480,14 +480,13 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
       <Modal
         isVisible={isCommentModalVisible}
         onBackdropPress={toggleCommentModal}
-        onSwipeComplete={toggleCommentModal}
-        swipeDirection="down"
         backdropOpacity={0.5}
         backdropColor="#000"
         style={styles.commentModal}
-        animationIn="slideInUp"
-        animationOut="slideOutDown"
+        animationIn="fadeIn"
+        animationOut="fadeOut"
         useNativeDriver={true}
+        avoidKeyboard={true}
       >
         <View style={styles.commentModalContent}>
           <View style={styles.commentModalHeader}>
