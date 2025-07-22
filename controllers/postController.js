@@ -27,8 +27,37 @@ const getUserId = async (req) => {
 };
 
 const cleanUrl = (url) => {
-  if (!url) return url;
-  return url.replace(/\/+/g, '/');
+  if (!url || typeof url !== 'string') return null;
+  // Fix protocol issues (https:/, https:///, etc.)
+  let cleaned = url
+    .replace(/^https?:\/+/, 'https://') // Fix https:/ or https:///
+    .replace(/\/+/g, '/')              // Collapse multiple slashes in path
+    .replace(/^http:/, 'https:');      // Force HTTPS
+  // Ensure no trailing slashes
+  cleaned = cleaned.replace(/\/+$/, '');
+  // Validate URL format
+  try {
+    new URL(cleaned);
+    logger.info(`cleanUrl: Normalized URL: ${url} -> ${cleaned}`);
+    return cleaned;
+  } catch (error) {
+    logger.warn(`cleanUrl: Invalid URL format: ${url}`);
+    return null;
+  }
+};
+
+const fixDatabaseURLs = async () => {
+  try {
+    const query = `
+      UPDATE posts
+      SET media_url = REGEXP_REPLACE(media_url, '^https?:\/+', 'https://')
+      WHERE media_url LIKE 'https:/%';
+    `;
+    await queryDB(query, []);
+    logger.info('Database media URLs fixed');
+  } catch (error) {
+    logger.error(`Error fixing database URLs: ${error.message}`);
+  }
 };
 
 // Post Controller
@@ -37,7 +66,7 @@ const postController = {
     try {
       const userId = await getUserId(req);
       if (!userId) return res.status(401).json({ error: 'User authentication required' });
-      
+
       if (!req.file) {
         return res.status(400).json({ error: 'Media file required' });
       }
@@ -54,14 +83,14 @@ const postController = {
       }
 
       logger.info(`Request body:`, req.body);
-      
+
       const { content } = req.body;
       if (!content) {
         return res.status(400).json({ error: 'Content is required' });
       }
 
       const fileName = `post-${Date.now()}${path.extname(req.file.originalname)}`;
-      
+
       const { data, error } = await supabase.storage
         .from('posts')
         .upload(fileName, req.file.buffer, {
@@ -326,6 +355,16 @@ const postController = {
       `;
       await queryDB(query, []);
       res.status(200).json({ message: 'Media URLs normalized' });
+    } catch (error) {
+      logger.error(`Fix media URLs error: ${error.message}`);
+      res.status(500).json({ error: 'Server error' });
+    }
+  },
+
+  fixMediaURLs: async (req, res) => {
+    try {
+      await fixDatabaseURLs();
+      res.status(200).json({ message: 'Media URLs normalized in database' });
     } catch (error) {
       logger.error(`Fix media URLs error: ${error.message}`);
       res.status(500).json({ error: 'Server error' });
