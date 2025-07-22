@@ -32,21 +32,15 @@ const cleanUrl = (url) => {
     return null;
   }
   let cleaned = url;
-  // Recursively replace https:/ or http:/ with https://
   while (cleaned.includes('https:/') || cleaned.includes('http:/')) {
     cleaned = cleaned
       .replace(/https:\/+/g, 'https://')
       .replace(/http:\/+/g, 'https://');
   }
-  // Collapse multiple slashes in path
   cleaned = cleaned.replace(/\/+/g, '/');
-  // Fix case-insensitive /uploads
   cleaned = cleaned.replace(/\/[uU][pP][lL][oO][aA][dD][sS]\//g, '/uploads/');
-  // Force HTTPS
   cleaned = cleaned.replace(/^http:/, 'https:');
-  // Remove trailing slashes
   cleaned = cleaned.replace(/\/+$/, '');
-  // Validate URL
   try {
     new URL(cleaned);
     logger.info(`cleanUrl: Normalized URL: ${url} -> ${cleaned}`);
@@ -57,9 +51,25 @@ const cleanUrl = (url) => {
   }
 };
 
+// Cache for cleaned URLs (simple in-memory cache)
+const urlCache = new Map();
+
+const getCleanedUrl = (url) => {
+  if (!url) return null;
+  const cached = urlCache.get(url);
+  if (cached) return cached;
+  const cleaned = cleanUrl(url);
+  if (cleaned) urlCache.set(url, cleaned);
+  return cleaned;
+};
+
+const withTimeout = (promise, ms) => Promise.race([
+  promise,
+  new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), ms))
+]);
+
 const fixDatabaseURLs = async () => {
   try {
-    // Log affected URLs for debugging
     const selectQuery = `
       SELECT post_id, media_url
       FROM posts
@@ -73,7 +83,6 @@ const fixDatabaseURLs = async () => {
       logger.info('fixDatabaseURLs: No problematic URLs found');
     }
 
-    // Update URLs
     const updateQuery = `
       UPDATE posts
       SET media_url = REGEXP_REPLACE(
@@ -123,23 +132,21 @@ const postController = {
 
       const fileName = `post-${Date.now()}${path.extname(req.file.originalname)}`;
 
-      const { data, error } = await supabase.storage
-        .from('posts')
-        .upload(fileName, req.file.buffer, {
+      const { data, error } = await withTimeout(
+        supabase.storage.from('posts').upload(fileName, req.file.buffer, {
           contentType: req.file.mimetype,
-        });
+        }),
+        30000
+      );
 
       if (error) {
         logger.error(`createPost: Supabase upload error for user ${userId}: ${error.message}`);
         return res.status(500).json({ error: 'Failed to upload post media' });
       }
 
-      const { data: urlData } = supabase.storage
-        .from('posts')
-        .getPublicUrl(fileName);
-
+      const { data: urlData } = supabase.storage.from('posts').getPublicUrl(fileName);
       const rawMediaUrl = urlData.publicUrl;
-      const mediaUrl = cleanUrl(rawMediaUrl);
+      const mediaUrl = getCleanedUrl(rawMediaUrl);
       if (!mediaUrl) {
         logger.error(`createPost: Invalid media URL after cleaning: raw=${rawMediaUrl}`);
         return res.status(500).json({ error: 'Invalid media URL generated' });
@@ -179,6 +186,10 @@ const postController = {
 
   getAllPosts: async (req, res) => {
     try {
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 10;
+      const offset = (page - 1) * limit;
+
       const query = `
         SELECT p.post_id, p.user_id, u.username, u.name, p.media_url, p.content, p.created_at, p.media_type,
                (SELECT COUNT(*) FROM likes WHERE post_id = p.post_id) AS like_count,
@@ -187,12 +198,14 @@ const postController = {
         FROM posts p
         JOIN users u ON p.user_id = u.user_id
         ORDER BY p.created_at DESC
+        LIMIT $1 OFFSET $2
       `;
-      const posts = await queryDB(query, []);
+      const values = [limit, offset];
+      const posts = await queryDB(query, values);
 
       res.json(posts.map(post => {
-        const cleanedMediaUrl = cleanUrl(post.media_url);
-        const cleanedProfilePicture = cleanUrl(post.profile_picture || '');
+        const cleanedMediaUrl = getCleanedUrl(post.media_url);
+        const cleanedProfilePicture = getCleanedUrl(post.profile_picture || '');
         logger.info(`getAllPosts: Post ${post.post_id}: raw_media_url=${post.media_url}, cleaned_media_url=${cleanedMediaUrl}, raw_profile_picture=${post.profile_picture}, cleaned_profile_picture=${cleanedProfilePicture}`);
         return {
           ...post,
@@ -225,6 +238,10 @@ const postController = {
         }
       }
 
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 10;
+      const offset = (page - 1) * limit;
+
       const query = `
         SELECT p.post_id, p.user_id, u.username, u.name, p.media_url, p.content, p.created_at, p.media_type,
                (SELECT COUNT(*) FROM likes WHERE post_id = p.post_id) AS like_count,
@@ -234,13 +251,14 @@ const postController = {
         JOIN users u ON p.user_id = u.user_id
         WHERE p.user_id = $1
         ORDER BY p.created_at DESC
+        LIMIT $2 OFFSET $3
       `;
-      const values = [userId];
+      const values = [userId, limit, offset];
       const posts = await queryDB(query, values);
 
       res.json(posts.map(post => {
-        const cleanedMediaUrl = cleanUrl(post.media_url);
-        const cleanedProfilePicture = cleanUrl(post.profile_picture || '');
+        const cleanedMediaUrl = getCleanedUrl(post.media_url);
+        const cleanedProfilePicture = getCleanedUrl(post.profile_picture || '');
         logger.info(`getMyPosts: Post ${post.post_id} for user ${userId}: raw_media_url=${post.media_url}, cleaned_media_url=${cleanedMediaUrl}, raw_profile_picture=${post.profile_picture}, cleaned_profile_picture=${cleanedProfilePicture}`);
         return {
           ...post,
