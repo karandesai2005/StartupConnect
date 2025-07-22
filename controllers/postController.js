@@ -27,36 +27,68 @@ const getUserId = async (req) => {
 };
 
 const cleanUrl = (url) => {
-  if (!url || typeof url !== 'string') return null;
-  // Fix protocol issues (https:/, https:///, etc.)
-  let cleaned = url
-    .replace(/^https?:\/+/, 'https://') // Fix https:/ or https:///
-    .replace(/\/+/g, '/')              // Collapse multiple slashes in path
-    .replace(/^http:/, 'https:');      // Force HTTPS
-  // Ensure no trailing slashes
+  if (!url || typeof url !== 'string') {
+    logger.warn('cleanUrl: Invalid or empty URL provided');
+    return null;
+  }
+  let cleaned = url;
+  // Recursively replace https:/ or http:/ with https://
+  while (cleaned.includes('https:/') || cleaned.includes('http:/')) {
+    cleaned = cleaned
+      .replace(/https:\/+/g, 'https://')
+      .replace(/http:\/+/g, 'https://');
+  }
+  // Collapse multiple slashes in path
+  cleaned = cleaned.replace(/\/+/g, '/');
+  // Fix case-insensitive /uploads
+  cleaned = cleaned.replace(/\/[uU][pP][lL][oO][aA][dD][sS]\//g, '/uploads/');
+  // Force HTTPS
+  cleaned = cleaned.replace(/^http:/, 'https:');
+  // Remove trailing slashes
   cleaned = cleaned.replace(/\/+$/, '');
-  // Validate URL format
+  // Validate URL
   try {
     new URL(cleaned);
     logger.info(`cleanUrl: Normalized URL: ${url} -> ${cleaned}`);
     return cleaned;
   } catch (error) {
-    logger.warn(`cleanUrl: Invalid URL format: ${url}`);
+    logger.warn(`cleanUrl: Invalid URL format: ${url} -> ${cleaned}, error: ${error.message}`);
     return null;
   }
 };
 
 const fixDatabaseURLs = async () => {
   try {
-    const query = `
-      UPDATE posts
-      SET media_url = REGEXP_REPLACE(media_url, '^https?:\/+', 'https://')
-      WHERE media_url LIKE 'https:/%';
+    // Log affected URLs for debugging
+    const selectQuery = `
+      SELECT post_id, media_url
+      FROM posts
+      WHERE media_url LIKE '%https:/%' OR media_url ~* '/[uU][pP][lL][oO][aA][dD][sS]/';
     `;
-    await queryDB(query, []);
-    logger.info('Database media URLs fixed');
+    const affectedRows = await queryDB(selectQuery, []);
+    if (affectedRows.length > 0) {
+      logger.info(`fixDatabaseURLs: Found ${affectedRows.length} problematic URLs:`, 
+        affectedRows.map(row => ({ post_id: row.post_id, media_url: row.media_url })));
+    } else {
+      logger.info('fixDatabaseURLs: No problematic URLs found');
+    }
+
+    // Update URLs
+    const updateQuery = `
+      UPDATE posts
+      SET media_url = REGEXP_REPLACE(
+        REGEXP_REPLACE(media_url, 'https?:\/+', 'https://'),
+        '/[uU][pP][lL][oO][aA][dD][sS]/', '/uploads/'
+      )
+      WHERE media_url LIKE '%https:/%' OR media_url ~* '/[uU][pP][lL][oO][aA][dD][sS]/'
+      RETURNING post_id, media_url;
+    `;
+    const updatedRows = await queryDB(updateQuery, []);
+    logger.info(`fixDatabaseURLs: Updated ${updatedRows.length} URLs:`, 
+      updatedRows.map(row => ({ post_id: row.post_id, media_url: row.media_url })));
   } catch (error) {
-    logger.error(`Error fixing database URLs: ${error.message}`);
+    logger.error(`fixDatabaseURLs: Error fixing database URLs: ${error.message}`, error.stack);
+    throw error;
   }
 };
 
@@ -71,7 +103,7 @@ const postController = {
         return res.status(400).json({ error: 'Media file required' });
       }
 
-      logger.info(`File received: ${req.file.originalname}, MIME: ${req.file.mimetype}, Size: ${req.file.size}`);
+      logger.info(`createPost: File received for user ${userId}: ${req.file.originalname}, MIME: ${req.file.mimetype}, Size: ${req.file.size}`);
 
       if (req.file.size > MAX_FILE_SIZE_POST) {
         return res.status(400).json({ error: 'File size exceeds 100MB limit' });
@@ -82,7 +114,7 @@ const postController = {
         return res.status(400).json({ error: 'Only images (JPEG, PNG, GIF) and videos (MP4, MOV) allowed for posts' });
       }
 
-      logger.info(`Request body:`, req.body);
+      logger.info(`createPost: Request body for user ${userId}:`, req.body);
 
       const { content } = req.body;
       if (!content) {
@@ -98,7 +130,7 @@ const postController = {
         });
 
       if (error) {
-        logger.error(`Supabase upload error: ${error.message}`);
+        logger.error(`createPost: Supabase upload error for user ${userId}: ${error.message}`);
         return res.status(500).json({ error: 'Failed to upload post media' });
       }
 
@@ -106,8 +138,13 @@ const postController = {
         .from('posts')
         .getPublicUrl(fileName);
 
-      const mediaUrl = urlData.publicUrl;
-      logger.info(`Post media uploaded: ${mediaUrl}`);
+      const rawMediaUrl = urlData.publicUrl;
+      const mediaUrl = cleanUrl(rawMediaUrl);
+      if (!mediaUrl) {
+        logger.error(`createPost: Invalid media URL after cleaning: raw=${rawMediaUrl}`);
+        return res.status(500).json({ error: 'Invalid media URL generated' });
+      }
+      logger.info(`createPost: Post media uploaded for user ${userId}: raw=${rawMediaUrl}, cleaned=${mediaUrl}`);
 
       const mediaType = req.file.mimetype.startsWith('video') ? 'video' : 'image';
 
@@ -120,18 +157,22 @@ const postController = {
       const result = await queryDB(query, values);
 
       const newPost = result[0];
-      logger.info('Post created:', newPost);
+      logger.info(`createPost: Post created for user ${userId}:`, {
+        post_id: newPost.post_id,
+        media_url: newPost.media_url,
+        media_type: newPost.media_type
+      });
 
       res.status(201).json({
         post_id: newPost.post_id,
         user_id: newPost.user_id,
         content: newPost.content,
-        media_url: cleanUrl(newPost.media_url),
+        media_url: newPost.media_url,
         media_type: newPost.media_type,
         created_at: newPost.created_at,
       });
     } catch (error) {
-      logger.error(`Create post error: ${error.message}`);
+      logger.error(`createPost: Error for user ${req.user?.id || 'unknown'}: ${error.message}`, error.stack);
       res.status(error.message.includes('required') ? 400 : 500).json({ error: error.message });
     }
   },
@@ -149,16 +190,21 @@ const postController = {
       `;
       const posts = await queryDB(query, []);
 
-      res.json(posts.map(post => ({
-        ...post,
-        media_url: cleanUrl(post.media_url),
-        profile_picture: cleanUrl(post.profile_picture || ''),
-        name: post.name || post.username,
-        comment_count: Number(post.comment_count) || 0,
-        like_count: Number(post.like_count) || 0,
-      })));
+      res.json(posts.map(post => {
+        const cleanedMediaUrl = cleanUrl(post.media_url);
+        const cleanedProfilePicture = cleanUrl(post.profile_picture || '');
+        logger.info(`getAllPosts: Post ${post.post_id}: raw_media_url=${post.media_url}, cleaned_media_url=${cleanedMediaUrl}, raw_profile_picture=${post.profile_picture}, cleaned_profile_picture=${cleanedProfilePicture}`);
+        return {
+          ...post,
+          media_url: cleanedMediaUrl,
+          profile_picture: cleanedProfilePicture,
+          name: post.name || post.username,
+          comment_count: Number(post.comment_count) || 0,
+          like_count: Number(post.like_count) || 0,
+        };
+      }));
     } catch (error) {
-      logger.error(`Get all posts error: ${error.message}`);
+      logger.error(`getAllPosts: Error: ${error.message}`, error.stack);
       res.status(500).json({ error: 'Server error' });
     }
   },
@@ -167,14 +213,12 @@ const postController = {
     try {
       let userId;
 
-      // Check if user_id is provided in query params (for testing or admin purposes)
       if (req.query.user_id) {
         userId = req.query.user_id;
         if (isNaN(userId)) {
           return res.status(400).json({ error: 'User ID must be a valid number' });
         }
       } else {
-        // Otherwise, get user_id from authenticated user
         userId = await getUserId(req);
         if (!userId) {
           return res.status(401).json({ error: 'User authentication required' });
@@ -194,16 +238,21 @@ const postController = {
       const values = [userId];
       const posts = await queryDB(query, values);
 
-      res.json(posts.map(post => ({
-        ...post,
-        media_url: cleanUrl(post.media_url),
-        profile_picture: cleanUrl(post.profile_picture || ''),
-        name: post.name || post.username,
-        comment_count: Number(post.comment_count) || 0,
-        like_count: Number(post.like_count) || 0,
-      })));
+      res.json(posts.map(post => {
+        const cleanedMediaUrl = cleanUrl(post.media_url);
+        const cleanedProfilePicture = cleanUrl(post.profile_picture || '');
+        logger.info(`getMyPosts: Post ${post.post_id} for user ${userId}: raw_media_url=${post.media_url}, cleaned_media_url=${cleanedMediaUrl}, raw_profile_picture=${post.profile_picture}, cleaned_profile_picture=${cleanedProfilePicture}`);
+        return {
+          ...post,
+          media_url: cleanedMediaUrl,
+          profile_picture: cleanedProfilePicture,
+          name: post.name || post.username,
+          comment_count: Number(post.comment_count) || 0,
+          like_count: Number(post.like_count) || 0,
+        };
+      }));
     } catch (error) {
-      logger.error(`Get my posts error: ${error.message}`);
+      logger.error(`getMyPosts: Error for user ${req.user?.id || 'unknown'}: ${error.message}`, error.stack);
       res.status(error.message.includes('User ID') || error.message.includes('authentication') ? 400 : 500).json({ error: error.message });
     }
   },
@@ -244,7 +293,7 @@ const postController = {
 
       res.status(200).json({ success: true, liked, like_count: likeCount });
     } catch (error) {
-      logger.error(`Toggle like error: ${error.message}`);
+      logger.error(`toggleLike: Error for user ${req.user?.id || 'unknown'}, post ${req.params.postId}: ${error.message}`, error.stack);
       res.status(error.message.includes('Post ID') ? 400 : 500).json({ error: error.message });
     }
   },
@@ -275,7 +324,7 @@ const postController = {
 
       res.status(200).json({ likeCount, isLiked });
     } catch (error) {
-      logger.error(`Get likes error: ${error.message}`);
+      logger.error(`getLikes: Error for user ${req.user?.id || 'unknown'}, post ${req.params.postId}: ${error.message}`, error.stack);
       res.status(error.message.includes('Post ID') ? 400 : 500).json({ error: error.message });
     }
   },
@@ -312,7 +361,7 @@ const postController = {
       const newComment = result[0];
       res.status(201).json(newComment);
     } catch (error) {
-      logger.error(`Add comment error: ${error.message}`);
+      logger.error(`addComment: Error for user ${req.user?.id || 'unknown'}, post ${req.params.postId}: ${error.message}`, error.stack);
       res.status(error.message.includes('Post ID') || error.message.includes('Comment') ? 400 : 500).json({ error: error.message });
     }
   },
@@ -341,23 +390,8 @@ const postController = {
 
       res.json(comments);
     } catch (error) {
-      logger.error(`Get comments error: ${error.message}`);
+      logger.error(`getComments: Error for post ${req.params.postId}: ${error.message}`, error.stack);
       res.status(error.message.includes('Post ID') ? 400 : 500).json({ error: error.message });
-    }
-  },
-
-  fixMediaURLs: async (req, res) => {
-    try {
-      const query = `
-        UPDATE posts
-        SET media_url = REGEXP_REPLACE(media_url, '//+[uU][pP][lL][oO][aA][dD][sS]', '/Uploads', 'i')
-        WHERE media_url ~* '//+[uU][pP][lL][oO][aA][dD][sS]';
-      `;
-      await queryDB(query, []);
-      res.status(200).json({ message: 'Media URLs normalized' });
-    } catch (error) {
-      logger.error(`Fix media URLs error: ${error.message}`);
-      res.status(500).json({ error: 'Server error' });
     }
   },
 
@@ -366,7 +400,7 @@ const postController = {
       await fixDatabaseURLs();
       res.status(200).json({ message: 'Media URLs normalized in database' });
     } catch (error) {
-      logger.error(`Fix media URLs error: ${error.message}`);
+      logger.error(`fixMediaURLs: Error: ${error.message}`, error.stack);
       res.status(500).json({ error: 'Server error' });
     }
   },
