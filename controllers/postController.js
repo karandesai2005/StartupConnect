@@ -28,14 +28,15 @@ const getUserId = async (req) => {
 
 const cleanUrl = (url) => {
   if (!url || typeof url !== 'string') return null;
-  // Fix protocol issues (https:/, https:///, etc.)
-  let cleaned = url
-    .replace(/^https?:\/+/, 'https://') // Fix https:/ or https:///
-    .replace(/\/+/g, '/')              // Collapse multiple slashes in path
-    .replace(/^http:/, 'https:');      // Force HTTPS
-  // Ensure no trailing slashes
+  let cleaned = url;
+  while (cleaned.includes('https:/') || cleaned.includes('http:/')) {
+    cleaned = cleaned
+      .replace(/https:\/+/, 'https://')
+      .replace(/http:\/+/, 'https://');
+  }
+  cleaned = cleaned.replace(/\/+/g, '/');
+  cleaned = cleaned.replace(/^http:/, 'https:');
   cleaned = cleaned.replace(/\/+$/, '');
-  // Validate URL format
   try {
     new URL(cleaned);
     logger.info(`cleanUrl: Normalized URL: ${url} -> ${cleaned}`);
@@ -50,8 +51,8 @@ const fixDatabaseURLs = async () => {
   try {
     const query = `
       UPDATE posts
-      SET media_url = REGEXP_REPLACE(media_url, '^https?:\/+', 'https://')
-      WHERE media_url LIKE 'https:/%';
+      SET media_url = REGEXP_REPLACE(media_url, '(https?:\/+)+', 'https://')
+      WHERE media_url LIKE '%https:/%';
     `;
     await queryDB(query, []);
     logger.info('Database media URLs fixed');
@@ -66,7 +67,7 @@ const postController = {
     try {
       const userId = await getUserId(req);
       if (!userId) return res.status(401).json({ error: 'User authentication required' });
-
+      
       if (!req.file) {
         return res.status(400).json({ error: 'Media file required' });
       }
@@ -83,14 +84,14 @@ const postController = {
       }
 
       logger.info(`Request body:`, req.body);
-
+      
       const { content } = req.body;
       if (!content) {
         return res.status(400).json({ error: 'Content is required' });
       }
 
       const fileName = `post-${Date.now()}${path.extname(req.file.originalname)}`;
-
+      
       const { data, error } = await supabase.storage
         .from('posts')
         .upload(fileName, req.file.buffer, {
@@ -107,7 +108,7 @@ const postController = {
         .getPublicUrl(fileName);
 
       const mediaUrl = urlData.publicUrl;
-      logger.info(`Post media uploaded: ${mediaUrl}`);
+      logger.info(`Supabase getPublicUrl: bucket=posts, file=${fileName}, raw=${mediaUrl}, cleaned=${cleanUrl(mediaUrl)}`);
 
       const mediaType = req.file.mimetype.startsWith('video') ? 'video' : 'image';
 
@@ -116,7 +117,7 @@ const postController = {
         VALUES ($1, $2, $3, $4, NOW())
         RETURNING post_id, user_id, content, media_url, media_type, created_at
       `;
-      const values = [userId, content, mediaUrl, mediaType];
+      const values = [userId, content, cleanUrl(mediaUrl), mediaType];
       const result = await queryDB(query, values);
 
       const newPost = result[0];
@@ -148,15 +149,20 @@ const postController = {
         ORDER BY p.created_at DESC
       `;
       const posts = await queryDB(query, []);
-
-      res.json(posts.map(post => ({
-        ...post,
-        media_url: cleanUrl(post.media_url),
-        profile_picture: cleanUrl(post.profile_picture || ''),
-        name: post.name || post.username,
-        comment_count: Number(post.comment_count) || 0,
-        like_count: Number(post.like_count) || 0,
-      })));
+      const mappedPosts = posts.map(post => {
+        const cleanedMediaUrl = cleanUrl(post.media_url);
+        const cleanedProfilePicture = cleanUrl(post.profile_picture || '');
+        logger.info(`getAllPosts: Post ${post.post_id}: raw_media_url=${post.media_url}, cleaned_media_url=${cleanedMediaUrl}, raw_profile_picture=${post.profile_picture}, cleaned_profile_picture=${cleanedProfilePicture}`);
+        return {
+          ...post,
+          media_url: cleanedMediaUrl,
+          profile_picture: cleanedProfilePicture,
+          name: post.name || post.username,
+          comment_count: Number(post.comment_count) || 0,
+          like_count: Number(post.like_count) || 0,
+        };
+      });
+      res.json(mappedPosts);
     } catch (error) {
       logger.error(`Get all posts error: ${error.message}`);
       res.status(500).json({ error: 'Server error' });
@@ -166,15 +172,12 @@ const postController = {
   getMyPosts: async (req, res) => {
     try {
       let userId;
-
-      // Check if user_id is provided in query params (for testing or admin purposes)
       if (req.query.user_id) {
         userId = req.query.user_id;
         if (isNaN(userId)) {
           return res.status(400).json({ error: 'User ID must be a valid number' });
         }
       } else {
-        // Otherwise, get user_id from authenticated user
         userId = await getUserId(req);
         if (!userId) {
           return res.status(401).json({ error: 'User authentication required' });
@@ -193,15 +196,20 @@ const postController = {
       `;
       const values = [userId];
       const posts = await queryDB(query, values);
-
-      res.json(posts.map(post => ({
-        ...post,
-        media_url: cleanUrl(post.media_url),
-        profile_picture: cleanUrl(post.profile_picture || ''),
-        name: post.name || post.username,
-        comment_count: Number(post.comment_count) || 0,
-        like_count: Number(post.like_count) || 0,
-      })));
+      const mappedPosts = posts.map(post => {
+        const cleanedMediaUrl = cleanUrl(post.media_url);
+        const cleanedProfilePicture = cleanUrl(post.profile_picture || '');
+        logger.info(`getMyPosts: Post ${post.post_id}: raw_media_url=${post.media_url}, cleaned_media_url=${cleanedMediaUrl}, raw_profile_picture=${post.profile_picture}, cleaned_profile_picture=${cleanedProfilePicture}`);
+        return {
+          ...post,
+          media_url: cleanedMediaUrl,
+          profile_picture: cleanedProfilePicture,
+          name: post.name || post.username,
+          comment_count: Number(post.comment_count) || 0,
+          like_count: Number(post.like_count) || 0,
+        };
+      });
+      res.json(mappedPosts);
     } catch (error) {
       logger.error(`Get my posts error: ${error.message}`);
       res.status(error.message.includes('User ID') || error.message.includes('authentication') ? 400 : 500).json({ error: error.message });
@@ -343,21 +351,6 @@ const postController = {
     } catch (error) {
       logger.error(`Get comments error: ${error.message}`);
       res.status(error.message.includes('Post ID') ? 400 : 500).json({ error: error.message });
-    }
-  },
-
-  fixMediaURLs: async (req, res) => {
-    try {
-      const query = `
-        UPDATE posts
-        SET media_url = REGEXP_REPLACE(media_url, '//+[uU][pP][lL][oO][aA][dD][sS]', '/Uploads', 'i')
-        WHERE media_url ~* '//+[uU][pP][lL][oO][aA][dD][sS]';
-      `;
-      await queryDB(query, []);
-      res.status(200).json({ message: 'Media URLs normalized' });
-    } catch (error) {
-      logger.error(`Fix media URLs error: ${error.message}`);
-      res.status(500).json({ error: 'Server error' });
     }
   },
 
