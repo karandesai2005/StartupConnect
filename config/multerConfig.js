@@ -1,13 +1,7 @@
 const multer = require("multer");
 const sharp = require("sharp");
 const path = require("path");
-const fs = require("fs");
-
-// Ensure uploads directory exists
-const uploadDir = path.join(__dirname, "uploads");
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir);
-}
+const { supabase } = require("../services/supabase"); // Import Supabase client
 
 const memoryStorage = multer.memoryStorage();
 
@@ -25,23 +19,21 @@ const profileFileFilter = (req, file, cb) => {
 const postFileFilter = (req, file, cb) => {
   const isImage = imageTypes.has(file.mimetype);
   const isVideo = videoTypes.has(file.mimetype);
-
-  const fileExtension = file.originalname.split('.').pop().toLowerCase();
-  const isImageByExt = ['jpg', 'jpeg', 'png', 'gif', 'heic', 'heif'].includes(fileExtension);
-  const isVideoByExt = ['mp4', 'mov', 'quicktime'].includes(fileExtension);
+  const fileExtension = file.originalname.split(".").pop().toLowerCase();
+  const isImageByExt = ["jpg", "jpeg", "png", "gif", "heic", "heif"].includes(fileExtension);
+  const isVideoByExt = ["mp4", "mov"].includes(fileExtension);
 
   if (isImage || isVideo || isImageByExt || isVideoByExt) {
     if (!isImage && !isVideo) {
       if (isVideoByExt) {
-        file.mimetype = 'video/mp4';
-        file.media_type = 'video';
+        file.mimetype = "video/mp4";
+        file.media_type = "video";
       } else if (isImageByExt) {
-        // Convert HEIC/HEIF to JPEG, so set MIME type accordingly
-        file.mimetype = fileExtension === 'heic' || fileExtension === 'heif' ? 'image/jpeg' : `image/${fileExtension}`;
-        file.media_type = 'image';
+        file.mimetype = fileExtension === "heic" || fileExtension === "heif" ? "image/jpeg" : `image/${fileExtension}`;
+        file.media_type = "image";
       }
     } else {
-      file.media_type = isVideo ? 'video' : 'image';
+      file.media_type = isVideo ? "video" : "image";
     }
     return cb(null, true);
   } else {
@@ -54,7 +46,7 @@ const postFileFilter = (req, file, cb) => {
 
 const limits = {
   profile: { fileSize: 5 * 1024 * 1024 }, // 5MB
-  post: { fileSize: 100 * 1024 * 1024 }, // 100MB
+  post: { fileSize: 10 * 1024 * 1024 }, // 10MB for testing
 };
 
 const uploadProfilePicture = multer({
@@ -69,12 +61,15 @@ const uploadPostMedia = multer({
   limits: limits.post,
 }).single("media");
 
-// Example route handlers to process uploads with image conversion
+// Utility function to clean URLs
+const cleanUrl = (url) => {
+  if (!url) return url;
+  return url.replace(/\/+/g, "/").replace(/^http:/, "https:");
+};
+
+// Route handlers using Supabase storage
 const express = require("express");
 const router = express.Router();
-
-// Replace with your actual NGROK_URL or server URL
-const NGROK_URL = process.env.NGROK_URL || "http://localhost:3000";
 
 router.post("/upload-profile", uploadProfilePicture, async (req, res) => {
   try {
@@ -84,21 +79,29 @@ router.post("/upload-profile", uploadProfilePicture, async (req, res) => {
 
     let buffer = req.file.buffer;
     let contentType = req.file.mimetype;
-    let filename = req.file.originalname;
+    let filename = `${Date.now()}-${req.file.originalname}`;
 
     // Convert HEIC/HEIF to JPEG
     if (req.file.mimetype === "image/heic" || req.file.mimetype === "image/heif") {
-      buffer = await sharp(buffer).jpeg({ quality: 80 }).toBuffer();
+      buffer = await sharp(buffer).jpeg({ quality: 80, progressive: true }).toBuffer();
       contentType = "image/jpeg";
       filename = filename.replace(/\.(heic|heif)$/i, ".jpg");
     }
 
-    // Save file to disk (example); replace with your storage logic (e.g., S3)
-    const filePath = path.join(uploadDir, `${Date.now()}-${filename}`);
-    fs.writeFileSync(filePath, buffer);
+    // Upload to Supabase storage
+    const { data, error } = await supabase.storage
+      .from("profiles")
+      .upload(filename, buffer, { contentType });
 
-    // Generate URL for the file
-    const fileUrl = `${NGROK_URL}/uploads/${path.basename(filePath)}`;
+    if (error) {
+      console.error("Supabase upload error for profile picture:", error.message);
+      return res.status(500).json({ error: "Failed to upload profile picture" });
+    }
+
+    const { data: urlData } = supabase.storage.from("profiles").getPublicUrl(filename);
+    const fileUrl = cleanUrl(urlData.publicUrl);
+
+    console.log(`Profile picture uploaded: ${fileUrl}`);
 
     res.status(200).json({
       url: fileUrl,
@@ -119,22 +122,36 @@ router.post("/upload-post", uploadPostMedia, async (req, res) => {
 
     let buffer = req.file.buffer;
     let contentType = req.file.mimetype;
-    let filename = req.file.originalname;
+    let filename = `${Date.now()}-${req.file.originalname}`;
     const mediaType = req.file.media_type || (contentType.startsWith("video") ? "video" : "image");
 
     // Convert HEIC/HEIF to JPEG
     if (req.file.mimetype === "image/heic" || req.file.mimetype === "image/heif") {
-      buffer = await sharp(buffer).jpeg({ quality: 80 }).toBuffer();
+      buffer = await sharp(buffer).jpeg({ quality: 80, progressive: true }).toBuffer();
       contentType = "image/jpeg";
       filename = filename.replace(/\.(heic|heif)$/i, ".jpg");
     }
 
-    // Save file to disk (example); replace with your storage logic (e.g., S3)
-    const filePath = path.join(uploadDir, `${Date.now()}-${filename}`);
-    fs.writeFileSync(filePath, buffer);
+    // Validate video format for iOS (H.264)
+    if (mediaType === "video") {
+      // Note: Sharp cannot validate video codecs; consider using ffmpeg for validation
+      // For simplicity, assume MP4/MOV are H.264; add ffmpeg check if needed
+    }
 
-    // Generate URL for the file
-    const fileUrl = `${NGROK_URL}/uploads/${path.basename(filePath)}`;
+    // Upload to Supabase storage
+    const { data, error } = await supabase.storage
+      .from("posts")
+      .upload(filename, buffer, { contentType });
+
+    if (error) {
+      console.error("Supabase upload error for post media:", error.message);
+      return res.status(500).json({ error: "Failed to upload post media" });
+    }
+
+    const { data: urlData } = supabase.storage.from("posts").getPublicUrl(filename);
+    const fileUrl = cleanUrl(urlData.publicUrl);
+
+    console.log(`Post media uploaded: ${fileUrl}`);
 
     res.status(200).json({
       url: fileUrl,
