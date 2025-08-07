@@ -48,7 +48,7 @@ const LoginScreen = () => {
         const { data, error } = await supabase
           .from('users')
           .select('email')
-          .eq('username', emailToUse.toLowerCase()) // Use .eq and lowercase
+          .eq('username', emailToUse.toLowerCase())
           .limit(1);
         if (error) {
           console.error('Username query error:', error.message);
@@ -95,9 +95,9 @@ const LoginScreen = () => {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.keyboardAvoid}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20} // Adjusted for iOS
       >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <ScrollView
@@ -179,7 +179,6 @@ const LoginScreen = () => {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#fff" },
-  keyboardAvoid: { flex: 1 },
   container: {
     flexGrow: 1,
     justifyContent: "center",
@@ -238,7 +237,7 @@ const styles = StyleSheet.create({
   },
   appleButtonText: { marginLeft: 10, color: "#ffffff", fontSize: 16, fontWeight: "bold" },
   registerLink: { marginTop: 20 },
-  registerLinkText: { fontSize: 14, color: "#007BFF", textDecorationLine: "underline" },
+  registerLinkText: { fontSize: 14, color: "#007BFF", textDecorationLine: "underline", paddingTop: 10 },
 });
 
 export default LoginScreen;

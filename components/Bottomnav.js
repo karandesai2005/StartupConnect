@@ -44,7 +44,7 @@ export default function Bottomnav() {
           borderTopWidth: 0.5,
           borderTopColor: '#E0E0E0',
           backgroundColor: '#FFFFFF',
-          height: Platform.OS === 'ios' ? 80 + insets.bottom : 60 + insets.bottom,
+          height: Platform.OS === 'ios' ? 50 + insets.bottom : 60 + insets.bottom,
           zIndex: 10,
           paddingTop: 15,
         },

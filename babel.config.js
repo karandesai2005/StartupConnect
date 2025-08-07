@@ -1,5 +1,7 @@
 module.exports = {
   presets: ['babel-preset-expo'],
-  plugins: ['module:react-native-dotenv'],
+  plugins: [
+    'module:react-native-dotenv',
+    'react-native-reanimated/plugin', // 👈 MUST BE LAST!
+  ],
 };
-

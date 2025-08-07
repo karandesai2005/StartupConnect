@@ -1,9 +1,13 @@
 import React, { useState, useCallback, useEffect, useMemo } from "react";
 import {
+  PanGestureHandler,
+  State as GestureState,
+} from "react-native-gesture-handler";
+import { Image } from 'expo-image';
+import {
   StyleSheet,
   View,
   Text,
-  Image,
   TouchableOpacity,
   ActivityIndicator,
   FlatList,
@@ -511,7 +515,17 @@ const Profile = ({ route }) => {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+    <PanGestureHandler
+      onHandlerStateChange={({ nativeEvent }) => {
+        if (
+          nativeEvent.state === GestureState.END &&
+          nativeEvent.translationY < -100 // Swipe up threshold
+        ) {
+          navigation.navigate("DynamicGraphs");
+        }
+      }}
+    >
+      <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
       <StatusBar
         barStyle="dark-content"
         backgroundColor="#fff"
@@ -594,7 +608,8 @@ const Profile = ({ route }) => {
         windowSize={5}
       />
     </SafeAreaView>
-  );
+  </PanGestureHandler>
+);
 };
 
 const styles = StyleSheet.create({

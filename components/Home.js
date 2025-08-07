@@ -1,5 +1,6 @@
 
 import React, { useEffect, useState, useCallback, memo, useMemo } from "react";
+import { Image } from 'expo-image';
 import {
     View,
     Text,
@@ -7,7 +8,6 @@ import {
     ActivityIndicator,
     StyleSheet,
     TouchableOpacity,
-    Image,
     TextInput,
     Platform,
     Dimensions,
@@ -152,32 +152,6 @@ const PostCard = memo(
                 setIsVideo(true);
                 setImageHeight((width * 5) / 4);
                 setIsLoading(false);
-            } else {
-                if (isStringUrl && mediaUrl) {
-                    Image.getSize(
-                        mediaUrl,
-                        (originalWidth, originalHeight) => {
-                            const aspectRatio = originalWidth / originalHeight;
-                            setImageHeight(width / aspectRatio);
-                            setIsLoading(false);
-                            // console.log(
-                            //     `PostCard: Image size for post ${item.post_id || item.login?.uuid}:`,
-                            //     { width: originalWidth, height: originalHeight }
-                            // );
-                        },
-                        (error) => {
-                            console.error(
-                                `PostCard: Error getting image size for post ${item.post_id || item.login?.uuid}:`,
-                                error
-                            );
-                            setImageHeight(width);
-                            setIsLoading(false);
-                        }
-                    );
-                } else {
-                    setImageHeight(width);
-                    setIsLoading(false);
-                }
             }
         }, [item]);
 
@@ -433,6 +407,8 @@ const PostCard = memo(
             }
             return require("../assets/profiledefault.jpg");
         })();
+        const [avatarSource, setAvatarSource] = useState(profilePictureSource);
+
 
         // CHANGED: Debug transform
         // console.log(
@@ -454,15 +430,16 @@ const PostCard = memo(
                         <View style={styles.cardHeader}>
                             <View style={styles.userInfo}>
                                 <TouchableOpacity onPress={handleProfilePress}>
-                                    <Image
-                                        source={profilePictureSource}
-                                        style={styles.avatar}
-                                        onError={(e) =>
-                                            console.error(
-                                                `PostCard: Profile picture error for post ${item.post_id || item.login?.uuid}:`,
-                                                e.nativeEvent.error
-                                            )
-                                        }
+                                <Image
+                                    source={avatarSource}
+                                    style={styles.avatar}
+                                    onError={(e) => {
+                                        console.error(
+                                        `PostCard: Profile picture error for post ${item.post_id || item.login?.uuid}:`,
+                                        e.nativeEvent.error
+                                        );
+                                        setAvatarSource(require("../assets/profiledefault.jpg")); // ✅ make sure file exists
+                                    }}
                                     />
                                 </TouchableOpacity>
                                 <View>
@@ -493,11 +470,7 @@ const PostCard = memo(
                         onPress={handleDoubleTap}
                     >
                         <View style={[styles.imageContainer, { height: imageHeight }]}>
-                            {isLoading && (
-                                <View style={styles.imageLoader}>
-                                    <ActivityIndicator size="large" color="#007AFF" />
-                                </View>
-                            )}
+                            
                             {isVideo ? (
                                 <Video
                                     ref={videoRef}
@@ -526,22 +499,10 @@ const PostCard = memo(
                                 />
                             ) : (
                                 <Image
+                                style={[styles.postImage, { height: imageHeight }]}
                                     source={mediaSource}
-                                    style={[styles.postImage, { height: imageHeight }]}
-                                    resizeMode="cover"
-                                    onLoad={() => {
-                                        setIsLoading(false);
-                                        // console.log(
-                                        //     `PostCard: Image loaded for post ${item.post_id || item.login?.uuid}`
-                                        // );
-                                    }}
-                                    onError={(e) => {
-                                        console.error(
-                                            `PostCard: Image loading error for post ${item.post_id || item.login?.uuid}:`,
-                                            e.nativeEvent.error
-                                        );
-                                        setIsLoading(false);
-                                    }}
+                                    contentFit="cover"
+                                    //style={{ width: 300, height: 200, borderRadius: 10 }}
                                 />
                             )}
                         </View>
@@ -1094,12 +1055,12 @@ export default function Home() {
 
                     </TouchableOpacity>
                     <View style={styles.iconsContainer}>
-                        <TouchableOpacity onPress={() => navigation.navigate('Messages')}>
-                            <Image
-                                source={require("../assets/Arrow.png")}
-                                style={styles.chatIcon}
-                            />
-                        </TouchableOpacity>
+                    <TouchableOpacity onPress={() => navigation.navigate('Messages')}>
+                        <Image
+                            source={require("../assets/Arrow.png")}
+                            style={styles.chatIcon}
+                        />
+                    </TouchableOpacity>
                         <TouchableOpacity
                             style={styles.iconSpacing}
                             onPress={() => {

@@ -925,7 +925,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingVertical: 5,
+    paddingVertical: 15,
     borderBottomWidth: 1,
     borderBottomColor: '#E9ECEF',
     backgroundColor: 'white',
