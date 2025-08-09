@@ -1,6 +1,7 @@
 const { supabase } = require("../services/supabase");
 const { queryDB } = require("../config/db");
 const logger = require("../logger");
+const path = require('path');
 
 // Constants
 const MAX_FILE_SIZE_POST = 10 * 1024 * 1024; // 10MB for testing
