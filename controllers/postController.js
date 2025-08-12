@@ -336,6 +336,53 @@ const postController = {
       res.status(500).json({ error: "Server error" });
     }
   },
+
+  deletePost: async (req, res) => {
+  try {
+    const userId = await getUserId(req);
+    const { postId } = req.params;
+    
+    // Validate postId
+    if (!postId || isNaN(postId)) {
+      return res.status(400).json({ error: "Invalid post ID" });
+    }
+    
+    // Fetch the post and check ownership
+    const postQuery = "SELECT user_id, media_url FROM posts WHERE post_id = $1";
+    const postResult = await queryDB(postQuery, [postId]);
+    
+    if (postResult.length === 0) {
+      return res.status(404).json({ error: "Post not found" });
+    }
+    
+    const post = postResult[0];
+    if (post.user_id !== userId) {
+      return res.status(403).json({ error: "You are not authorized to delete this post" });
+    }
+    
+    // Delete media from storage if exists
+    if (post.media_url) {
+      const fileName = post.media_url.split('/').pop();
+      const { error: storageError } = await supabase.storage
+        .from('posts')
+        .remove([fileName]);
+      if (storageError) {
+        console.warn("Failed to delete media from storage:", storageError.message);
+      }
+    }
+    
+    // Delete the post from DB
+    const deleteQuery = "DELETE FROM posts WHERE post_id = $1";
+    await queryDB(deleteQuery, [postId]);
+    
+    res.status(200).json({ message: "Post deleted successfully" });
+    
+  } catch (error) {
+    console.error("Delete post error:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+}
+
 };
 
 module.exports = postController;
