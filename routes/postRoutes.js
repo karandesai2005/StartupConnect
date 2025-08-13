@@ -51,9 +51,9 @@ router.route('/all')
 router.route('/myposts')
   .get(authenticateJWT, debugMiddleware, postController.getMyPosts);
 
-// Delete post route
-router.route('/:postId')
-  .delete(authenticateJWT, debugMiddleware, postController.deletePost);
+// // Delete post route
+// router.route('/:postId')
+//   .delete(authenticateJWT, debugMiddleware, postController.deletePost);
 
 // Like Routes
 router.route('/:postId/likes')
