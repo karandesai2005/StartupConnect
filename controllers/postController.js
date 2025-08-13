@@ -378,9 +378,9 @@ const postController = {
       await queryDB(deleteLikesQuery, [postId]);
       // --- NEW CODE END ---
 
-      // // 3. Finally, delete the post itself
-      // const deletePostQuery = "DELETE FROM posts WHERE post_id = $1";
-      // await queryDB(deletePostQuery, [postId]);
+      // 3. Finally, delete the post itself
+      const deletePostQuery = "DELETE FROM posts WHERE post_id = $1";
+      await queryDB(deletePostQuery, [postId]);
 
       res.status(200).json({ message: "Post deleted successfully" });
 
