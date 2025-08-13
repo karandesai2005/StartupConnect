@@ -289,7 +289,7 @@ export default function SettingsScreen() {
 
               while (retryCount < maxRetries) {
                 try {
-                  await axios.delete(`${baseUrl}/api/delete-account`, { headers });
+                  await axios.delete(`${baseUrl}/api/auth/delete-account`, { headers });
                   await AsyncStorage.multiRemove(['token', 'userData']);
                   navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
                   break;

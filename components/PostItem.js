@@ -311,8 +311,8 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
   const toggleCommentModal = () => setIsCommentModalVisible((prev) => !prev);
   const toggleMoreModal = () => setIsMoreModalVisible((prev) => !prev);
   const handleDoubleTap = () => debouncedHandleLike();
-  const handlePressIn = () => Animated.spring(animatedScale, { toValue: 0.98, useNativeDriver: true }).start();
-  const handlePressOut = () => Animated.spring(animatedScale, { toValue: 1, useNativeDriver: true }).start();
+  const handlePressIn = () => Animated.spring(animatedScale, { toValue: 0.98, useNativeDriver: false }).start();
+  const handlePressOut = () => Animated.spring(animatedScale, { toValue: 1, useNativeDriver: false }).start();
 
   const handleTextLayout = (event) => {
     const { height } = event.nativeEvent.layout;
@@ -485,7 +485,7 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
         style={styles.commentModal}
         animationIn="fadeIn"
         animationOut="fadeOut"
-        useNativeDriver={true}
+        useNativeDriver={false}
         avoidKeyboard={true}
       >
         <View style={styles.commentModalContent}>
@@ -539,7 +539,7 @@ const PostItem = memo(({ item, index, currentUsername, isVisible, expandedItems,
         style={styles.moreModal}
         animationIn="slideInUp"
         animationOut="slideOutDown"
-        useNativeDriver={true}
+        useNativeDriver={false}
       >
         <View style={styles.moreModalContent}>
           {isUserPost && (
