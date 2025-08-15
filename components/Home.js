@@ -619,13 +619,7 @@ const PostCard = memo(
                                         <Text style={styles.closeButtonText}>Close</Text>
                                     </TouchableOpacity>
                                 </View>
-                                {isCommentsLoading ? (
-                                    <ActivityIndicator
-                                        size="large"
-                                        color="#007AFF"
-                                        style={styles.commentLoader}
-                                    />
-                                ) : (
+
                                     <FlatList
                                         data={comments}
                                         renderItem={({ item }) => (
@@ -646,7 +640,7 @@ const PostCard = memo(
                                             <Text style={styles.noCommentsText}>No comments yet.</Text>
                                         }
                                     />
-                                )}
+                                
                                 <View style={styles.commentInputContainer}>
                                     <TextInput
                                         style={styles.commentInput}
@@ -1057,7 +1051,7 @@ export default function Home() {
                     <View style={styles.iconsContainer}>
                     <TouchableOpacity onPress={() => navigation.navigate('Messages')}>
                         <Image
-                            source={require("../assets/Arrow.png")}
+                            source={require("../assets/send.png")}
                             style={styles.chatIcon}
                         />
                     </TouchableOpacity>

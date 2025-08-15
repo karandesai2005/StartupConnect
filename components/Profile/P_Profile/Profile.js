@@ -183,7 +183,7 @@ const GridItem = React.memo(({ item, index, itemSize, onPress }) => {
     >
       {isMediaLoading && !mediaError && (
         <View style={styles.gridItem}>
-          <ActivityIndicator size="small" color="#007BFF" />
+          <ActivityIndicator size="small" color="black" />
         </View>
       )}
       {mediaError ? (
@@ -509,7 +509,7 @@ const Profile = ({ route }) => {
   if (isLoading || !currentUser || !userData) {
     return (
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-        <ActivityIndicator size="large" color="#007BFF" />
+        <ActivityIndicator size="large" color="#black" />
       </SafeAreaView>
     );
   }

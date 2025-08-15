@@ -54,50 +54,57 @@ export default function CreatePostScreen() {
       () => setKeyboardVisible(false)
     );
 
-    const fetchUserProfile = async () => {
-      try {
-        setIsLoadingUsername(true);
-        const cachedUserData = await AsyncStorage.getItem("userData");
-        if (cachedUserData) {
-          const userData = JSON.parse(cachedUserData);
-          setUsername(userData.username || "User");
-          setProfilePic(
-            userData.profile_picture
-              ? `${NGROK_URL}${userData.profile_picture}`
-              : null
-          );
-          setIsLoadingUsername(false);
-          return;
-        }
-        const token = await AsyncStorage.getItem("token");
-        if (!token) throw new Error("No authentication token found");
+const fetchUserProfile = async () => {
+  try {
+    setIsLoadingUsername(true);
+    const cachedUserData = await AsyncStorage.getItem("userData");
+    if (cachedUserData) {
+      const userData = JSON.parse(cachedUserData);
+      setUsername(userData.username || "User");
+      setProfilePic(
+        userData.profile_picture
+          ? `${NGROK_URL}${userData.profile_picture}`
+          : null
+      );
+      setIsLoadingUsername(false);
+      return;
+    }
 
-        const response = await fetch(`${NGROK_URL}/api/auth/profile`, {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-            "Cache-Control": "no-cache",
-          },
-        });
+    const token = await AsyncStorage.getItem("token");
+    if (!token) throw new Error("No authentication token found");
 
-        if (!response.ok) throw new Error("Failed to fetch profile");
+    const apiUrl = `${NGROK_URL}/api/auth/profile`;
+    console.log("fetchUserProfile: Fetching from", apiUrl);
 
-        const profileData = await response.json();
-        setUsername(profileData.username || "User");
-        if (profileData.profile_picture) {
-          const profilePicUrl = `${NGROK_URL}${profileData.profile_picture}`;
-          setProfilePic(profilePicUrl);
-        }
-        await AsyncStorage.setItem("userData", JSON.stringify(profileData));
-      } catch (error) {
-        console.error("Error fetching profile:", error);
-        setUsername("User");
-        setProfilePic(null);
-      } finally {
-        setIsLoadingUsername(false);
-      }
-    };
+    const response = await fetch(apiUrl, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        "Cache-Control": "no-cache",
+      },
+    });
+
+    if (!response.ok) throw new Error("Failed to fetch profile");
+
+    const profileData = await response.json();
+    console.log("Profile API raw data:", profileData);
+
+    setUsername(profileData.username || "User");
+    if (profileData.profile_picture) {
+      const profilePicUrl = `${NGROK_URL}${profileData.profile_picture}`;
+      setProfilePic(profilePicUrl);
+    }
+    await AsyncStorage.setItem("userData", JSON.stringify(profileData));
+  } catch (error) {
+    console.error("Error fetching profile:", error);
+    setUsername("User");
+    setProfilePic(null);
+  } finally {
+    setIsLoadingUsername(false);
+  }
+};
+
 
     fetchUserProfile();
 

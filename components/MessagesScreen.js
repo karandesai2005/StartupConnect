@@ -235,8 +235,19 @@ const MessagesScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Messages</Text>
+      <View style={styles.parallel}>
+        <TouchableOpacity
+                onPress={() =>
+                  navigation.reset({ index: 0, routes: [{ name: "Main" }] })
+                }
+                style={styles.backButton}
+              >
+                <Text style={styles.backButtonText}>←</Text>
+              </TouchableOpacity> 
+
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Messages</Text>
+        </View>
       </View>
       {loading ? (
         <ActivityIndicator size="large" color="#007AFF" style={styles.loader} />
@@ -259,17 +270,20 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   header: {
-    paddingHorizontal: 15,
-    paddingVertical: 10,
+    paddingVertical: 15,
+    paddingHorizontal: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
-    backgroundColor: '#fff',
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#000',
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#1a1a1a',
+    fontFamily: 'AvenirNextCyr',
   },
+  backButton: { position: "absolute", left: 10, top: 10, zIndex: 1 }, // Adjusted left and top for better positioning
+  backButtonText: { fontSize: 32, color: "#000", marginRight: 9 },
+  parallel: {paddingHorizontal: 35},
   chatItem: {
     flexDirection: 'row',
     padding: 15,

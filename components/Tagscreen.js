@@ -247,6 +247,10 @@ export default function SelectTagsScreen() {
       Alert.alert("Upload Failed", errorMessage);
     } finally {
       setLoading(false);
+      navigation.reset({
+        index: 0,
+        routes: [{ name: "Main" }],
+      });
     }
   };
 
@@ -341,7 +345,7 @@ const styles = StyleSheet.create({
   },
   postButtonDisabled: { backgroundColor: "#0095f660" },
   postButtonText: { fontSize: 16, fontWeight: "600", color: "#fff" },
-  scrollContainer: { paddingHorizontal: 16, paddingBottom: 20, flexGrow: 1 }, // Added paddingHorizontal and paddingBottom
+  scrollContainer: { paddingHorizontal: 16, paddingBottom: 20, flexGrow: 1, paddingTop: 20 }, // Added paddingHorizontal and paddingBottom
   tagsContainer: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   tagButton: {
     paddingVertical: 8,
