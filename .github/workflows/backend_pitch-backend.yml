@@ -18,29 +18,29 @@ jobs:
       contents: read
 
     steps:
-      # 1️⃣ Checkout repo
+      # 1️⃣ Checkout repository
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # 2️⃣ Use Node.js 18 (stable for EB)
+      # 2️⃣ Set Node.js version (stable for Elastic Beanstalk)
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '18.x'
 
-      # 3️⃣ Install deps
+      # 3️⃣ Install dependencies
       - name: Install dependencies
         run: npm install
 
-      # 4️⃣ Build (optional)
+      # 4️⃣ Build (if present)
       - name: Build
         run: npm run build --if-present
 
-      # 5️⃣ Test (optional)
+      # 5️⃣ Test (if present)
       - name: Test
         run: npm test --if-present
 
-      # 6️⃣ Zip backend only (exclude mobile + git junk)
+      # 6️⃣ Package application (exclude junk + mobile)
       - name: Package application
         run: |
           zip -r app.zip . \
@@ -63,20 +63,20 @@ jobs:
           VERSION_LABEL="${GITHUB_SHA::8}-$(date +%s)"
 
           echo "Uploading bundle to S3..."
-          aws s3 cp app.zip s3://elasticbeanstalk-eu-north-1-940420095386/app-$VERSION_LABEL.zip
+          aws s3 cp app.zip s3://elasticbeanstalk-eu-north-1-655356399713/app-$VERSION_LABEL.zip
 
           echo "Creating application version..."
           aws elasticbeanstalk create-application-version \
             --application-name pitch-backend \
             --version-label "$VERSION_LABEL" \
-            --source-bundle S3Bucket="elasticbeanstalk-eu-north-1-940420095386",S3Key="app-$VERSION_LABEL.zip"
+            --source-bundle S3Bucket="elasticbeanstalk-eu-north-1-655356399713",S3Key="app-$VERSION_LABEL.zip"
 
           echo "Updating environment..."
           aws elasticbeanstalk update-environment \
             --environment-name Pitch-backend-env \
             --version-label "$VERSION_LABEL"
 
-      # 9️⃣ Expose environment URL
+      # 9️⃣ Output environment URL
       - name: Check Environment URL
         id: check-env-url
         run: |
