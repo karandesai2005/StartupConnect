@@ -9,66 +9,75 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     environment:
-      name: 'Production'
+      name: Production
       url: ${{ steps.check-env-url.outputs.webapp-url }}
+
     permissions:
-      id-token: write
       contents: read
 
     steps:
+      # 1️⃣ Checkout repo
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Set up Node.js version
+      # 2️⃣ Use Node.js 18 (stable for EB)
+      - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '22.x'
+          node-version: '18.x'
 
+      # 3️⃣ Install deps
       - name: Install dependencies
         run: npm install
 
-      - name: Build (if applicable)
+      # 4️⃣ Build (optional)
+      - name: Build
         run: npm run build --if-present
 
-      - name: Test (if applicable)
-        run: npm run test --if-present
+      # 5️⃣ Test (optional)
+      - name: Test
+        run: npm test --if-present
 
+      # 6️⃣ Zip backend only (exclude mobile + git junk)
       - name: Package application
         run: |
-          zip -r app.zip . -x "*.git*"
+          zip -r app.zip . \
+            -x "*.git*" \
+            -x "node_modules/*" \
+            -x "android/*" \
+            -x "ios/*"
 
+      # 7️⃣ Configure AWS credentials
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-south-1
+          aws-region: eu-north-1
 
+      # 8️⃣ Deploy to Elastic Beanstalk
       - name: Deploy to Elastic Beanstalk
-        id: deploy-to-beanstalk
         run: |
-          # Generate a unique version label by appending the current timestamp to $GITHUB_SHA
-          VERSION_LABEL="$GITHUB_SHA-$(date +%s)"
-          
-          # Upload the app.zip to S3 with the unique version label
-          aws s3 cp app.zip s3://elasticbeanstalk-ap-south-1-940420095386/app-$VERSION_LABEL.zip
-          
-          # Create a new application version with the unique version label
+          VERSION_LABEL="${GITHUB_SHA::8}-$(date +%s)"
+
+          echo "Uploading bundle to S3..."
+          aws s3 cp app.zip s3://elasticbeanstalk-eu-north-1-940420095386/app-$VERSION_LABEL.zip
+
+          echo "Creating application version..."
           aws elasticbeanstalk create-application-version \
             --application-name pitch-backend \
-            --version-label $VERSION_LABEL \
-            --source-bundle S3Bucket="elasticbeanstalk-ap-south-1-940420095386",S3Key="app-$VERSION_LABEL.zip"
-          
-          # Update the environment with the new version label
+            --version-label "$VERSION_LABEL" \
+            --source-bundle S3Bucket="elasticbeanstalk-eu-north-1-940420095386",S3Key="app-$VERSION_LABEL.zip"
+
+          echo "Updating environment..."
           aws elasticbeanstalk update-environment \
             --environment-name Pitch-backend-env \
-            --version-label $VERSION_LABEL
-        env:
-          AWS_REGION: ap-south-1
+            --version-label "$VERSION_LABEL"
 
+      # 9️⃣ Expose environment URL
       - name: Check Environment URL
         id: check-env-url
         run: |
-          echo "webapp-url=https://Pitch-backend-env.eba-4n4stnmn.ap-south-1.elasticbeanstalk.com" >> $GITHUB_OUTPUT
-#PUSH CHANGE1
+          echo "webapp-url=https://pitch-backend-env.eba-wbunutja.eu-north-1.elasticbeanstalk.com" >> $GITHUB_OUTPUT
